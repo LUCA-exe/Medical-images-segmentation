@@ -6,7 +6,7 @@
 
 import os
 
-def set_up_info_logging():
+def create_info_logging():
   """Function to set up the high-level logging
   """ 
   log_folder_path = Path("logs")
