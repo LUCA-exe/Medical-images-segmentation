@@ -7,13 +7,18 @@ Helpful resources:
     - 
 """
 
-from utils import create_info_logging
+from utils import create_logging
 from parser import get_parser, get_processed_args
 
 def main():
   """ Main function to call in order to run all the project classes and functions
   """
-  log_file = set_up_logging()
+  log = create_logging()
+
+  # DEBUG
+  log.INFO("prova info")
+  log.DEBUG("prova debug")
+
   args = get_parser().parse_args()
   args = get_processed_args(args)
 
@@ -22,4 +27,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

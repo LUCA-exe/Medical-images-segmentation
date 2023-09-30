@@ -5,33 +5,47 @@
 """
 
 import os
+import logging
+import datetime
 
-def create_info_logging():
-  """Function to set up the high-level logging
+LOGS_PATH = "logs" # Const as the path is fixed
+
+def create_logging():
+  """ Function to set up the 'INFO' and 'DEBUG' log file
   """ 
-  log_folder_path = Path("logs")
-  if not log_folder_path.exists():
-    log_folder_path.mkdir(parents=True)
-    print("Logs folder created.")
-  else:
-    print("Logs folder already exists.")
+  os.makedirs(LOGS_PATH, exist_ok=True)
 
   # Get the current date and time
   current_datetime = datetime.now()
-  # Extract the date, hour, and minute components as strings
-  current_date = current_datetime.strftime("%Y-%m-%d")
-  current_hour = current_datetime.strftime("%H")
-  current_minute = current_datetime.strftime("%M")
-  log_file_name = f"log_{current_date}_{current_hour}_{current_minute}.log"
 
-  # Create the file path
-  file_path = Path(log_folder_path) / log_file_name
-  file_path_str = str(file_path)
+  # Extract the date and  hour, and minute components for the sub-folder
+  current_date = current_datetime.strftime("%Y-%m-%d") 
+  day_log_path = os.path.join(LOGS_PATH, current_date) # Folder for the day's logs
+  os.makedirs(day_log_path, exist_ok=True)
 
-  # Save the file
-  try:
-    logging.basicConfig(filename=file_path_str, filemode='w', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-  except AssertionError as error:
-    print(f"Can't create log file >>> Error: {error}")
+  current_time = current_datetime.strftime("%H-%M-%S") 
+  run_log_folder_path = os.path.join(day_log_path, current_time) # Specific folder for a run
   
-  return file_path_str # Return to pass the file to the Trainer class
+  info_log_file = f"info_{current_time}.log"
+  debug_log_file = f"debug_{current_time}.log"
+
+  # Set up handlers
+  info_handler = logging.FileHandler(info_log_file)
+  info_handler.setLevel(logging.INFO)
+  debug_handler = logging.FileHandler(debug_log_file)
+  debug_handler.setLevel(logging.DEBUG)
+
+  # Set up single logger (info and debug)
+  logger = logging.getLogger('Logger')
+  logger.setLevel(logging.DEBUG) # Lower level for the two handlers
+
+  # Set up the format messages
+  log_format = logging.Formatter('%(asctime)s - %(levelname)s : %(message)s')
+  info_handler.setFormatter(log_format)
+  debug_handler.setFormatter(log_format)
+
+  # Add the handlers to the loggers
+  logger.addHandler(info_handler)
+  logger.addHandler(debug_handler)
+
+  return logger
