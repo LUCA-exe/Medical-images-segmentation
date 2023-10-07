@@ -1,31 +1,35 @@
-"""main.py
+"""main_img.py
 
-This is the main executable file for running the Time series analysis code.
-Processing and analysis of time series and  Training/validation/testing of the models occurs from this entrypoint.
-
-Helpful resources:
-    - 
+This is the main executable file for running the processing of images functions.
 """
 
-from utils import create_logging, download_images
-from parser import get_parser, get_processed_args
+class images_processor:
 
-def main():
-  """ Main function to call in order to run all the project classes and functions
+  def __init__(self, env, args):
+
+    self.env = env # Load overall dicts to be used along the class
+    self.args = args
+
+
+  def compute_signals(self, split='all'):
+    """ Load the images from a single split or multiple and compute for every one Its properties
+
+    Args:
+        split (str): What split to take in order to compute the images
+
+    Returns:
+        None 
   """
-  log = create_logging() # Set up 'logger' object 
 
-  args = get_parser().parse_args() # Set up dict arguments
-  args = get_processed_args(args)
-  
-  env = {} # TODO: Load this from a '.json' file
-  env['logger'] = log # Move the object through 'env' dict
+  # Util functions
 
-  log.info(f"args: {args}") # Print overall args 
-  log.debug(f"env: {env}")
+  def __load_image__(image_folder): # Util function of this class. Check if this pattern make sense
+    """ Load the single channel or multiple channels of the required image.
+        It return a dict with id and all the different images for each 'version' (only nuclei, only boundaries etc ..)
 
-  download_images(env, args) # Set up the images folder
-  
+    Args:
+        image_folder (str): Path to the different version of the image
 
-if __name__ == "__main__":
-    main()
+    Returns:
+        dict: {'id': image_folder, 'dapi': Image object, 'fitc': image object .. }
+  """

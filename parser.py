@@ -20,10 +20,9 @@ def get_parser():
                         help="Path to donwload images (both single images and video frame)")
 
   parser.add_argument("--images_mode", # If required is True why put a 'default' param?
-                        default="single",
-                        #required=True, 
+                        default="single-frame",
                         type=str,
-                        choices=["single", "time_lapse"],
+                        choices=["single-frame", "multiple_frames"],
                         help="Which folder to access")
 
   # WARNING: Usless in trial phase.
