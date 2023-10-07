@@ -16,14 +16,13 @@ def main():
   log = create_logging()
 
   # DEBUG
-  log.INFO("prova info")
-  log.DEBUG("prova debug")
+  log.info("prova info")
+  log.debug("prova debug")
 
   args = get_parser().parse_args()
   args = get_processed_args(args)
 
   print("args: \n")
-  pprint.pprint(args)
 
 if __name__ == "__main__":
     main()

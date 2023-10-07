@@ -6,9 +6,9 @@
 
 import os
 import logging
-import datetime
+from datetime import datetime
 
-LOGS_PATH = "logs" # Const as the path is fixed
+LOGS_PATH = "logs" # TODO: Const as the path is fixed. Move this in a 'ENV' dict 
 
 def create_logging():
   """ Function to set up the 'INFO' and 'DEBUG' log file
@@ -24,15 +24,20 @@ def create_logging():
   os.makedirs(day_log_path, exist_ok=True)
 
   current_time = current_datetime.strftime("%H-%M-%S") 
-  run_log_folder_path = os.path.join(day_log_path, current_time) # Specific folder for a run
+  run_log_path = os.path.join(day_log_path, current_time) # Specific folder for a run
+  os.makedirs(run_log_path, exist_ok=True)
   
   info_log_file = f"info_{current_time}.log"
   debug_log_file = f"debug_{current_time}.log"
-
+  
+  # Complete paths for the logs file
+  info_log_path = os.path.join(run_log_path, info_log_file)
+  debug_log_path = os.path.join(run_log_path, debug_log_file)
+  
   # Set up handlers
-  info_handler = logging.FileHandler(info_log_file)
+  info_handler = logging.FileHandler(info_log_path)
   info_handler.setLevel(logging.INFO)
-  debug_handler = logging.FileHandler(debug_log_file)
+  debug_handler = logging.FileHandler(debug_log_path)
   debug_handler.setLevel(logging.DEBUG)
 
   # Set up single logger (info and debug)

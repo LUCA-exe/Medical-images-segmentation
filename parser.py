@@ -3,7 +3,7 @@
 - Configuration of the parameters.
 """
 
-import configargparse
+from argparse import ArgumentParser
 
 def get_parser():
   """ Standard function to load the parameters
@@ -11,7 +11,7 @@ def get_parser():
     Returns:
         Object: parser
   """
-  parser = configargparse.ArgumentParser(description="Medical images segmentation")
+  parser = ArgumentParser(description="Medical images segmentation")
 
   # Path arguments
   parser.add_argument("--images_path",
