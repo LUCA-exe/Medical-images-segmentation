@@ -6,16 +6,17 @@ Processing and analysis of time series and  Training/validation/testing of the m
 Helpful resources:
     - 
 """
-
 from utils import create_logging, download_images
 from parser import get_parser, get_processed_args
+from img_processing.main_img import *
+
 
 def main():
   """ Main function to call in order to run all the project classes and functions
   """
   log = create_logging() # Set up 'logger' object 
 
-  args = get_parser().parse_args() # Set up dict arguments
+  args = get_parser() # Set up dict arguments
   args = get_processed_args(args)
   
   env = {} # TODO: Load this from a '.json' file
@@ -26,6 +27,9 @@ def main():
 
   download_images(env, args) # Set up the images folder
   
+  processor = images_processor(env, args)
+  processor.process_images()
+
 
 if __name__ == "__main__":
     main()

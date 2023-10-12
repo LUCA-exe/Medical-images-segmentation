@@ -45,9 +45,10 @@ def create_logging():
   logger.setLevel(logging.DEBUG) # Lower level for the two handlers
 
   # Set up the format messages
-  log_format = logging.Formatter('%(asctime)s - %(levelname)s   %(message)s')
-  info_handler.setFormatter(log_format)
-  debug_handler.setFormatter(log_format)
+  log_info_format = logging.Formatter('%(asctime)s - %(levelname)s   %(message)s')
+  log_debug_format = logging.Formatter('%(asctime)s - %(levelname)s  %(message)s')
+  info_handler.setFormatter(log_info_format)
+  debug_handler.setFormatter(log_debug_format)
 
   # Add the handlers to the loggers
   logger.addHandler(info_handler)

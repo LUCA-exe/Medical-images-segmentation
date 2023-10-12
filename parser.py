@@ -15,7 +15,7 @@ def get_parser():
 
   # Path arguments
   parser.add_argument("--images_path",
-                        default="images/",
+                        default="dataset/",
                         type=str,
                         help="Path to donwload images (both single images and video frame)")
 
@@ -27,12 +27,13 @@ def get_parser():
 
   # WARNING: Usless in trial phase.
   parser.add_argument("--link_images", # TODO: Move this to a 'config.json' or other options
-                                       # For now download from my private google drive.. this arg. unused
+                                       # For now download from my private google drive.. this arg. is temporary unused
                         required=True, 
                         type=str,
                         help="Link to download the dataset")
                         
-  return parser
+  args = parser.parse_args()
+  return args
 
 
 def get_processed_args(args):
