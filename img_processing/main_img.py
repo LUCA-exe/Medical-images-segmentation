@@ -4,8 +4,9 @@ This is the main executable file for running the processing of images functions.
 """
 
 import os
+import tifffile as tiff
 from collections import defaultdict
-from imageUtils.py import *
+from img_processing.imageUtils import * # Remember to write the path the the 'importer' of this file is calling
 
 class images_processor:
 
@@ -85,6 +86,14 @@ class images_processor:
         for file_name in images_files_path:
             # gather all the signals for a specific image
             split_data[file_name] = __get_cr()'''
-        
+
+        print(f"image path {image_path}")
+        print(f"image path {mask_path}")
+
+        image = tiff.imread(image_path)
+        mask = tiff.imread(mask_path)
+        print(f"Image shape: {image.shape}")
+        print(f"Mask shape: {mask.shape}")
+
         return None
             

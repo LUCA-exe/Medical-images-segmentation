@@ -9,16 +9,19 @@ import os
 
 # TODO: Save the images in tmp folder to visualize them
 
-def visualize_raw_mask(mask):
+def visualize_mask(mask, file_path):
     fig, axs = plt.subplots(1, 2, figsize=(12, 12))
     mask = np.ma.masked_array(mask, mask==0)
     axs[0].imshow(np.squeeze(mask)) # Raw mask
     axs[0].axis('off')
+
     axs[1].imshow(np.squeeze(mask), cmap='gray') # The segmentation map as a grey scale image
     axs[1].axis('off')
+    
     fig.tight_layout()
+    plt.savefig(file_path)
 
-def visualize_raw_res(image, mask):
+def visualize_raw_res(image, mask, file_path):
     fig, axs = plt.subplots(1, 3, figsize=(12, 12))
     axs[0].imshow(np.squeeze(image)) # The visualization 'cmap' can be changed depending on the type of visualization for the 'raw' pixel value
     axs[0].axis('off')
@@ -31,6 +34,7 @@ def visualize_raw_res(image, mask):
     axs[2].axis('off')
 
     fig.tight_layout()
+    plt.savefig(file_path)
 
 
 # Util functions
@@ -59,12 +63,11 @@ def fetch_image_path(mask_path, images_folder):
     images_name = os.listdir(images_folder)
     for image_name in images_name: # Search for the correct image name
 
-        p_name = image_name.split('t')[-1]
-        if p_name == os.path.basename(mask_path)
-
-
-
-
-
+        p_name = image_name[1:]
+        if p_name == os.path.basename(mask_path).split('seg')[-1]:
+            # Proper image path found!
+            return image_name
+    
+    return None # ERROR: Name not found!
 
 
