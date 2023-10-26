@@ -85,15 +85,18 @@ class images_processor:
         mask = tiff.imread(mask_path)
 
         # TODO: Check if the mask has to be modified already here
-        print(f"Mask type: {type(mask)}")
-        print(f"Mask shape: {mask.shape}")
-        print(f"Few values of the mask {mask[:, :20]}")
-        boolean_mask = mask == 0 # Create a boolean matrix
-        mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
-        print(f"Few values of the mask {mask.shape}")
-        print(f"Few values of the mask {mask[:, :20]}")
-        print(f"{type(mask[0,0])}")
-        exit(1)
+        #print(f"Mask type: {type(mask)}")
+        #print(f"Mask shape: {mask.shape}")
+        #print(f"Few values of the mask {mask[:, :20]}")
+        boolean_mask = mask != 0 # Create a boolean matrix
+
+        obj_pixels = len(mask[boolean_mask]) # Pixels belonging to segmented objects considered
+        tot_pixels = mask.shape[0] * mask.shape[1]
+        print(f"Signal to noise ratio: {obj_pixels/tot_pixels * 100} %")
+        #exit(1)
+        #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
+        
+        
         # WORK IN PROGRESS: Init. segmenting the original to gather the signals
         #img2 = cv2.drawContours(img, multiple_ab, -1, (255,255,255), -1)
 
