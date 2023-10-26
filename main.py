@@ -1,7 +1,6 @@
 """main.py
 
-This is the main executable file for running the Time series analysis code.
-Processing and analysis of time series and  Training/validation/testing of the models occurs from this entrypoint.
+This is a temporary main executable file for running the repository.
 
 Helpful resources:
     - 
@@ -28,7 +27,7 @@ def main():
   download_images(env, args) # Set up the images folder
   
   processor = images_processor(env, args)
-  processor.process_images()
+  processor.collect_signals()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ This is the main executable file for running the processing of images functions.
 
 from matplotlib import pyplot as plt
 import numpy as np
+import os
 
 # TODO: Save the images in tmp folder to visualize them
 
@@ -44,3 +45,26 @@ def __load_image__(image_folder): # Util function of this class. Check if this p
     Returns:
         dict: {'id': image_folder, 'dapi': Image object, 'fitc': image object .. }
 """
+
+
+def fetch_image_path(mask_path, images_folder):
+    """ Given a path of a mask, return the corresponding image path
+
+    Args:
+        image_folder (str): Path to the different version of the image
+
+    Returns:
+        dict: {'id': image_folder, 'dapi': Image object, 'fitc': image object .. }
+    """
+    images_name = os.listdir(images_folder)
+    for image_name in images_name: # Search for the correct image name
+
+        p_name = image_name.split('t')[-1]
+        if p_name == os.path.basename(mask_path)
+
+
+
+
+
+
+
