@@ -11,13 +11,26 @@ import os
 
 def visualize_mask(mask, file_path):
     fig, axs = plt.subplots(1, 2, figsize=(12, 12))
+    
     mask = np.ma.masked_array(mask, mask==0)
     axs[0].imshow(np.squeeze(mask)) # Raw mask
     axs[0].axis('off')
 
     axs[1].imshow(np.squeeze(mask), cmap='gray') # The segmentation map as a grey scale image
     axs[1].axis('off')
+
+    fig.tight_layout()
+    plt.savefig(file_path)
+
+def visualize_image(image, file_path):
+    fig, axs = plt.subplots(1, 2, figsize=(12, 12))
     
+    axs[0].imshow(np.squeeze(image)) # Raw image
+    axs[0].axis('off')
+
+    axs[1].imshow(np.squeeze(image), cmap='gray') # Gray scale image
+    axs[1].axis('off')
+
     fig.tight_layout()
     plt.savefig(file_path)
 

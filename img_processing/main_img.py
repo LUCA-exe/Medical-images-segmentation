@@ -1,10 +1,12 @@
 """main_img.py
 
-This is the main executable file for running the processing of images functions.
+This is the main executable file for running the processing functions for the images/masks.
 """
 
 import os
+import numpy as np
 import tifffile as tiff
+import cv2
 from collections import defaultdict
 from img_processing.imageUtils import * # Remember to write the path the the 'importer' of this file is calling
 
@@ -19,8 +21,10 @@ class images_processor:
         #self.base_folder = 'images' # WARNING: Should be const
         self.task = task # Final folder for the ground truth mask
 
-        self.log.info(f"'Image processor' object instantiated; working on '{self.images_folder}'")
+        self.log.info(f"'Image processor' object instantiated: working on '{self.images_folder}'")
         
+        os.makedirs('tmp', exist_ok=True) # Set up a './tmp' folder for debugging images
+        self.debug_folder = 'tmp'
         
     def set_dataset(self, new_images_path, new_dataset): # Change the target repository
         self.images_folder = os.path.join(new_images_path, new_dataset)
@@ -66,34 +70,37 @@ class images_processor:
         return None
 
     def __compute_signals(self, image_path, mask_path):
+
         """ Load the image and mask from the given paths and compute the signals
 
         Args:
-            split (str): What split to take in order to compute the images
+            image_path (str): Path to load the '*.tif' image
+            mask_path (str): Path to load the '*.tif' mask
 
         Returns:
-            (dict): {'images_id':(str), 'signals_1': (float)}
-    """
-
-        '''images_path = os.path.join(self.images_folder, split, self.base_folder)
-        images_files_path = os.listdir(images_path) # Gather the name of the images files
-        
-        self.log.info(f"Number of files readed in '{images_path}' is {len(images_files_path)}")
-        self.log.debug(f"Images files read are : {images_files_path}")
-
-        split_data = defaultdict(dict)
-
-        for file_name in images_files_path:
-            # gather all the signals for a specific image
-            split_data[file_name] = __get_cr()'''
-
-        print(f"image path {image_path}")
-        print(f"image path {mask_path}")
+            (dict): {'signals_1': (float), 'signals_2': (float)}
+        """
 
         image = tiff.imread(image_path)
         mask = tiff.imread(mask_path)
-        print(f"Image shape: {image.shape}")
+
+        # TODO: Check if the mask has to be modified already here
+        print(f"Mask type: {type(mask)}")
         print(f"Mask shape: {mask.shape}")
+        print(f"Few values of the mask {mask[:, :20]}")
+        boolean_mask = mask == 0 # Create a boolean matrix
+        mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
+        print(f"Few values of the mask {mask.shape}")
+        print(f"Few values of the mask {mask[:, :20]}")
+        print(f"{type(mask[0,0])}")
+        exit(1)
+        # WORK IN PROGRESS: Init. segmenting the original to gather the signals
+        #img2 = cv2.drawContours(img, multiple_ab, -1, (255,255,255), -1)
+
+        # Visualization debug
+        mask_name = os.path.basename(mask_path).split('.')[0]
+        #visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
+        visualize_image(mask, os.path.join(self.debug_folder, mask_name))
 
         return None
             
