@@ -9,17 +9,21 @@ from collections import defaultdict
 class images_processor:
 
     def __init__(self, env, args):
-
+        """Class to create a obj. that gather images signals from segmentation masks"""
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
-        self.images_folder = os.path.join(args.images_path, args.images_mode) # Path in which the json will be saved
-        self.base_folder = 'images' # WARNING: Should be const
+        self.images_folder = os.path.join(args.images_path, args.dataset) # Path in which the json will be saved
+        #self.base_folder = 'images' # WARNING: Should be const
 
         self.log.info(f"'Image processor' object instantiated; working on '{self.images_folder}'")
 
+    def set_dataset(self, new_images_path, new_dataset): # Change the target repository
+        self.images_folder = os.path.join(new_images_path, new_dataset)
 
-    def process_images(self, split='train'): # TODO: Split can be both parser/config file
-        """ Load the images from a single split or multiple and compute for every one Its signals/properties
+        return None
+
+    def process_images(self):
+        """ Load the images from a folder and compute the signals
 
         Args:
             split (str): What split to take in order to compute the images
@@ -29,17 +33,13 @@ class images_processor:
     """
         data = {} # Dict to contain the different's data split
 
-        if split == 'all': # Compute all the signals for different splits
-            self.__compute_signals('train')
-            self.__compute_signals('val')
-            self.__compute_signals('test')
-        else:
-            self.__compute_signals(split)
+        folders = os.listdir(self.images_folder)
+        self.log.info(f"Folder inside the dataset: {folders}")
 
         return None
 
-    def __compute_signals(self, split):
-        """ Load the images from a single split and compute for every one Its signals/properties
+    def __compute_signals(self, image_path, mask_path):
+        """ Load the image and mask from the given path and compute the signals
 
         Args:
             split (str): What split to take in order to compute the images
@@ -60,19 +60,3 @@ class images_processor:
             # gather all the signals for a specific image
             split_data[file_name] = __get_cr()
             
-
-
-
-
-    # Util functions
-
-    def __load_image__(image_folder): # Util function of this class. Check if this pattern make sense
-        """ Load the single channel or multiple channels of the required image.
-            It return a dict with id and all the different images for each 'version' (only nuclei, only boundaries etc ..)
-
-        Args:
-            image_folder (str): Path to the different version of the image
-
-        Returns:
-            dict: {'id': image_folder, 'dapi': Image object, 'fitc': image object .. }
-    """

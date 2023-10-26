@@ -15,14 +15,14 @@ def get_parser():
 
   # Path arguments
   parser.add_argument("--images_path",
-                        default="dataset/",
+                        default="training_data/",
                         type=str,
-                        help="Path to donwload images (both single images and video frame)")
+                        help="Path to the images dataset")
 
-  parser.add_argument("--images_mode", # If required is True why put a 'default' param?
-                        default="single-frame",
+  parser.add_argument("--dataset", # If required is True why put a 'default' param?
+                        default="Fluo-E2DV-train",
                         type=str,
-                        choices=["single-frame", "multiple_frames"],
+                        #choices=["single-frame", "multiple_frames"],
                         help="Which folder to access")
 
   # WARNING: Usless in trial phase.
