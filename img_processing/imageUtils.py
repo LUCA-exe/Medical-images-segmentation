@@ -6,9 +6,11 @@ This is the main executable file for running the processing of images functions.
 from matplotlib import pyplot as plt
 import numpy as np
 import os
+from collections import defaultdict
+import json
 
-# TODO: Save the images in tmp folder to visualize them
 
+# Save the images in tmp folder to visualize them
 def visualize_mask(mask, file_path):
     fig, axs = plt.subplots(1, 2, figsize=(12, 12))
     
@@ -61,7 +63,7 @@ def __load_image__(image_folder): # Util function of this class. Check if this p
 
     Returns:
         dict: {'id': image_folder, 'dapi': Image object, 'fitc': image object .. }
-"""
+    """
 
 
 def fetch_image_path(mask_path, images_folder):
@@ -82,5 +84,67 @@ def fetch_image_path(mask_path, images_folder):
             return image_name
     
     return None # ERROR: Name not found!
+
+def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # Fow now don't pass files name as list, This function will retrieve them
+    """ Create a '*.json' file that contains signals gathered for every image.
+
+    Args:
+        log (obj): Object that handles the log messages
+        file_path (str): Where to save the file
+        name (str): Name of the file. The format will be '.json'
+        ext (str)
+
+    Returns:
+        None
+    """
+    if os.path.exists(os.path.join(file_path, name + ext)):
+        log.info(f"Signals file already existing in {file_path}, It will be not subscribed")
+        return None
+    
+    empty_dict = defaultdict(dict) # Just record all the images name to prepare to be filled later
+    images_name = ['t' + s.split('seg')[-1] for s in os.listdir(file_path) if s.startswith("man")] # Load already the name of the images given the semented mask
+    log.info(f"The signals file {name + ext} will be created in {file_path} for the images: {images_name}")
+    
+    [empty_dict[name] for name in images_name] # Fill the inital dict without signals
+
+    with open(os.path.join(file_path, name + ext), "w") as outfile:
+        json.dump(empty_dict, fp=outfile, indent = 4, sort_keys=True)
+        log.info(f"File created correctly!")
+
+    return None
+
+# NOTE: It requires time complexity but It is modular: the information data can be filled in different times
+def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json'):
+    """ Read the '*.json' file and complement/insert the additional infomation for each images
+
+    Args:
+        log (obj): Object that handles the log messages
+        file_path (str): Where to save the file
+        data (dict): dict with singnals data that has to be updated/inserted for every image
+        name (str): Name of the file. The format will be '.json'
+        ext (str)
+
+    Returns:
+        None
+    """
+    f = open(os.path.join(file_path, name + ext))
+    old_data = json.load(f) # Read the existing '*.json' to add new informations
+    
+    log.debug(f"File {name + ext} loaded from '{file_path}' loaded correctly!")
+
+    for key, item in data.items(): # If there is a file, all the names are alredy inside it
+        
+        # 'item' contain the signals the have to be inserted
+        for signals, value in item.items():
+            old_data[key][signals] = value
+
+    with open(os.path.join(file_path, name + ext), "w") as outfile:
+        json.dump(old_data, fp=outfile, indent = 4, sort_keys=True)
+        log.info(f"File {name + ext} loaded from '{file_path}' updated correctly!")
+
+    return None
+
+    
+     
 
 

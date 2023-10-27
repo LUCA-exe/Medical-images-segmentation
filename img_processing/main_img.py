@@ -48,14 +48,15 @@ class images_processor:
         
         #masks_list = [] # List of lists containing masks path for each mask folder 
         
-        for folder in masks_folders: # Main loop; for every folder gather the data
+        for folder in masks_folders: # Main loop: for every folder gather the data
 
             current_images_path = os.path.join(self.images_folder, folder.split('_')[0]) # Fetch the original images from this folder
             current_path = os.path.join(self.images_folder, folder, self.task) # Compose the masks folder
             files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks
             #masks_list.append(files_name)
             files_name.sort()
-            self.log.debug(f"{files_name}")
+            self.log.debug(f"Currently working in {current_path}: files are {files_name}")
+            create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
 
             stats = {} # Dict contatining 'id' and {'signal' : value}
             for file_name in files_name:
@@ -65,12 +66,14 @@ class images_processor:
                 current_image_path = os.path.join(current_images_path, image_name)
 
                 # Ready to compute the signals for the coupled mask - image
-                self.__compute_signals(current_image_path, current_mask_path)
+                stats[image_name] = self.__compute_signals(current_image_path, current_mask_path) # Save the signals for every original image name
 
+            # Finished to gather data from the current folder - update the existing '*.json'
+            update_signals_file(self.log, current_path, stats)
+            
         return None
 
     def __compute_signals(self, image_path, mask_path):
-
         """ Load the image and mask from the given paths and compute the signals
 
         Args:
@@ -83,7 +86,7 @@ class images_processor:
 
         image = tiff.imread(image_path)
         mask = tiff.imread(mask_path)
-
+        signals_dict = {}
         # TODO: Check if the mask has to be modified already here
         #print(f"Mask type: {type(mask)}")
         #print(f"Mask shape: {mask.shape}")
@@ -102,8 +105,9 @@ class images_processor:
 
         # Visualization debug
         mask_name = os.path.basename(mask_path).split('.')[0]
-        #visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
-        visualize_image(mask, os.path.join(self.debug_folder, mask_name))
-
-        return None
+        visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
+        #visualize_image(mask, os.path.join(self.debug_folder, mask_name))
+        signals_dict['stn'] = obj_pixels/tot_pixels
+        
+        return signals_dict
             
