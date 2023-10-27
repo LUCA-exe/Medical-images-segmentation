@@ -20,6 +20,7 @@ class images_processor:
         self.images_folder = os.path.join(args.images_path, args.dataset) # Path in which the json will be saved
         #self.base_folder = 'images' # WARNING: Should be const
         self.task = task # Final folder for the ground truth mask
+        self.thr = args.cell_dim
 
         self.log.info(f"'Image processor' object instantiated: working on '{self.images_folder}'")
         
@@ -107,7 +108,7 @@ class images_processor:
         print(f"Valori degli oggetti (incluso background): {np.unique(mask)}")
 
         # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
-        thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
+        #thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
         mean_cells, std_cells = [], []
         obj_values = np.unique(mask) # Store the pixel value for each object
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
@@ -116,7 +117,7 @@ class images_processor:
             # DEBUG - tried this on other datasets
             print(f"   {value} - {count}")
 
-            if count > thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
+            if count > self.thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
                 current_mask = mask == value
                 current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
                 mean_cells.append(np.mean(current_pixels)) 

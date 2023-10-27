@@ -6,34 +6,43 @@
 from argparse import ArgumentParser
 
 def get_parser():
-  """ Standard function to load the parameters
+    """ Standard function to load the parameters
 
-    Returns:
-        Object: parser
-  """
-  parser = ArgumentParser(description="Medical images segmentation")
+        Returns:
+            Object: parser
+    """
+    parser = ArgumentParser(description="Medical images segmentation")
 
-  # Path arguments
-  parser.add_argument("--images_path",
-                        default="training_data/",
-                        type=str,
-                        help="Path to the images dataset")
+    # Path arguments
+    parser.add_argument("--images_path",
+                            default="training_data/",
+                            type=str,
+                            help="Path to the images dataset")
 
-  parser.add_argument("--dataset", # If required is True why put a 'default' param?
-                        default="Fluo-E2DV-train",
-                        type=str,
-                        #choices=["single-frame", "multiple_frames"],
-                        help="Which folder to access")
+    parser.add_argument("--dataset", # If required is True why put a 'default' param?
+                            default="Fluo-E2DV-train",
+                            type=str,
+                            #choices=["single-frame", "multiple_frames"],
+                            help="Which folder to access")
 
-  # WARNING: Usless in trial phase.
-  parser.add_argument("--link_images", # TODO: Move this to a 'config.json' or other options
-                                       # For now download from my private google drive.. this arg. is temporary unused
-                        required=True, 
-                        type=str,
-                        help="Link to download the dataset")
-                        
-  args = parser.parse_args()
-  return args
+
+    # TODO: Kept fixed as arguments.. maybe should be extracted from a '*.json' file with a finetuned dimension for every seen dataset..
+    parser.add_argument("--cell_dim", # If required is True why put a 'default' param?
+                            default = 7000, # My dataset has an avg of 4000 EVs dim in pixels 
+                            type=int,
+                            help="Min. dimension to consider for gathering cells stats")
+
+
+
+    # WARNING: Usless in trial phase.
+    parser.add_argument("--link_images", # TODO: Move this to a 'config.json' or other options
+                                        # For now download from my private google drive.. this arg. is temporary unused
+                            required=True, 
+                            type=str,
+                            help="Link to download the dataset")
+                            
+    args = parser.parse_args()
+    return args
 
 
 def get_processed_args(args):
