@@ -55,7 +55,7 @@ class images_processor:
             files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks
             #masks_list.append(files_name)
             files_name.sort()
-            self.log.debug(f"Currently working in {current_path}: files are {files_name}")
+            self.log.debug(f"Currently working in '{current_path}': files are {files_name}")
             create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
 
             stats = {} # Dict contatining 'id' and {'signal' : value}
@@ -73,6 +73,7 @@ class images_processor:
             
         return None
 
+    # TODO: Working for gather signal both from my dataset and others (e.g. CTC/DSB 2018 datasets)
     def __compute_signals(self, image_path, mask_path):
         """ Load the image and mask from the given paths and compute the signals
 
@@ -86,17 +87,43 @@ class images_processor:
 
         image = tiff.imread(image_path)
         mask = tiff.imread(mask_path)
-        signals_dict = {}
-        # TODO: Check if the mask has to be modified already here
-        #print(f"Mask type: {type(mask)}")
-        #print(f"Mask shape: {mask.shape}")
-        #print(f"Few values of the mask {mask[:, :20]}")
+        signals_dict = {} # Init the dict for the signals
+
+        
         boolean_mask = mask != 0 # Create a boolean matrix
 
         obj_pixels = len(mask[boolean_mask]) # Pixels belonging to segmented objects considered
-        tot_pixels = mask.shape[0] * mask.shape[1]
-        print(f"Signal to noise ratio: {obj_pixels/tot_pixels * 100} %")
-        #exit(1)
+        tot_pixels = mask.shape[0] * mask.shape[1] # Total pixels of the image
+
+        
+
+        background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
+        print(f"Rumore nel background: {np.std(background_pixels)}")
+
+        # Mean and std inside the segmented cells
+
+        # Debug purpose
+        print(f"Numero di oggetti (incluso il background): {len(np.unique(mask))}")
+        print(f"Valori degli oggetti (incluso background): {np.unique(mask)}")
+
+        # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
+        thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
+        mean_cells, std_cells = [], []
+        obj_values = np.unique(mask) # Store the pixel value for each object
+        obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
+        
+        for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
+            # DEBUG - tried this on other datasets
+            print(f"   {value} - {count}")
+
+            if count > thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
+                current_mask = mask == value
+                current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
+                mean_cells.append(np.mean(current_pixels)) 
+                std_cells.append(np.std(current_pixels))
+
+        print("-------")
+
         #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
         
         
@@ -107,7 +134,11 @@ class images_processor:
         mask_name = os.path.basename(mask_path).split('.')[0]
         visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
         #visualize_image(mask, os.path.join(self.debug_folder, mask_name))
-        signals_dict['stn'] = obj_pixels/tot_pixels
         
+        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells pixels
+        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std
+        signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
+        signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
+
         return signals_dict
             

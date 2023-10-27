@@ -98,7 +98,7 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
         None
     """
     if os.path.exists(os.path.join(file_path, name + ext)):
-        log.info(f"Signals file already existing in {file_path}, It will be not subscribed")
+        log.info(f"Signals file already existing in {file_path}, It will be not subscribed!")
         return None
     
     empty_dict = defaultdict(dict) # Just record all the images name to prepare to be filled later
@@ -109,7 +109,7 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
 
     with open(os.path.join(file_path, name + ext), "w") as outfile:
         json.dump(empty_dict, fp=outfile, indent = 4, sort_keys=True)
-        log.info(f"File created correctly!")
+        log.info(f"File '{name + ext}' in '{file_path}' created correctly!")
 
     return None
 
@@ -140,7 +140,7 @@ def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json
 
     with open(os.path.join(file_path, name + ext), "w") as outfile:
         json.dump(old_data, fp=outfile, indent = 4, sort_keys=True)
-        log.info(f"File {name + ext} loaded from '{file_path}' updated correctly!")
+        log.info(f"File updated correctly!")
 
     return None
 
