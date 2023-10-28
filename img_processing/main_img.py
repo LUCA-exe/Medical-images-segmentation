@@ -141,7 +141,7 @@ class images_processor:
 
         #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
 
-        # Visualization debug - both image/mask
+        # Visualization for debug purpose - both image/mask saved inside the 'debug_folder'
         mask_name = os.path.basename(mask_path).split('.')[0]
         visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
         image_name = os.path.basename(image_path).split('.')[0]
@@ -151,6 +151,11 @@ class images_processor:
         signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
         signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
+
+        # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
+        signals_dict['crc'] = np.mean(mean_cells[1:]) - mean_cells[0] # Contrast ratio for the cells: Difference in avg. pixel values between beackground and cells
+
+        # TODO: Cells hetereogenity along the time lapse, aggregated measure: variations of the avg values of the cells along the different frames
 
         return signals_dict
             
