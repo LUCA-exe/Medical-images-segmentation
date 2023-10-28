@@ -45,10 +45,11 @@ class images_processor:
             None 
         """
         # This function will process images; cleaning the './tmp' folder
-        if os.listdir(self.debug_folder): # Debug dir has some files
-            print("folder not empty, removing files")
+        if os.listdir(self.debug_folder): 
+            # 'Debug dir' has some files: delete all
+            self.log.debug(f"Folder '{self.debug_folder}' contains files, It will be cleaned")
             for file_name in os.listdir(self.debug_folder):
-                os.remove(file_name)
+                os.remove(os.path.join(self.debug_folder, file_name))
              
         # Start collecting the folders path for the current dataset
         folders = os.listdir(self.images_folder)
