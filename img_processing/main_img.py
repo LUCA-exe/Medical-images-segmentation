@@ -22,10 +22,12 @@ class images_processor:
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
 
-        self.log.info(f"'Image processor' object instantiated: working on '{self.images_folder}'")
-        
         os.makedirs('tmp', exist_ok=True) # Set up a './tmp' folder for debugging images
         self.debug_folder = 'tmp'
+
+        self.log.info(f"'Image processor' object instantiated: working on '{self.images_folder}'")
+        
+        
         
     def set_dataset(self, new_images_path, new_dataset): # Change the target repository
         self.images_folder = os.path.join(new_images_path, new_dataset)
@@ -33,6 +35,7 @@ class images_processor:
         return None
 
     def collect_signals(self):
+
         """ Load the images from a folder and compute the signals
 
         Args:
@@ -40,7 +43,14 @@ class images_processor:
 
         Returns:
             None 
-    """
+        """
+        # This function will process images; cleaning the './tmp' folder
+        if os.listdir(self.debug_folder): # Debug dir has some files
+            print("folder not empty, removing files")
+            for file_name in os.listdir(self.debug_folder):
+                os.remove(file_name)
+             
+        # Start collecting the folders path for the current dataset
         folders = os.listdir(self.images_folder)
         self.log.info(f"Folders inside the dataset: {folders}")
 
@@ -87,6 +97,10 @@ class images_processor:
         """
 
         image = tiff.imread(image_path)
+        if (len(image.shape) > 2):
+            image = to_single_channel(image) # Convert the image if needed
+            self.log.debug(f".. image '{os.path.basename(image_path)}' converted to one channel ..")
+
         mask = tiff.imread(mask_path)
         signals_dict = {} # Init the dict for the signals
 
@@ -101,7 +115,6 @@ class images_processor:
         background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
         print(f"Rumore nel background: {np.std(background_pixels)}")
 
-        # Mean and std inside the segmented cells
 
         # Debug purpose
         print(f"Numero di oggetti (incluso il background): {len(np.unique(mask))}")
@@ -109,7 +122,7 @@ class images_processor:
 
         # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
         #thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
-        mean_cells, std_cells = [], []
+        mean_cells, std_cells = [], [] # Mean and std inside the segmented cells
         obj_values = np.unique(mask) # Store the pixel value for each object
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
@@ -126,15 +139,12 @@ class images_processor:
         print("-------")
 
         #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
-        
-        
-        # WORK IN PROGRESS: Init. segmenting the original to gather the signals
-        #img2 = cv2.drawContours(img, multiple_ab, -1, (255,255,255), -1)
 
-        # Visualization debug
+        # Visualization debug - both image/mask
         mask_name = os.path.basename(mask_path).split('.')[0]
         visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
-        #visualize_image(mask, os.path.join(self.debug_folder, mask_name))
+        image_name = os.path.basename(image_path).split('.')[0]
+        visualize_image(image, os.path.join(self.debug_folder, image_name))
         
         signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells pixels
         signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std
