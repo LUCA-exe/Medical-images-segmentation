@@ -85,6 +85,7 @@ def fetch_image_path(mask_path, images_folder):
     
     return None # ERROR: Name not found!
 
+
 def to_single_channel(image):
     """ Take an image and fuse the channels toghether
 
@@ -98,11 +99,11 @@ def to_single_channel(image):
     if (len(image.shape)) > 3:
         # TODO: Raise exeption!
         print(f"image has more than 3 dims!")
+        return None
+
     else:
         return np.sum(image, axis=2) # Sum the pixels value along the last dim
     
-
-
 
 def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # Fow now don't pass files name as list, This function will retrieve them
     """ Create a '*.json' file that contains signals gathered for every image.

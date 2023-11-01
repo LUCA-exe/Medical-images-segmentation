@@ -103,23 +103,19 @@ class images_processor:
             self.log.debug(f".. image '{os.path.basename(image_path)}' converted to one channel ..")
 
         mask = tiff.imread(mask_path)
-        signals_dict = {} # Init the dict for the signals
+        signals_dict = {} # Init. the dict for the signals
 
-        
-        boolean_mask = mask != 0 # Create a boolean matrix
+        boolean_mask = mask != 0 # Create a boolean matrix for the segmented objects
 
         obj_pixels = len(mask[boolean_mask]) # Pixels belonging to segmented objects considered
         tot_pixels = mask.shape[0] * mask.shape[1] # Total pixels of the image
 
-        
-
+        # DEBUG console visualization
+        print(f"Working on {os.path.basename(image_path).split('.')[0]} image")
         background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
-        print(f"Rumore nel background: {np.std(background_pixels)}")
-
-
-        # Debug purpose
-        print(f"Numero di oggetti (incluso il background): {len(np.unique(mask))}")
-        print(f"Valori degli oggetti (incluso background): {np.unique(mask)}")
+        print(f"> Rumore nel background: {np.std(background_pixels)}")
+        print(f"> Numero di oggetti (incluso il background): {len(np.unique(mask))}")
+        print(f"> Valori degli oggetti (incluso background): {np.unique(mask)}")
 
         # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
         #thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
@@ -128,7 +124,7 @@ class images_processor:
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
-            # DEBUG - tried this on other datasets
+            print(f"> List of 'pixels value' - 'number of pixel'")
             print(f"   {value} - {count}")
 
             if count > self.thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
@@ -137,11 +133,9 @@ class images_processor:
                 mean_cells.append(np.mean(current_pixels)) 
                 std_cells.append(np.std(current_pixels))
 
-        print("-------")
+        #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here - It should just be a conversion of array 0 values 
 
-        #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here
-
-        # Visualization for debug purpose - both image/mask saved inside the 'debug_folder'
+        # Visualization for debug purpose - both image/mask saved inside the 'self.debug_folder'
         mask_name = os.path.basename(mask_path).split('.')[0]
         visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
         image_name = os.path.basename(image_path).split('.')[0]
@@ -153,7 +147,7 @@ class images_processor:
         signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
 
         # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
-        signals_dict['crc'] = np.mean(mean_cells[1:]) - mean_cells[0] # Contrast ratio for the cells: Difference in avg. pixel values between beackground and cells
+        signals_dict['crc'] = abs(np.mean(mean_cells[1:]) - mean_cells[0]) # Cells Contrast Ratio: Absoluth difference in avg. pixel values between beackground and segmented cells
 
         # TODO: Cells hetereogenity along the time lapse, aggregated measure: variations of the avg values of the cells along the different frames
 

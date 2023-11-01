@@ -30,7 +30,7 @@ def get_parser():
     parser.add_argument("--cell_dim", # If required is True why put a 'default' param?
                             default = 7000, # My dataset has an avg of 4000 EVs dim in pixels 
                             type=int,
-                            help="Min. dimension to consider for gathering cells stats")
+                            help="Min. dimension (in pixels) to consider for gathering cells stats")
 
 
 
