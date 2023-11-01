@@ -29,6 +29,9 @@ def main():
   processor = images_processor(env, args)
   processor.collect_signals()
 
+  visualizator = signalsVisualizator(env, args)
+  #visualizator.main_func()
+
 
 if __name__ == "__main__":
     main()
