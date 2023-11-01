@@ -167,6 +167,23 @@ class images_processor:
 
         return signals_dict
 
+    # TODO: For every 'mask' folder aggregate a final 'datasets.json' with aggregated data
+    def aggregate_signals(self):
+        folders = os.listdir(self.images_folder)
+
+        masks_folders = [s for s in folders if s.endswith("GT")]
+        print(f"Mask folders: {masks_folders}")
+
+        stats = [] # List of dicts: one for every folder mask
+        for folder in masks_folders:
+            current_folder = os.path.join(self.images_folder, folder, self.task)
+            print(f".. Working on {current_folder} ..")
+            
+
+
+        return None
+
+
 # TODO: Follow the standard format for name object classes
 class signalsVisualizator: # Object to plot singnals gathered by training/test dataset (images/masks signals for every time lapse)
  
@@ -187,7 +204,10 @@ class signalsVisualizator: # Object to plot singnals gathered by training/test d
     def main_func(self):
 
         # DEBUG console
-        print(f"")
+        print(f"Dataset in the {self.split_folder} are {os.listdir(self.split_folder)}")
+
+        # for every dataset plot single folder study and the stats of the dataset aggregated 
+
 
 
     def __plot_signals_dataset(self, dataset):
