@@ -3,6 +3,7 @@
 This is the main executable file for running the processing functions for the images/masks.
 """
 
+from copy import deepcopy
 from math import floor
 import os
 import numpy as np
@@ -57,19 +58,20 @@ class images_processor:
         masks_folders = [s for s in folders if s.endswith("GT")]
         self.log.debug(f"Folders with the masks: {masks_folders}")
         
-        #masks_list = [] # List of lists containing masks path for each mask folder 
-        
+        total_stats = [] # List of dicts containing all the computed signals - It is not a 'dict' cause we can lose the 'name' of the image for the final aggregation
+
         for folder in masks_folders: # Main loop: for every folder gather the data
 
             current_images_path = os.path.join(self.images_folder, folder.split('_')[0]) # Fetch the original images from this folder
             current_path = os.path.join(self.images_folder, folder, self.task) # Compose the masks folder
+
             files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks
-            #masks_list.append(files_name)
             files_name.sort()
             self.log.debug(f"Currently working in '{current_path}': files are {files_name}")
-            create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
 
-            stats = {} # Dict contatining 'id' and {'signal' : value}
+            create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data - 
+            stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
+
             for file_name in files_name:
                 current_mask_path = os.path.join(current_path, file_name)
                 # For evey mask path, fetch the proper image path
@@ -79,9 +81,14 @@ class images_processor:
                 # Ready to compute the signals for the coupled mask - image
                 stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels) # Save the signals for every original image name
 
-            # Finished to gather data from the current folder - update the existing '*.json'
+                total_stats.append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset
+
+            # Finished to gather data from the current folder - update the existing '*.json' (on the current folder)
             update_signals_file(self.log, current_path, stats)
-            
+
+        total_dict = aggregate_signals(self.log, total_stats) # Aggregate the signals of the current dataset in a single dict 
+        save_aggregated_signals(self.log, self.images_folder, total_dict) # Save the 'dict' on the root folder of the dataset
+
         return None
 
     # TODO: Working for gather signal both from my dataset and others (e.g. CTC/DSB 2018 datasets)
@@ -157,57 +164,71 @@ class images_processor:
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
         signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
 
-
         # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
         signals_dict['crc'] = abs(np.mean(mean_cells[1:]) - mean_cells[0]) # Cells Contrast Ratio: Absoluth difference in avg. pixel values between beackground and segmented cells
         signals_dict['bh'] = abs(max(background_patches)-min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
         
-
         # TODO: Cells hetereogenity along the time lapse, aggregated measure: variations of the avg values of the cells along the different frames
 
         return signals_dict
 
-    # TODO: For every 'mask' folder aggregate a final 'datasets.json' with aggregated data
-    def aggregate_signals(self):
-        folders = os.listdir(self.images_folder)
+    # TODO: Remove from here - moved to utils
+    def __aggregate_signals(self, signals_list, method='mean'):
+        """ Create a dict that contains aggregated signals gathered for every image of a dataset.
 
-        masks_folders = [s for s in folders if s.endswith("GT")]
-        print(f"Mask folders: {masks_folders}")
+        Args:
+            signals_list (obj): List of dict; every dict contains the signals of a single image
 
-        stats = [] # List of dicts: one for every folder mask
-        for folder in masks_folders:
-            current_folder = os.path.join(self.images_folder, folder, self.task)
-            print(f".. Working on {current_folder} ..")
-            
+        Returns:
+            (dict): Return a unique dict of aggregated signals
+        """
 
+        # TODO: Upgrade and add functionalities: for now just compute the mean for every aggregated signals 
+        total_dict = defaultdict(list)
+        
+        for single_dict in signals_list: # for every image dict
 
-        return None
+            for key, value in single_dict.items(): # Append the value to the 'total_dict'
+                total_dict[key].append(value)
+
+        for k in total_dict.keys(): # Just aggregate with the chosen method
+            total_dict[k] = np.mean(total_dict[k]) # Even if the defaultdict is set to list It works just with void key.
+
+        self.log.debug(f"Signals of the current dataset aggregated correctly!")
+        return total_dict
 
 
 # TODO: Follow the standard format for name object classes
-class signalsVisualizator: # Object to plot singnals gathered by training/test dataset (images/masks signals for every time lapse)
+class signalsVisualizator: # Object to plot signals of a single dataset (both aggregated/single mask folder): for now mantain this design - (To oeprate on multiple dataset just create a appropriate main script).
  
     def __init__(self, env, args, task='SEG'):
-        """Class to create a obj. that gather images signals from segmentation masks"""
+        """ Class to create a obj. that gather images signals from segmentation masks"""
 
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
-        self.split_folder = args.images_path # Path in which the '*.json' files will be loaded
+        self.images_folder = os.path.join(args.images_path, args.dataset) # Path to load the different '*.json' files
         self.task = task # Folder for the ground truth mask signals loading
 
-        os.makedirs('visualization_results', exist_ok=True) # Set up a './tmp' folder for debugging images
-        self.visualization_folder = 'visualization_results' #  Folder to use as temporary folder for plot the signals of the different datasets
+        os.makedirs('visualization_results', exist_ok=True) # Set up a folder that will contains the final plots
+        self.visualization_folder = 'visualization_results' # Path starting from the './' (current folder - root folder of the project)
 
-        self.log.info(f"Obj. to plot the computed signals instantiated: working on '{self.split_folder}'")
+        self.log.info(f"Obj. to plot the computed signals instantiated: working on '{self.images_folder}'")
 
-    # Temporary function for debugging the other obj. functions
-    def main_func(self):
+    def visualize_signals(self): # Save a plot for every '*.json' that can find
 
         # DEBUG console
-        print(f"Dataset in the {self.split_folder} are {os.listdir(self.split_folder)}")
+        print(f"Files in the {self.images_folder} are {os.listdir(self.images_folder)}")
 
-        # for every dataset plot single folder study and the stats of the dataset aggregated 
+        files = os.listdir(self.images_folder) # List files contained in the current dataset folder
+        # Search for '.json' extension (the aggregated signals of the dataset)
+        aggr_json = [s for s in files if s.endswith(".json")]
+        
+        if aggr_json: # If the obj. is True then is not empty
+            self.log.info(f"Aggregated file {aggr_json} found")
+        else:
+            self.log.info(f"Aggregated file {aggr_json} NOT found.. searching for the specific folders signals ..")
 
+       
 
 
     def __plot_signals_dataset(self, dataset):

@@ -104,7 +104,6 @@ def to_single_channel(image):
     else:
         return np.sum(image, axis=2) # Sum the pixels value along the last dim
     
-
 def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # Fow now don't pass files name as list, This function will retrieve them
     """ Create a '*.json' file that contains signals gathered for every image.
 
@@ -117,7 +116,7 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
     Returns:
         None
     """
-    if os.path.exists(os.path.join(file_path, name + ext)):
+    if os.path.exists(os.path.join(file_path, name + ext)): # Check if the file already exist, if already existing it contains already all the 'key'(imag name)
         log.info(f"Signals file already existing in {file_path}, It will be not subscribed!")
         return None
     
@@ -163,6 +162,60 @@ def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json
         log.info(f"File updated correctly!")
 
     return None
+
+# NOTE: The data will be saved in a file, if the '*.json' already exist It will be overwrite
+def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ext='.json'):
+    """ Save the aggregated signals dict of a dataset in a '*.json'
+
+    Args:
+        log (obj): Object that handles the log messages
+        file_path (str): Where to save the file
+        data (dict): dict with signals data that has to be inserted
+        name (str): Name of the file. The format will be '.json'
+        ext (str)
+
+    Returns:
+        None
+    """
+    
+    files = os.listdir(file_path)
+    file_name = name + ext
+    if file_name in files: # Check if the file already exist (just to notify)
+        log.info(f"Aggregated file for the dataset {file_path} will be overwrite")
+
+    with open(os.path.join(file_path, file_name), "w") as outfile:
+        json.dump(data, fp=outfile, indent = 4, sort_keys=True)
+        
+        log.info(f"File {file_name} save correctly in {file_path}!")
+
+    return None
+
+# Function used from both 'image_processor' and 'imageVisualizator', moved in the utils
+def aggregate_signals(log, signals_list, method='mean'):
+    """ Create a dict that contains aggregated signals gathered for every image of a dataset.
+
+    Args:
+        signals_list (obj): List of dict; every dict contains the signals of a single image
+
+    Returns:
+        (dict): Return a unique dict of aggregated signals
+    """
+
+    # TODO: Upgrade and add functionalities: for now just compute the mean for every aggregated signals 
+    total_dict = defaultdict(list)
+    
+    for single_dict in signals_list: # for every image dict
+
+        for key, value in single_dict.items(): # Append the value to the 'total_dict'
+            total_dict[key].append(value)
+
+    if method == 'mean':
+        for k in total_dict.keys(): # Just aggregate with the chosen method
+            total_dict[k] = np.mean(total_dict[k]) # Even if the defaultdict is set to list It works just with void key.
+
+    log.debug(f"Signals of the current dataset aggregated correctly! (aggregation used: {method})")
+    
+    return total_dict # The obj. may differ in structure given the aggregation method
 
     
      

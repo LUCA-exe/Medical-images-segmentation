@@ -28,10 +28,11 @@ def main():
   
   processor = images_processor(env, args)
   #processor.collect_signals()
-  processor.aggregate_signals()
+  
+  #processor.aggregate_signals()
 
-  #visualizator = signalsVisualizator(env, args)
-  #visualizator.main_func()
+  visualizator = signalsVisualizator(env, args)
+  visualizator.visualize_signals()
 
 
 if __name__ == "__main__":
