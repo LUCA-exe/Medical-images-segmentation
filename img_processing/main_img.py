@@ -240,7 +240,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             current_files = os.listdir(os.path.join(self.images_folder, mask_folder, self.task))
             print(f"Current files for the '{mask_folder}' are: {current_files}")
             
-            data_json  = [s for s in current_files if s.endswith(".json")]
+            data_json  = [s for s in current_files if s.endswith(".json") and s.startswith('dataset')]
             if data_json: # Check for the signal file of the current folder
                 data_json = data_json[0]
                 current_data_json = os.path.join(self.images_folder, mask_folder, self.task, data_json)
@@ -282,6 +282,21 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             plt.savefig(current_file_path)
             plt.close()
 
+        return None
+
+    def __plot_signals_comparison(self, data_list, folder_sample = '01'):
+        """ Read the list of dict (one for each datasets) and plot a graph for every metrics contained
+
+        Args:
+            data (list): List of dict; every key contains a list of values (one for every image)
+            file_name (str): It contains the name of the file (format: 'dataset_imagesfolder')
+
+        Returns:
+            None
+        """
+        # Comparare le metriche divise per folder divise per dataset - salvare file su visualization results
+        
+        
         return None
 
 

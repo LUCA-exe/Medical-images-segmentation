@@ -23,6 +23,7 @@ def visualize_mask(mask, file_path):
 
     fig.tight_layout()
     plt.savefig(file_path)
+    plt.close()
 
 def visualize_image(image, file_path):
     fig, axs = plt.subplots(1, 2, figsize=(12, 12))
@@ -35,6 +36,7 @@ def visualize_image(image, file_path):
 
     fig.tight_layout()
     plt.savefig(file_path)
+    plt.close()
 
 def visualize_raw_res(image, mask, file_path):
     fig, axs = plt.subplots(1, 3, figsize=(12, 12))
@@ -50,6 +52,7 @@ def visualize_raw_res(image, mask, file_path):
 
     fig.tight_layout()
     plt.savefig(file_path)
+    plt.close()
 
 
 # Util functions
