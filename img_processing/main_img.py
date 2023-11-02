@@ -4,9 +4,11 @@ This is the main executable file for running the processing functions for the im
 """
 
 from copy import deepcopy
+import json
 from math import floor
 import os
 import numpy as np
+from matplotlib import pyplot as plt
 import tifffile as tiff
 import cv2
 from collections import defaultdict
@@ -224,15 +226,82 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         aggr_json = [s for s in files if s.endswith(".json")]
         
         if aggr_json: # If the obj. is True then is not empty
-            self.log.info(f"Aggregated file {aggr_json} found")
+            self.log.info(f"Aggregated file {aggr_json} found!")
+            aggr_json = aggr_json[0] # Select just the value from the list to load the file
+            f = open(os.path.join(self.images_folder, aggr_json)) # Open the aggregated file
+            aggr_data = json.load(f)
+            # TODO: Select how to visualize/compare the aggr_data with the other datasets
         else:
             self.log.info(f"Aggregated file {aggr_json} NOT found.. searching for the specific folders signals ..")
-
-       
-
-
-    def __plot_signals_dataset(self, dataset):
+        
+        mask_folders = [s for s in files if s.endswith("_GT")] # Take all the mask folders to extract the single '*.json' for each one
+        for mask_folder in mask_folders:
+            
+            current_files = os.listdir(os.path.join(self.images_folder, mask_folder, self.task))
+            print(f"Current files for the '{mask_folder}' are: {current_files}")
+            
+            data_json  = [s for s in current_files if s.endswith(".json")]
+            if data_json: # Check for the signal file of the current folder
+                data_json = data_json[0]
+                current_data_json = os.path.join(self.images_folder, mask_folder, self.task, data_json)
+                f = open(current_data_json) # Open the aggregated file
+                data = json.load(f) # Signals of the current folder
+                
+                data_list = [] # List of images signals of the current folder
+                for key in data.keys(): # Create a list of dict (one dict for every image)
+                    data_list.append(deepcopy(data[key]))
+                
+                data_list = aggregate_signals(self.log, data_list, 'none') # Get a list of the metrics for this current folders (lose the image name)
+                self.__plot_signals(data_list, self.args.dataset + '_' + mask_folder + '_', self.visualization_folder)
+            
         return None
+
+    def __plot_signals(self, data, file_name, path): # Plot the dict metrics of a dataset's single folder (every metric contains a list of value)
+        """ Read the list of dict and plot a graph for every metrics contained
+
+        Args:
+            data (list): List of dict; every key contains a list of values (one for every image)
+            file_name (str): It contains the name of the file (format: 'dataset_imagesfolder')
+
+        Returns:
+            None
+        """
+        print(f"file name : {file_name}")
+        print(f"file path : {path}")
+
+
+        return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

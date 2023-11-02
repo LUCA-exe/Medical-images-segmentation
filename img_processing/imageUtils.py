@@ -205,11 +205,10 @@ def aggregate_signals(log, signals_list, method='mean'):
     total_dict = defaultdict(list)
     
     for single_dict in signals_list: # for every image dict
-
         for key, value in single_dict.items(): # Append the value to the 'total_dict'
             total_dict[key].append(value)
 
-    if method == 'mean':
+    if method == 'mean': # If not applied any aggregation method the dict will contains a list of value for every metrics
         for k in total_dict.keys(): # Just aggregate with the chosen method
             total_dict[k] = np.mean(total_dict[k]) # Even if the defaultdict is set to list It works just with void key.
 
