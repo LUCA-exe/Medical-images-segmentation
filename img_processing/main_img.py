@@ -251,7 +251,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
                 for key in data.keys(): # Create a list of dict (one dict for every image)
                     data_list.append(deepcopy(data[key]))
                 
-                data_list = aggregate_signals(self.log, data_list, 'none') # Get a list of the metrics for this current folders (lose the image name)
+                data_list = aggregate_signals(self.log, data_list, 'none') # Get a dict with for every metric key the list of values for this current folder (lose the image name key)
                 self.__plot_signals(data_list, self.args.dataset + '_' + mask_folder + '_', self.visualization_folder)
             
         return None
@@ -266,9 +266,21 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         Returns:
             None
         """
+        # DEBUG
         print(f"file name : {file_name}")
         print(f"file path : {path}")
 
+        for metric, values in data.items():
+            # DEBUG
+            print(f"Metric :{metric}   -   values: {values}")
+            current_file_path = os.path.join(path, file_name + metric)
+            print(f"saving {current_file_path}")
+            # Plot the single metric
+            plt.plot(range(len(values)), values, 'r')
+            plt.xlabel("values")
+            plt.ylabel(metric)
+            plt.savefig(current_file_path)
+            plt.close()
 
         return None
 
