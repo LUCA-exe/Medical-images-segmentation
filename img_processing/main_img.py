@@ -275,6 +275,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             print(f"Metric :{metric}   -   values: {values}")
             current_file_path = os.path.join(path, file_name + metric)
             print(f"saving {current_file_path}")
+            
             # Plot the single metric
             plt.plot(range(len(values)), values, 'r')
             plt.xlabel("values")
@@ -284,19 +285,95 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         return None
 
-    def __plot_signals_comparison(self, data_list, folder_sample = '01'):
+    # NOTE: WORK IN PROGRESS! (To debug the actual values..)
+    @staticmethod
+    def plot_signals_comparison(log, split_folder='training_data', folders_sample = '01_GT', task='SEG'):
         """ Read the list of dict (one for each datasets) and plot a graph for every metrics contained
 
         Args:
-            data (list): List of dict; every key contains a list of values (one for every image)
-            file_name (str): It contains the name of the file (format: 'dataset_imagesfolder')
+            folders_sample (str): Folders to search for '*.json' to compare among different datasets
 
         Returns:
             None
         """
+
+        os.makedirs('visualization_results', exist_ok=True) # Set up a folder that will contains the final plots
+        log.info(f"Comparison of different datasets signals (used the folders '{folders_sample}' in the split '{split_folder}')")
         # Comparare le metriche divise per folder divise per dataset - salvare file su visualization results
         
+        # For every dataset, take the signals computed in the '01_GT' folder
+        dataset_folders = os.listdir(split_folder)
+        dataset_folders = [s for s in dataset_folders if not s.startswith("__")]
+        print(dataset_folders) 
         
+        # List of dict: every dict contains the metric and values of the images in a 'folders_sample' of the current dataset
+        comparison_list = [] 
+        names_list = [] # Name of the dataset (for the label in the final plots)
+
+        for folder in dataset_folders: # Enter in the single mask folder
+            curr_json_path = os.path.join(split_folder, folder, folders_sample, task)
+            print(curr_json_path)
+            log.info(f".. searching signals for '{curr_json_path}'")
+            
+            # TODO: Make this an args/const/params in a config file
+            json_file = 'dataset_signals.json'
+
+            if json_file in os.listdir(curr_json_path):
+                f = open(os.path.join(curr_json_path, json_file)) # Open the single folder 'signals'
+                signals_dict = json.load(f)
+                log.info(f"File found succesfully!")
+
+                # DEBUG
+                print(f"data : {signals_dict}")
+
+                # TODO: Make this an utils function.. used often
+                data_list = [] # List of images signals of the current folder
+                for key in signals_dict.keys(): # Create a list of dict (one dict for every image)
+                    data_list.append(deepcopy(signals_dict[key]))
+
+                # Store the values for every metric of the current folder
+                comparison_list.append(aggregate_signals(log, data_list, 'none')) # Get list of values for every metrics starting from the signals dict
+
+            else:
+                # Just explore other folders
+                log.info(f"File not found .. still to compute!")
+        
+        # DEBUG
+        print(f"data (converted) : {comparison_list}")
+        print(f"Number of dataset read: {len(comparison_list)}")
+
+        # TODO: Move this to another function (utils - plot a sequence of dict)
+        if comparison_list:
+            metrics = list(comparison_list[0].keys()) # Cast to list from 'dict_keys' obj.
+            print(f"Keys to print: {metrics}")
+            
+            # Plot for every metrics all the values for every dataset (of the sample folder chosen)
+            for key in metrics:
+                
+                current_values = [] # List to collect the values for every dataset for a metrics
+                for single_dict in comparison_list:
+                    current_values.append(single_dict[key])
+
+                # DEBUG
+                print(f"For the key '{key}' there are {len(current_values)} array of values to plot!")
+
+                # Open, plot the array with the proper name and save the fig. for every metric
+                for idx, values in enumerate(current_values):
+                    plt.plot(values, 'o', label = dataset_folders[idx])
+                
+                plt.legend(fontsize="8")
+                plt.xlabel("Time frame")
+                plt.ylabel(key)
+
+                plt.savefig(os.path.join('visualization_results', key))
+                plt.close() # Close the picture of this metric
+
+
+        else:
+            # No signals json is found ..
+            log.info(f"There are not signals computed in the datasets!")
+            
+
         return None
 
 

@@ -27,12 +27,13 @@ def main():
   download_images(env, args) # Set up the images folder
   
   processor = images_processor(env, args)
-  processor.collect_signals()
+  #processor.collect_signals()
   
   #processor.aggregate_signals()
 
   visualizator = signalsVisualizator(env, args)
-  visualizator.visualize_signals()
+  #visualizator.visualize_signals()
+  signalsVisualizator.plot_signals_comparison(log)
 
 
 if __name__ == "__main__":
