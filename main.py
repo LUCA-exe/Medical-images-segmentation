@@ -26,14 +26,13 @@ def main():
 
   download_images(env, args) # Set up the images folder
   
+  # Process single folders signals and aggregate for the dataset
   processor = images_processor(env, args)
-  #processor.collect_signals()
+  processor.collect_signals()
   
-  #processor.aggregate_signals()
-
   visualizator = signalsVisualizator(env, args)
-  #visualizator.visualize_signals()
-  signalsVisualizator.plot_signals_comparison(log)
+  visualizator.visualize_signals() # Compute single signals
+  #signalsVisualizator.plot_signals_comparison(log) # Compare single signals from different datasets
 
 
 if __name__ == "__main__":

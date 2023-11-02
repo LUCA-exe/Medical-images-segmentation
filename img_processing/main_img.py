@@ -168,6 +168,8 @@ class images_processor:
 
         # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
         signals_dict['crc'] = abs(np.mean(mean_cells[1:]) - mean_cells[0]) # Cells Contrast Ratio: Absoluth difference in avg. pixel values between beackground and segmented cells
+        
+        # TODO: Debug the computing loop for the patches gathering
         signals_dict['bh'] = abs(max(background_patches)-min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
         
         # TODO: Cells hetereogenity along the time lapse, aggregated measure: variations of the avg values of the cells along the different frames
