@@ -22,7 +22,10 @@ def __download_data(url, target): # Download the datasets chosen
     print(url)
     print(target)
 
-    local_filename = target / url.split('/')[-1]
+    local_filename = os.path.join(target, url.split('/')[-1])
+    
+    # DEBUG
+    print(f"{local_filename}")
 
     with requests.get(url, stream=True) as r:
         r.raise_for_status() # Help debugging error in case of status different from 200
@@ -46,6 +49,7 @@ def download_datasets(log, args): # Main function to download the chosen dataset
     """
     log.info(f"Preparing the datasets download ..")
     log.info(f"The folders used will be respectively '{args.train_images_path}' and '{args.test_images_path}'")
+    
     # Set up the split folders
     os.makedirs(args.train_images_path, exist_ok=True)
     os.makedirs(args.test_images_path, exist_ok=True)
@@ -57,17 +61,21 @@ def download_datasets(log, args): # Main function to download the chosen dataset
             current_test_path = os.path.join(args.test_images_path, dataset)
             
             if not os.path.isdir(current_train_path): # Check if It's already present
+                log.info(f"Downloading train/test {dataset} dataset ..")
 
                 try: # even if some datasets are not downloadable continue the code
-                    log.info(f"Downloading train/test {dataset} dataset ..")
                     train_url = os.path.join(TRAINDATA_URL, dataset + '.zip') # Set up the url for the download 
-                    test_url = os.path.join(TESTDATA_URL, dataset + '.zip')
-
                     __download_data(train_url, args.train_images_path) # Donwload training data
+                
+                except:
+                    log.info(f"Failed the download of the train split of {dataset}")
+
+                try:
+                    test_url = os.path.join(TESTDATA_URL, dataset + '.zip')
                     __download_data(test_url, args.test_images_path) # Donwload test data
                 
                 except:
-                    log.info(f"Failed the donwload of {dataset}")
+                    log.info(f"Failed the download of the test split of {dataset}")
 
                 
 
