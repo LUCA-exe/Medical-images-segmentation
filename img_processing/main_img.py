@@ -21,7 +21,7 @@ class images_processor:
 
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
-        self.images_folder = os.path.join(args.images_path, args.dataset) # Path in which the json will be saved
+        self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path in which the json will be saved
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
 
@@ -210,7 +210,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
-        self.images_folder = os.path.join(args.images_path, args.dataset) # Path to load the different '*.json' files
+        self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path to load the different '*.json' files
         self.task = task # Folder for the ground truth mask signals loading
 
         os.makedirs('visualization_results', exist_ok=True) # Set up a folder that will contains the final plots

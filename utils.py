@@ -56,9 +56,10 @@ def create_logging():
 
   return logger
 
+# TODO: Deprecated
 def download_images(env, args):
   """ Function to download the images in the path passed by arguments.
-      Folder structure is fixed but the root position can be changed.
+      Dataset folder structure is fixed.
 
     Args:
         args (dict): Arguments usefull for the download and creation of the images folder

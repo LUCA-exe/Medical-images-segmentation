@@ -8,6 +8,7 @@ Helpful resources:
 from utils import create_logging, download_images
 from parser import get_parser, get_processed_args
 from img_processing.main_img import *
+from download_data import download_datasets
 
 
 def main():
@@ -24,14 +25,17 @@ def main():
   log.info(f"args: {args}") # Print overall args 
   log.debug(f"env: {env}")
 
-  download_images(env, args) # Set up the images folder
+  if args.download: # Check if is is requested the donwloading of datasets
+    download_datasets(log, args)
+
+  #download_images(env, args) # Set up the images folder
   
   # Process single folders signals and aggregate for the dataset
   processor = images_processor(env, args)
-  processor.collect_signals()
+  #processor.collect_signals()
   
   visualizator = signalsVisualizator(env, args)
-  visualizator.visualize_signals() # Compute single signals
+  #visualizator.visualize_signals() # Compute single signals
   #signalsVisualizator.plot_signals_comparison(log) # Compare single signals from different datasets
 
 
