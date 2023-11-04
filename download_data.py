@@ -8,32 +8,59 @@ import os
 import requests
 import zipfile
 
+
 # TODO: Move this to a 'config file' inside the repository
 DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
             "PhC-C2DH-U373", "PhC-C2DL-PSC", "Fluo-N2DH-SIM+"]
 
-# NOTE: For now donwload just the train/test Datasets from CTC
+
+# NOTE: For now download just the train/test Datasets from CTC
 TRAINDATA_URL = 'http://data.celltrackingchallenge.net/training-datasets/'
-TESTDATA_URL = 'http://data.celltrackingchallenge.net/challenge-datasets/'
+TESTDATA_URL = 'http://data.celltrackingchallenge.net/test-datasets/'
 
-def __download_data(url, target): # Download the datasets chosen
 
-    #DEBUG 
-    print(url)
-    print(target)
+def __download_data(log, url, target): # Download the datasets chosen with a specific chunk size
 
     local_filename = os.path.join(target, url.split('/')[-1])
     
-    # DEBUG
-    print(f"{local_filename}")
-
+    # TODO: Try a couple of times if raise status give error. 
     with requests.get(url, stream=True) as r:
-        r.raise_for_status() # Help debugging error in case of status different from 200
+
+        if not r.raise_for_status() is None: # If the method doesn't return NoneType It is bad
+            log.debug(f"Status for the url {url}: {r.raise_for_status()}") # Help debugging error in case of status different from 200
+        
         with open(local_filename, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
                 
     return local_filename
+
+
+def __check_dataset(log, dataset_path, url): # Check if It is alredy available, if not donwload it (function used both for test/train splits)
+    
+    dataset = dataset_path.split('/')[-1] # Extract the name
+
+    if not os.path.isdir(dataset_path): # Check if It's already present
+
+        log.info(f"Downloading {dataset_path.split('/')[0].split('_')[0]} {dataset} dataset ..")
+        try: # even if some datasets are not downloadable continue the code
+
+            dataset_url = os.path.join(url, dataset + '.zip') # Set up the url for the download 
+            __download_data(log, dataset_url, dataset_path.split('/')[0]) # Donwload the data on the target folder
+
+        except:
+            log.info(f"Failed the download of the {dataset_path.split('/')[0].split('_')[0]} split of {dataset}")
+        
+        log.info(f"Unzipping {dataset_path + '.zip'} ..")
+        with zipfile.ZipFile(dataset_path + '.zip', 'r') as z: # Extract zipped dataset
+            z.extractall(dataset_path.split('/')[0])
+
+        os.remove(dataset_path + '.zip') # Remove orginal zip
+
+    else:
+        log.info(f"'{dataset_path}' exists already!")
+
+    return None
 
 
 def download_datasets(log, args): # Main function to download the chosen datasets and set up their utilization
@@ -48,7 +75,7 @@ def download_datasets(log, args): # Main function to download the chosen dataset
 
     """
     log.info(f"Preparing the datasets download ..")
-    log.info(f"The folders used will be respectively '{args.train_images_path}' and '{args.test_images_path}'")
+    log.info(f"   The folders used will be respectively '{args.train_images_path}' and '{args.test_images_path}'")
     
     # Set up the split folders
     os.makedirs(args.train_images_path, exist_ok=True)
@@ -59,30 +86,16 @@ def download_datasets(log, args): # Main function to download the chosen dataset
         for dataset in DATASETS:
             current_train_path = os.path.join(args.train_images_path, dataset)
             current_test_path = os.path.join(args.test_images_path, dataset)
-            
-            if not os.path.isdir(current_train_path): # Check if It's already present
-                log.info(f"Downloading train/test {dataset} dataset ..")
 
-                try: # even if some datasets are not downloadable continue the code
-                    train_url = os.path.join(TRAINDATA_URL, dataset + '.zip') # Set up the url for the download 
-                    __download_data(train_url, args.train_images_path) # Donwload training data
-                
-                except:
-                    log.info(f"Failed the download of the train split of {dataset}")
+            __check_dataset(log, current_train_path, TRAINDATA_URL)
+            __check_dataset(log, current_test_path, TESTDATA_URL)
 
-                try:
-                    test_url = os.path.join(TESTDATA_URL, dataset + '.zip')
-                    __download_data(test_url, args.test_images_path) # Donwload test data
-                
-                except:
-                    log.info(f"Failed the download of the test split of {dataset}")
+    else: # Download single dataset if it is present in the list
+        current_train_path = os.path.join(args.train_images_path, args.download_dataset)
+        current_test_path = os.path.join(args.test_images_path, args.download_dataset)
 
-                
-
-    else: # Donwload single dataset if it is present in the list
-
-        pass
-
+        __check_dataset(log, current_train_path, TRAINDATA_URL)
+        __check_dataset(log, current_test_path, TESTDATA_URL)
 
     return None
 

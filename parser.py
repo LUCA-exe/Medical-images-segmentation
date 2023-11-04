@@ -46,7 +46,7 @@ def get_parser():
     parser.add_argument("--download_dataset",
                             default = "all",
                             type=str,
-                            help="Name of the dataset to download")
+                            help="Name of the dataset to download (else 'all')")
 
     # WARNING: Usless in trial phase.
     parser.add_argument("--link_images", # TODO: Move this to a 'config.json' or other options
