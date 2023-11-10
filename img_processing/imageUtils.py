@@ -58,7 +58,7 @@ def visualize_raw_res(image, mask, file_path):
 # Util functions
 
 def log_image_characteristics(log, image_obj, name_obj):
-    """ Log shape and max/min values of the images when downloading a new dataset
+    """ Log shape and max/min values of the images when downloading a new dataset (first check at the data)
 
     Args:
         image_obj (np.ndarray): Tensor of the image
@@ -67,8 +67,10 @@ def log_image_characteristics(log, image_obj, name_obj):
     Returns:
         None
     """
-
-    log.debug(f"First {name_obj} analyzed > shape: {image_obj.shape} max/min pixel values: {np.max(image_obj)} - {np.min(image_obj)}")
+    if name_obj == 'mask':
+        log.debug(f"First {name_obj} analyzed > shape: {image_obj.shape} max/min pixel values: {np.max(image_obj)} - {np.min(image_obj)} Different pixel values: {len(np.unique(image_obj))}")
+    else:
+        log.debug(f"First {name_obj} analyzed > shape: {image_obj.shape} max/min pixel values: {np.max(image_obj)} - {np.min(image_obj)}")
     return None
 
 def __load_image__(image_folder): # Util function of this class. Check if this pattern make sense
@@ -133,13 +135,13 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
     Returns:
         None
     """
-    if os.path.exists(os.path.join(file_path, name + ext)): # Check if the file already exist, if already existing it contains already all the 'key'(imag name)
+    if os.path.exists(os.path.join(file_path, name + ext)): # Check if the file already exist, if already existing it contains already all the 'key'(images name)
         log.info(f"Signals file already existing in {file_path}, It will be not subscribed!")
         return None
     
     empty_dict = defaultdict(dict) # Just record all the images name to prepare to be filled later
     images_name = ['t' + s.split('seg')[-1] for s in os.listdir(file_path) if s.startswith("man")] # Load already the name of the images given the semented mask
-    log.info(f"The signals file {name + ext} will be created in {file_path} for the images: {images_name}")
+    log.info(f"The signals file {name + ext} will be created in '{file_path}' for the images: {images_name}")
     
     [empty_dict[name] for name in images_name] # Fill the inital dict without signals
 
@@ -180,7 +182,7 @@ def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json
 
     return None
 
-# NOTE: The data will be saved in a file, if the '*.json' already exist It will be overwrite
+# WARNING: The data will be saved in a file, if the '*.json' already exist It will be overwrite
 def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ext='.json'):
     """ Save the aggregated signals dict of a dataset in a '*.json'
 
@@ -198,12 +200,12 @@ def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ex
     files = os.listdir(file_path)
     file_name = name + ext
     if file_name in files: # Check if the file already exist (just to notify)
-        log.info(f"Aggregated file for the dataset {file_path} will be overwrite")
+        log.info(f"Aggregated file for the dataset {os.path.basename(file_path)} will be overwrite")
 
     with open(os.path.join(file_path, file_name), "w") as outfile:
         json.dump(data, fp=outfile, indent = 4, sort_keys=True)
         
-        log.info(f"File {file_name} save correctly in {file_path}!")
+        log.info(f"File {file_name} save correctly in '{file_path}'!")
 
     return None
 

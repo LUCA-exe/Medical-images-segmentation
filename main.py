@@ -27,8 +27,6 @@ def main():
 
   if args.download: # Check if is is requested the donwloading of datasets
     download_datasets(log, args)
-
-  #download_images(env, args) # Set up the images folder
   
   # Process single folders signals and aggregate for the dataset
   processor = images_processor(env, args)
@@ -36,7 +34,7 @@ def main():
   
   visualizator = signalsVisualizator(env, args)
   #visualizator.visualize_signals() # Compute single signals
-  #signalsVisualizator.plot_signals_comparison(log) # Compare single signals from different datasets
+  signalsVisualizator.plot_signals_comparison(log) # Compare single signals from different datasets
 
 
 if __name__ == "__main__":

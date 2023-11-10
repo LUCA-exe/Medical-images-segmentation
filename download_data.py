@@ -88,7 +88,7 @@ def download_datasets(log, args): # Main function to download the chosen dataset
 
     """
     log.info(f"Preparing the datasets download ..")
-    log.info(f"   The folders used will be respectively '{args.train_images_path}' and '{args.test_images_path}'")
+    log.info(f"> The folders used will be respectively '{args.train_images_path}' and '{args.test_images_path}'")
     
     # Set up the split folders
     os.makedirs(args.train_images_path, exist_ok=True)
@@ -105,11 +105,14 @@ def download_datasets(log, args): # Main function to download the chosen dataset
             __check_dataset(log, current_test_path, TESTDATA_URL)
 
     else: # Download single dataset if it is present in the list
+        log.info(f"Dataset that will be downloaded: {args.download_dataset}")
         current_train_path = os.path.join(args.train_images_path, args.download_dataset)
         current_test_path = os.path.join(args.test_images_path, args.download_dataset)
 
         __check_dataset(log, current_train_path, TRAINDATA_URL)
         __check_dataset(log, current_test_path, TESTDATA_URL)
+
+    log.info(f"Data downloads completed!")
 
     return None
 

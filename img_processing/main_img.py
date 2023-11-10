@@ -24,6 +24,7 @@ class images_processor:
         self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path in which the json will be saved
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
+        self.considered_images = args.max_images # Set a limit to the number of masks to use
 
         os.makedirs('tmp', exist_ok=True) # Set up a './tmp' folder for debugging images
         self.debug_folder = 'tmp'
@@ -46,9 +47,10 @@ class images_processor:
         Returns:
             None 
         """
+        self.log.info(f"Collecting properties (max {self.considered_images} for every masks folders) of '{self.images_folder}' ..")
+
         # This function will process images; cleaning the './tmp' folder
-        if os.listdir(self.debug_folder): 
-            # 'Debug dir' has some files: delete all
+        if os.listdir(self.debug_folder): # 'Debug dir' has some files: delete all
             self.log.debug(f"Folder '{self.debug_folder}' contains files, It will be cleaned")
             for file_name in os.listdir(self.debug_folder):
                 os.remove(os.path.join(self.debug_folder, file_name))
@@ -71,23 +73,26 @@ class images_processor:
             files_name.sort()
             self.log.debug(f"Currently working in '{current_path}': files are {files_name}")
 
-            create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data - 
+            create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
             stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
 
+            if len(files_names) > self.considered_images: files_names = files_names[:self.considered_images] # Consider just a limited number of masks
             for file_name in files_name:
                 current_mask_path = os.path.join(current_path, file_name)
-                # For evey mask path, fetch the proper image path
+                # For evey mask path, fetch the proper image path (images masks less than total of the images)
                 image_name = fetch_image_path(current_mask_path, current_images_path)
                 current_image_path = os.path.join(current_images_path, image_name)
 
                 # Ready to compute the signals for the coupled mask - image
+                self.log.debug(f".. working on {image_name} - {file_name} ..")
                 stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels) # Save the signals for every original image name
 
-                total_stats.append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset
+                total_stats.append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset (copy, not the reference)
 
             # Finished to gather data from the current folder - update the existing '*.json' (on the current folder)
             update_signals_file(self.log, current_path, stats)
 
+        self.log.info(f".. Aggregating images signals from all folders ..")
         total_dict = aggregate_signals(self.log, total_stats) # Aggregate the signals of the current dataset in a single dict 
         save_aggregated_signals(self.log, self.images_folder, total_dict) # Save the 'dict' on the root folder of the dataset
 
@@ -116,30 +121,31 @@ class images_processor:
         boolean_mask = mask != 0 # Create a boolean matrix for the segmented objects
 
         obj_pixels = len(mask[boolean_mask]) # Pixels belonging to segmented objects considered
+        background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
         tot_pixels = mask.shape[0] * mask.shape[1] # Total pixels of the image
 
         # DEBUG console visualization
-        print(f"Working on {os.path.basename(image_path).split('.')[0]} image")
-        background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
+        print(f"\nWorking on {os.path.basename(image_path).split('.')[0]} image")
         print(f"> Rumore nel background: {np.std(background_pixels)}")
         print(f"> Numero di oggetti (incluso il background): {len(np.unique(mask))}")
         print(f"> Valori degli oggetti (incluso background): {np.unique(mask)}")
 
         # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
         #thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
-        mean_cells, std_cells = [], [] # Mean and std inside the segmented cells
+        mean_cells, std_cells, dim_cells, dim_cells_variations = [], [], [], [] # Mean, std and number of pixels of the segmented cells
         obj_values = np.unique(mask) # Store the pixel value for each object
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
+        print(f"> List of 'pixels value' - 'number of pixel'") # Debug console
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
-            print(f"> List of 'pixels value' - 'number of pixel'")
+            
             print(f"   {value} - {count}")
-
             if count > self.thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
                 current_mask = mask == value
                 current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
                 mean_cells.append(np.mean(current_pixels)) 
                 std_cells.append(np.std(current_pixels))
+                dim_cells.append(len(current_pixels))
 
         # To compute the image backround homogeinity
         print(f"> Background pixels shape: {background_pixels.shape}")
@@ -163,17 +169,15 @@ class images_processor:
         
         signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells pixels
         signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std
+        signals_dict['cd'] = np.mean(dim_cells[1:]) # Cell dimensions: avg. of the number of pixels of the cells
+        signals_dict['cdv'] = np.std(dim_cells[1:]) # Cell dimensions variations: std. of the number of pixels of the cells
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
         signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
 
         # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
-        signals_dict['crc'] = abs(np.mean(mean_cells[1:]) - mean_cells[0]) # Cells Contrast Ratio: Absoluth difference in avg. pixel values between beackground and segmented cells
-        
-        # TODO: Debug the computing loop for the patches gathering
+        signals_dict['ccd'] = abs(np.mean(mean_cells[1:]) - mean_cells[0]) # Cells Contrast Difference: Absoluth difference in avg. pixel values between beackground and segmented cells
         signals_dict['bh'] = abs(max(background_patches)-min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
         
-        # TODO: Cells hetereogenity along the time lapse, aggregated measure: variations of the avg values of the cells along the different frames
-
         return signals_dict
 
     # TODO: Remove from here - moved to utils

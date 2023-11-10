@@ -30,12 +30,6 @@ def get_parser():
                             #choices=["single-frame", "multiple_frames"],
                             help="Which folder to access")
 
-    # TODO: Kept fixed as arguments.. maybe should be extracted from a '*.json' file with a finetuned dimension for every seen dataset..
-    parser.add_argument("--cell_dim", # If required is True why put a 'default' param?
-                            default = 7000, # My dataset has an avg of 4000 EVs dim in pixels 
-                            type=int,
-                            help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
-
     parser.add_argument("--download",
                             default=False,
                             type=bool,
@@ -54,6 +48,19 @@ def get_parser():
                             required=True, 
                             type=str,
                             help="Link to download the dataset")
+    
+    # Starting args used for the image characteristics gathering
+
+    # TODO: Kept fixed as arguments.. maybe should be extracted from a '*.json' file with a finetuned dimension for every seen dataset..
+    parser.add_argument("--cell_dim", # If required is True why put a 'default' param?
+                            default = 7000, # My dataset has an avg of 4000 EVs dim in pixels 
+                            type=int,
+                            help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
+
+    parser.add_argument("--max_images", 
+                            default = 25,
+                            type=int,
+                            help="Max. number of images to take for the gathering of signals (for every folder separately)")
                             
     args = parser.parse_args()
     return args
