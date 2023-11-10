@@ -30,11 +30,11 @@ def main():
   
   # Process single folders signals and aggregate for the dataset
   processor = images_processor(env, args)
-  #processor.collect_signals()
+  processor.collect_signals()
   
   visualizator = signalsVisualizator(env, args)
   #visualizator.visualize_signals() # Compute single signals
-  signalsVisualizator.dataset_signals_comparison(log) # Compare single signals from different datasets
+  #signalsVisualizator.dataset_signals_comparison(log) # Compare single signals from different datasets
 
 
 if __name__ == "__main__":

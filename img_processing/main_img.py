@@ -168,7 +168,7 @@ class images_processor:
         visualize_image(image, os.path.join(self.debug_folder, image_name))
         
         signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells pixels
-        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std
+        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std.
         signals_dict['cd'] = np.mean(dim_cells[1:]) # Cell dimensions: avg. of the number of pixels of the cells
         signals_dict['cdv'] = np.std(dim_cells[1:]) # Cell dimensions variations: std. of the number of pixels of the cells
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
@@ -439,12 +439,12 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         for key, lists in datasets_dict.items():
             # Creare i boxplots per ogni lista nella chiave corrente
-            plt.figure()
+            plt.figure(figsize=(14, 10))
 
             plt.boxplot(lists)
 
             # Impostare le etichette sull'asse x
-            plt.xticks(np.arange(1, len(dataset_list) + 1), dataset_list) # set the x ticks
+            plt.xticks(np.arange(1, len(dataset_list) + 1), dataset_list, rotation=45) # set the x ticks
 
             plt.ylabel(f'{key}')
             plt.title(f'Dataset comparison')
@@ -460,7 +460,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         
         for key, lists in datasets_dict.items():
 
-            plt.figure()
+            plt.figure(figsize=(14, 10))
 
             for idx, values in enumerate(lists): # Plot the curve for every list for that metric
                 
