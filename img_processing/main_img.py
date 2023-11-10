@@ -136,7 +136,8 @@ class images_processor:
         obj_values = np.unique(mask) # Store the pixel value for each object
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
-        print(f"> List of 'pixels value' - 'number of pixel'") # Debug console
+        # DEBUG console visualization
+        print(f"> List of 'pixels value' - 'number of pixel'")
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
             
             print(f"   {value} - {count}")
@@ -148,8 +149,7 @@ class images_processor:
                 dim_cells.append(len(current_pixels))
 
         # To compute the image backround homogeinity
-        print(f"> Background pixels shape: {background_pixels.shape}")
-        #for patch in (background_pixels):
+        print(f"> Background pixels shape: {background_pixels.shape}") # DEBUG console visualization
         
         step = floor(perc_pixels * len(background_pixels))
         background_patches = [] # List containing the avg. value of a patches of background pixels
@@ -210,7 +210,7 @@ class images_processor:
 class signalsVisualizator: # Object to plot signals of a single dataset (both aggregated/single mask folder): for now mantain this design - (To oeprate on multiple dataset just create a appropriate main script).
  
     def __init__(self, env, args, task='SEG'):
-        """ Class to create a obj. that gather images signals from segmentation masks"""
+        """ Class to create a obj. that gather images signals from segmentation masks and plots the results"""
 
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
@@ -381,6 +381,100 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             
 
         return None
+
+    
+    # WORK IN PROGRESS: Dataset comparison (both box-plots for every metrics and normal line plot)
+    @staticmethod
+    def dataset_signals_comparison(log, split_folder='training_data'):
+        """ Read all the 'aggregated_signals' from the different datasets folders and plots the comparison graph
+
+        Args:
+            folders_sample (str): Folders to search for '*.json' to compare among different datasets (normally the training folder)
+
+        Returns:
+            None
+        """
+        target_folder = 'visualization_results' # TODO: Make a const of the object .. (outside the init)
+
+        os.makedirs(target_folder, exist_ok=True) # Set up a folder that will contains the final plots
+
+        log.info(f"Comparison of different datasets signals (used the dataset folders in the split '{split_folder}')")
+        # Comparare le metriche divise per folder divise per dataset - salvare file su visualization results
+        
+        # For every dataset, take the signals computed in the '01_GT' folder
+        dataset_folders = os.listdir(split_folder)
+        dataset_folders = [s for s in dataset_folders if not s.startswith("__")]
+
+        log.info(f"The datasets found are: {dataset_folders}")
+        dataset_list = [] # Just append the name of the dataset that actual contains the data
+        datasets_dict = defaultdict(list) # Dict in the format 'metric': [[one list for every dataset], [...], [...]]
+
+        for dataset in dataset_folders:
+            
+            json_file = [s for s in os.listdir(os.path.join(split_folder, dataset)) if s.endswith(".json")] # Search for the 'aggregated_signals.json'
+            
+            if json_file:
+                log.info(f".. extracting {dataset} data ..")
+                dataset_list.append(dataset)
+
+                f = open(os.path.join(split_folder, dataset, json_file[0])) # Open the current 'aggregated' data
+                signals_dict = json.load(f)
+
+                for metric, value in signals_dict.items(): # The 'value from the 'aggregated*.json' are lists of value
+                    datasets_dict[metric].append(value)
+
+            else:
+                log.info(f".. {dataset} doesn't contains any data ..")
+                        
+        log.debug(f"Total dataset considered are : {dataset_list}")
+
+        # BOX PLOT to compare the different datasets
+        log.info(f"The graphs will be saved in './{target_folder}'")
+        signalsVisualizator.__box_plots(log, datasets_dict, dataset_list, target_folder)
+        signalsVisualizator.__line_plots(log, datasets_dict, dataset_list, target_folder)
+        return None
+    
+    @staticmethod
+    def __box_plots(log, datasets_dict, dataset_list, target_folder):
+
+        for key, lists in datasets_dict.items():
+            # Creare i boxplots per ogni lista nella chiave corrente
+            plt.figure()
+
+            plt.boxplot(lists)
+
+            # Impostare le etichette sull'asse x
+            plt.xticks(np.arange(1, len(dataset_list) + 1), dataset_list) # set the x ticks
+
+            plt.ylabel(f'{key}')
+            plt.title(f'Dataset comparison')
+
+            plt.savefig(os.path.join(target_folder, f"{key}_boxplot"))
+            plt.close()
+
+        return None
+
+    
+    @staticmethod
+    def __line_plots(log, datasets_dict, dataset_list, target_folder):
+        
+        for key, lists in datasets_dict.items():
+
+            plt.figure()
+
+            for idx, values in enumerate(lists): # Plot the curve for every list for that metric
+                
+                plt.plot(values, '-.', label = dataset_list[idx])
+                
+                plt.legend(fontsize="8")
+                plt.xlabel("Time frame")
+                plt.ylabel(key)
+
+                plt.savefig(os.path.join(target_folder, f"{key}_lineplot"))
+            plt.close() # Close the picture of this metric
+
+    
+
 
 
 

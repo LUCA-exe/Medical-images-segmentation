@@ -58,7 +58,7 @@ def get_parser():
                             help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
 
     parser.add_argument("--max_images", 
-                            default = 25,
+                            default = 15,
                             type=int,
                             help="Max. number of images to take for the gathering of signals (for every folder separately)")
                             
