@@ -205,7 +205,7 @@ def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ex
     with open(os.path.join(file_path, file_name), "w") as outfile:
         json.dump(data, fp=outfile, indent = 4, sort_keys=True)
         
-        log.info(f"File {file_name} save correctly in '{file_path}'!")
+        log.info(f"File {file_name} saved correctly in '{file_path}'!")
 
     return None
 

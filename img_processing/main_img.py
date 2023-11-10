@@ -76,7 +76,7 @@ class images_processor:
             create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
             stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
 
-            if len(files_names) > self.considered_images: files_names = files_names[:self.considered_images] # Consider just a limited number of masks
+            if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks
             for file_name in files_name:
                 current_mask_path = os.path.join(current_path, file_name)
                 # For evey mask path, fetch the proper image path (images masks less than total of the images)
@@ -93,7 +93,7 @@ class images_processor:
             update_signals_file(self.log, current_path, stats)
 
         self.log.info(f".. Aggregating images signals from all folders ..")
-        total_dict = aggregate_signals(self.log, total_stats) # Aggregate the signals of the current dataset in a single dict 
+        total_dict = aggregate_signals(self.log, total_stats, 'none') # Aggregate the signals of the current dataset in a single dict (format = 'metric': [list of values])
         save_aggregated_signals(self.log, self.images_folder, total_dict) # Save the 'dict' on the root folder of the dataset
 
         return None
@@ -161,7 +161,7 @@ class images_processor:
         
         #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here - It should just be a conversion of array 0 values 
 
-        # Visualization for debug purpose - both image/mask saved inside the 'self.debug_folder'
+        # Visualization for DEBUG purpose - both image/mask saved inside the 'self.debug_folder'
         mask_name = os.path.basename(mask_path).split('.')[0]
         visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
         image_name = os.path.basename(image_path).split('.')[0]
