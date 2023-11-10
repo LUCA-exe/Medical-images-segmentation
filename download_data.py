@@ -7,7 +7,9 @@ This file contains the function to download and set up the train/test data.
 import os
 import requests
 import zipfile
+import tifffile as tiff
 
+from img_processing.imageUtils import *
 
 # TODO: Move this to a 'config file' inside the repository
 DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
@@ -48,15 +50,26 @@ def __check_dataset(log, dataset_path, url): # Check if It is alredy available, 
             dataset_url = os.path.join(url, dataset + '.zip') # Set up the url for the download 
             __download_data(log, dataset_url, dataset_path.split('/')[0]) # Donwload the data on the target folder
 
+            log.info(f"Unzipping {dataset_path + '.zip'} ..")
+            with zipfile.ZipFile(dataset_path + '.zip', 'r') as z: # Extract zipped dataset
+                z.extractall(dataset_path.split('/')[0])
+            os.remove(dataset_path + '.zip') # Remove orginal zip
+            
+            # As default will be used '01' and '01_GT/SEG' with the respective first files
+            images = os.listdir(os.path.join(dataset_path, '01'))
+            images.sort()
+            image = tiff.imread(os.path.join(dataset_path, '01', images[0]))
+            log_image_characteristics(log, image, 'image') # Log characteristics of images
+
+            if dataset_path.split('/')[0] == 'training_data': # TODO: should be passed directly from args
+                masks = os.listdir(os.path.join(dataset_path, '01_GT/SEG'))
+                masks.sort()
+                mask = tiff.imread(os.path.join(dataset_path, '01_GT/SEG', masks[0]))
+                log_image_characteristics(log, mask, 'mask')
+
         except:
             log.info(f"Failed the download of the {dataset_path.split('/')[0].split('_')[0]} split of {dataset}")
         
-        log.info(f"Unzipping {dataset_path + '.zip'} ..")
-        with zipfile.ZipFile(dataset_path + '.zip', 'r') as z: # Extract zipped dataset
-            z.extractall(dataset_path.split('/')[0])
-
-        os.remove(dataset_path + '.zip') # Remove orginal zip
-
     else:
         log.info(f"'{dataset_path}' exists already!")
 
@@ -82,7 +95,8 @@ def download_datasets(log, args): # Main function to download the chosen dataset
     os.makedirs(args.test_images_path, exist_ok=True)
 
     if args.download_dataset == 'all': # TODO: Provide other options
-        
+
+        log.info(f"All datasets will be downloaded")
         for dataset in DATASETS:
             current_train_path = os.path.join(args.train_images_path, dataset)
             current_test_path = os.path.join(args.test_images_path, dataset)

@@ -10,7 +10,7 @@ from collections import defaultdict
 import json
 
 
-# Save the images in tmp folder to visualize them
+# Functions to visualize the images during processing
 def visualize_mask(mask, file_path):
     fig, axs = plt.subplots(1, 2, figsize=(12, 12))
     
@@ -56,6 +56,20 @@ def visualize_raw_res(image, mask, file_path):
 
 
 # Util functions
+
+def log_image_characteristics(log, image_obj, name_obj):
+    """ Log shape and max/min values of the images when downloading a new dataset
+
+    Args:
+        image_obj (np.ndarray): Tensor of the image
+        name_obj (str): Name to print on the debug string
+
+    Returns:
+        None
+    """
+
+    log.debug(f"First {name_obj} analyzed > shape: {image_obj.shape} max/min pixel values: {np.max(image_obj)} - {np.min(image_obj)}")
+    return None
 
 def __load_image__(image_folder): # Util function of this class. Check if this pattern make sense
     """ Load the single channel or multiple channels of the required image.
