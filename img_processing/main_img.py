@@ -146,7 +146,7 @@ class images_processor:
                 current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
                 mean_cells.append(np.mean(current_pixels)) 
                 std_cells.append(np.std(current_pixels))
-                dim_cells.append(len(current_pixels))
+                dim_cells.append(len(current_pixels)/tot_pixels) # Get a percentage (It depends less on the resolution of the images)
 
         # To compute the image backround homogeinity
         print(f"> Background pixels shape: {background_pixels.shape}") # DEBUG console visualization
@@ -168,9 +168,9 @@ class images_processor:
         visualize_image(image, os.path.join(self.debug_folder, image_name))
         
         signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells pixels
-        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std.
-        signals_dict['cd'] = np.mean(dim_cells[1:]) # Cell dimensions: avg. of the number of pixels of the cells
-        signals_dict['cdv'] = np.std(dim_cells[1:]) # Cell dimensions variations: std. of the number of pixels of the cells
+        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std (It may be considered as 'blurriness').
+        signals_dict['cdr'] = np.mean(dim_cells[1:]) # Cell dimensions ratio: avg. of the number of pixels of the cells (in percentage over the total image)
+        signals_dict['cdvr'] = np.std(dim_cells[1:]) # Cell dimensions variations ratio: std. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
         signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
 

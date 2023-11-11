@@ -24,7 +24,7 @@ def get_parser():
                             type=str,
                             help="Path to the test images dataset")
 
-    parser.add_argument("--dataset", # If required is True why put a 'default' param?
+    parser.add_argument("--dataset", # NOTE: If required is True why put a 'default' param?
                             default="Fluo-E2DV-train",
                             type=str,
                             #choices=["single-frame", "multiple_frames"],
@@ -33,7 +33,7 @@ def get_parser():
     parser.add_argument("--download",
                             default=False,
                             type=bool,
-                            help="Boolean value to check for download online datasets")
+                            help="Boolean value to check for download online dataset/datasets")
 
     # TODO: Expand the dataset options from other challenges/websites
     # What dataset to download (from CTC website)
@@ -42,7 +42,7 @@ def get_parser():
                             type=str,
                             help="Name of the dataset to download (else 'all')")
 
-    # WARNING: Usless in trial phase.
+    # WARNING: Useless for now - should be transformed in a parameter to import my data
     parser.add_argument("--link_images", # TODO: Move this to a 'config.json' or other options
                                         # For now download from my private google drive.. this arg. is temporary unused
                             required=True, 
@@ -53,7 +53,7 @@ def get_parser():
 
     # TODO: Kept fixed as arguments.. maybe should be extracted from a '*.json' file with a finetuned dimension for every seen dataset..
     parser.add_argument("--cell_dim", # If required is True why put a 'default' param?
-                            default = 7000, # My dataset has an avg of 4000 EVs dim in pixels 
+                            default = 7000, # My dataset has an avg of 4000 EVs dim in pixels (It depends on the resolution)
                             type=int,
                             help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
 
@@ -61,6 +61,16 @@ def get_parser():
                             default = 15,
                             type=int,
                             help="Max. number of images to take for the gathering of signals (for every folder separately)")
+     
+    parser.add_argument("--compute_signals", # Gather signals for a dataset 
+                            default = False,
+                            type = bool,
+                            help="Compute signals for the chosen dataset")
+
+    parser.add_argument("--compare_signals", # Compare signals for all datasets (both box-plots and line-plots) 
+                            default = False,
+                            type = bool,
+                            help="Compute signals for the chosen dataset")
                             
     args = parser.parse_args()
     return args
