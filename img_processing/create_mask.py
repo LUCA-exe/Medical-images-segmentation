@@ -25,12 +25,12 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks):
 
         name = file_names[i]
         img = d_images[i]
-        drawed_images = [i]
+        drawed_images = d_drawed_images[i]
         mask = d_masks[i]
 
         visualize_image(img, os.path.join(DEBUG_PATH, name))
-        visualize_image(img, os.path.join(DEBUG_PATH, f"drawed_{name}"))
-        visualize_mask(img, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
+        visualize_image(drawed_images, os.path.join(DEBUG_PATH, f"drawed_{name}"))
+        visualize_mask(mask, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
