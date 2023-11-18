@@ -13,12 +13,24 @@ import cv2
 from img_processing.imageUtils import visualize_image, visualize_mask
 
 DEBUG_PATH = './tmp' # Folder for debug visualization
+N_IMAGES = 2 # Number of images to debug visually
 
 # NOTE: You have to have the '*.jpg' images.
 
 # TODO: Add debug visualization of the first and last frames (import functions from imageUtils)
-def debug_frames(d_images, d_drawed_images, d_masks):
+def debug_frames(file_names, d_images, d_drawed_images, d_masks):
+    os.makedirs(DEBUG_PATH ,exist_ok=True)
+    
+    for i in range(N_IMAGES):
 
+        name = file_names[i]
+        img = d_images[i]
+        drawed_images = [i]
+        mask = d_masks[i]
+
+        visualize_image(img, os.path.join(DEBUG_PATH, name))
+        visualize_image(img, os.path.join(DEBUG_PATH, f"drawed_{name}"))
+        visualize_mask(img, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
@@ -42,11 +54,12 @@ def create_mask_from_json(json_file, images_folder, target_folder):
             print(f".. Reading {filename} ..")
             images_names.append(filename)
 
-    d_images, d_drawed_images, d_masks = [], [], []  
+    d_names, d_images, d_drawed_images, d_masks = [], [], [], []  
 
     for name in all_file_names: # Loop over the original filenames - order of the '.json' keys mantained
 
         image_name = data[name]['filename'] # Extract the current 'real' images filename 
+        d_names.append(image_name.split('.')[0])
 
         print(f".. Working on image {image_name} ..")
         image_name = image_name.split('.')[0] + '.tif' # Original name.format of the current image
@@ -97,6 +110,6 @@ def create_mask_from_json(json_file, images_folder, target_folder):
                 print(f"Error when saving '{mask_name}' !")
 
     # call visual debug functions.
-
+    debug_frames(d_names, d_images, d_drawed_images, d_masks)
 
     return None
