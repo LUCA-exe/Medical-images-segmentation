@@ -4,6 +4,7 @@ This is a 'util' file to create segmentation masks from the 'annotation.json' (c
 (It is separate from the general repository, just a script that you can call from a notebook cell).
 """
 
+from copy import deepcopy
 import json
 import PIL.Image
 import numpy as np
@@ -15,11 +16,11 @@ from img_processing.imageUtils import visualize_image, visualize_mask
 DEBUG_PATH = './tmp' # Folder for debug visualization
 N_IMAGES = 2 # Number of images to debug visually
 
-# NOTE: You have to have the '*.jpg' images.
 
 # TODO: Add debug visualization of the first and last frames (import functions from imageUtils)
 def debug_frames(file_names, d_images, d_drawed_images, d_masks):
-    os.makedirs(DEBUG_PATH ,exist_ok=True)
+
+    os.makedirs(DEBUG_PATH ,exist_ok=True) # Set up the debugging folder
     
     for i in range(N_IMAGES):
 
@@ -31,6 +32,8 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks):
         visualize_image(img, os.path.join(DEBUG_PATH, name))
         visualize_image(drawed_images, os.path.join(DEBUG_PATH, f"drawed_{name}"))
         visualize_mask(mask, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
+    
+    print(f"The {N_IMAGES} images annotation process is shown on the {DEBUG_PATH}!")
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
@@ -67,7 +70,7 @@ def create_mask_from_json(json_file, images_folder, target_folder):
         if image_name in images_names: # Change the extension of the image (from '.jpg' to '.tif')
             img = np.asarray(PIL.Image.open(os.path.join(images_folder, image_name)))
 
-            d_images.append(img)
+            d_images.append(deepcopy(img))
         else:
             print(">> Exception! Pass to another the image ..")
             continue # Can't open the current image
@@ -109,7 +112,7 @@ def create_mask_from_json(json_file, images_folder, target_folder):
             else:
                 print(f"Error when saving '{mask_name}' !")
 
-    # call visual debug functions.
+    # Call visual debug functions
     debug_frames(d_names, d_images, d_drawed_images, d_masks)
 
     return None
