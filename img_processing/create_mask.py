@@ -5,6 +5,7 @@ This is a 'util' file to create segmentation masks from the 'annotation.json' (c
 """
 
 from copy import deepcopy
+import shutil
 import json
 import PIL.Image
 import numpy as np
@@ -19,7 +20,12 @@ N_IMAGES = 2 # Number of images to debug visually
 
 # TODO: Add debug visualization of the first and last frames (import functions from imageUtils)
 def debug_frames(file_names, d_images, d_drawed_images, d_masks):
-
+    
+    # Clean and set up the debugging folder
+    try:
+        shutil.rmtree(DEBUG_PATH)
+    except Exception as e:
+        print(f'Failed to delete directory: {e}')
     os.makedirs(DEBUG_PATH ,exist_ok=True) # Set up the debugging folder
     
     for i in range(N_IMAGES):
@@ -34,6 +40,8 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks):
         visualize_mask(mask, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
     
     print(f"The {N_IMAGES} images annotation process is shown on the {DEBUG_PATH}!")
+
+    return None
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
