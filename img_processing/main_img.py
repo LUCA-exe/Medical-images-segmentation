@@ -132,7 +132,7 @@ class images_processor:
 
         # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
         #thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
-        mean_cells, std_cells, dim_cells, dim_cells_variations = [], [], [], [] # Mean, std and number of pixels of the segmented cells
+        mean_cells, std_cells, dim_cells, dim_cells_variations = [], [], [], [] # Mean, std and number of pixels of the segmented cells (both total and )
         obj_values = np.unique(mask) # Store the pixel value for each object
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
@@ -144,9 +144,13 @@ class images_processor:
             if count > self.thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
                 current_mask = mask == value
                 current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
-                mean_cells.append(np.mean(current_pixels)) 
+                
+                # WARNING:  BUG on some dataset in the pixels value
+                current_pixels[current_pixels > 255] = 255 # Cap the value of the pixels to the actual RGB limit channel values
+                
+                mean_cells.append(np.mean(current_pixels))
                 std_cells.append(np.std(current_pixels))
-                dim_cells.append(len(current_pixels)/tot_pixels) # Get a percentage (It depends less on the resolution of the images)
+                dim_cells.append(len(current_pixels)/tot_pixels) # Get a ratio (this way it depends less on the resolution of the images)
 
         # To compute the image backround homogeinity
         print(f"> Background pixels shape: {background_pixels.shape}") # DEBUG console visualization
@@ -167,8 +171,8 @@ class images_processor:
         image_name = os.path.basename(image_path).split('.')[0]
         visualize_image(image, os.path.join(self.debug_folder, image_name))
         
-        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells pixels
-        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells pixels std (It may be considered as 'blurriness').
+        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells values pixels
+        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells values pixels std.
         signals_dict['cdr'] = np.mean(dim_cells[1:]) # Cell dimensions ratio: avg. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['cdvr'] = np.std(dim_cells[1:]) # Cell dimensions variations ratio: std. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio

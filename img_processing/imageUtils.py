@@ -121,7 +121,7 @@ def to_single_channel(image):
         return None
 
     else:
-        return np.sum(image, axis=2) # Sum the pixels value along the last dim
+        return np.sum(image, axis=2) # Sum the pixels value along the last dim.
     
 def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # Fow now don't pass files name as list, This function will retrieve them
     """ Create a '*.json' file that contains signals gathered for every image.

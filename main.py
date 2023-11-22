@@ -1,7 +1,7 @@
-"""main.py
+"""main_signals.py
 
-This is a temporary main executable file for running the repository (different pipelines
-from the same file).
+This is a temporary main executable file for running the repository functionalities about download dataset,
+gather images properties and compare signals among the images for dataset benchmarking.
 
 Helpful resources:
     - 
@@ -13,7 +13,7 @@ from download_data import download_datasets
 
 
 def main():
-    """ Main function to call in order to run all the project classes and functions
+    """ Main function to call in order to run all the project classes and functions about image download and properties
     """
     log = create_logging() # Set up 'logger' object 
 
@@ -30,7 +30,7 @@ def main():
         download_datasets(log, args)
 
     if args.compute_signals:
-        # Process single folders signals and aggregate for the dataset
+        # Process single folders signals and aggregate for the current dataset chosen by args
         processor = images_processor(env, args)
         processor.collect_signals()
 
@@ -41,6 +41,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main() # For now just donwload, compute and visualize signals for the chosen dataset
+    main() # For now just donwload, compute and visualize signals
 
 
