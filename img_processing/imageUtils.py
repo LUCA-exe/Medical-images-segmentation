@@ -1,6 +1,9 @@
-"""main_img.py
+"""imageUtils.py
 
-This is the main executable file for running the processing of images functions.
+This file contains utils function for the other scripts in the folder.
+- Visualization for debug purpose
+- Creation/updating of files containing images characteristics
+- Debugging functions
 """
 
 from matplotlib import pyplot as plt
@@ -8,6 +11,7 @@ import numpy as np
 import os
 from collections import defaultdict
 import json
+import tifffile as tiff
 
 
 # Functions to visualize the images during processing
@@ -235,7 +239,73 @@ def aggregate_signals(log, signals_list, method='mean'):
     
     return total_dict # The obj. may differ in structure given the aggregation method
 
+
+def debug_segmentation_masks(seg_masks_path):
+    # Function to print seg_masks characteristics on console (just helps for creating the 'man_track.txt' in the 'TRA' folder)
+
+    print(f"*** Printing masks properties on '{seg_masks_path}' ***")
+    masks_ids = [mask for mask in os.listdir(seg_masks_path) if mask.endswith('.tif')]
+    print(f"Mask found: {masks_ids}")
+
+    labels_dict = defaultdict(list) # Dict containing {'element': [first_frame, last_frame]}, helps the manual creation of 'man_track.txt'.
+    for mask_id in masks_ids:
+        mask = tiff.imread(os.path.join(seg_masks_path, mask_id))
+
+        print(f"Mask {mask_id}: shape {mask.shape}")
+        unique_values = np.unique(mask)
+        
+        for value in unique_values: # Remember, the 'value' representing the object segmented is the pixel value assigned to the object along the time lapse
+            labels_dict[value].append(int(mask_id.split('.')[0].split('g')[-1])) # Append just the frame int value if it is present the 'label' key object inside the current mask
+
+    print(f"The columns are: Label - first frame - last frame (the print is below to facilitate the '*.txt' creation)")
+    for key, frame_list in labels_dict.items():
+
+        if key == 0: # Avoid the background label
+            continue
+
+        print(f"{key} {min(frame_list)} {max(frame_list)}")
+
+    print("*** Debug maks properties complete! ***")
+
+    return None
+
+
+
+
+
     
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
      
 
 
