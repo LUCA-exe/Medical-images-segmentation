@@ -18,7 +18,6 @@ DEBUG_PATH = './tmp' # Folder for debug visualization
 N_IMAGES = 2 # Number of images to debug visually
 
 
-# TODO: Add debug visualization of the first and last frames (import functions from imageUtils)
 def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
     
     # Clean and set up the debugging folder
@@ -28,8 +27,8 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
         print(f'Failed to delete directory: {e}')
     os.makedirs(DEBUG_PATH ,exist_ok=True) # Set up the debugging folder
     
+    # Just visually debug the first 'N_IMAGES'
     for i in range(N_IMAGES):
-
         name = file_names[i]
         img = d_images[i]
         drawed_images = d_drawed_images[i]
@@ -47,7 +46,9 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
-def create_masks_from_json(json_file, images_folder, target_folder):
+def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=7000, reducing_ratio= 0.2): 
+    # 'pixel_limit' needed for the adusting of the marker dimension (smaller marker in case of cells)
+    # 'reducing_ratio' Needed to reduce the initial marker dimension
 
     print("*** Creation of the segmentation masks ***")
     print(f"Working on {json_file} ..")
@@ -107,43 +108,63 @@ def create_masks_from_json(json_file, images_folder, target_folder):
 
             mask, track = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint16), np.zeros((img.shape[0], img.shape[1]), dtype=np.uint16)
             
+            print(f".. segmenting {len(multiple_ab)} elements ..")
             for idx, obj in enumerate(multiple_ab): # Add one image at the time to manage different color
                 _ = cv2.drawContours(mask, [obj], -1, idx+1, -1) # cv2.drawContours modify inplace AND return an image - Creation of the mask
                 
                 right_upper_limits = np.squeeze(obj.max(axis=0))
                 left_lower_limits = np.squeeze(obj.min(axis=0))
                 mean_point = np.mean([right_upper_limits, left_lower_limits] ,axis=0) # Get the central point of the shape (in my case the shape are all full rounds)
-                
-                #print(right_upper_limits)
-                #print(left_lower_limits)
-                #print(mean_point)
-
-                
 
                 # NOTE: My tracking marker is built as a square (4 corners) inside the shape.
                 left_upper_corner = [int(np.mean([left_lower_limits[0], mean_point[0]])), int(np.mean([right_upper_limits[1], mean_point[1]]))]
                 right_upper_corner = [int(np.mean([right_upper_limits[0], mean_point[0]])), int(np.mean([right_upper_limits[1], mean_point[1]]))]
                 left_lower_corner = [int(np.mean([left_lower_limits[0], mean_point[0]])), int(np.mean([left_lower_limits[1], mean_point[1]]))]
                 right_lower_corner = [int(np.mean([right_upper_limits[0], mean_point[0]])), int(np.mean([left_lower_limits[1], mean_point[1]]))]
-                square_marker = np.asarray([left_upper_corner, right_upper_corner, right_lower_corner, left_lower_corner]) # Order is important to construct the figure
                 
-                #print(f"Round shape: {obj}")
-                #print(f"Square marker: {square_marker}")
-                #exit(1)
-                _ = cv2.drawContours(track, [square_marker], -1, idx+1, -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask
+                # Compute 'area' of the marker to see if it's a cell or a EVs.
+                diff_x = right_upper_corner[0] - left_upper_corner[0]
+                diff_y = right_upper_corner[1] - right_lower_corner[1]
+                area = (diff_x) * (diff_y)
 
+                if area > pixels_limit: # Adjust the marker dimension in case the marker should be too big compared to the EVs
+
+                    diff_x = int(diff_x * reducing_ratio) # 2/10 as fixed value for reducing the marker dim
+                    diff_y = int(diff_y * reducing_ratio) # 2/10 as fixed value for reducing the marker dim
+                    # Reducing on the x coord.
+                    left_upper_corner[0] += diff_x
+                    right_upper_corner[0] -= diff_x
+                    left_lower_corner[0] += diff_x
+                    right_lower_corner[0] -= diff_x
+
+                    # Reducing on the y coord.
+                    left_upper_corner[1] -= diff_y
+                    right_upper_corner[1] -= diff_y
+                    left_lower_corner[1] += diff_y
+                    right_lower_corner[1] += diff_y
+                
+                square_marker = np.asarray([left_upper_corner, right_upper_corner, right_lower_corner, left_lower_corner]) # Order is important to construct the figure
+                _ = cv2.drawContours(track, [square_marker], -1, idx+1, -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask
                 
             d_markers.append(track)
             d_masks.append(mask)
             
             mask_name = f'man_seg'+ image_name.split('.')[0].split('t')[-1] +'.tif' # Save the mask with the name of segmentation masks in the CTC datasets
             
-            if cv2.imwrite(os.path.join(target_folder, mask_name), mask): # Save the segmentation mask
+            track_name = f'man_track'+ image_name.split('.')[0].split('t')[-1] +'.tif' # Save the tracking mask with the name of segmentation masks in the CTC datasets
+            track_folder = seg_folder.split('SE')[0] + "TRA"
+            
+            if cv2.imwrite(os.path.join(seg_folder, mask_name), mask): # Save the segmentation mask
                 print(f"Saved '{mask_name}'")
             else:
                 print(f"Error when saving '{mask_name}' !")
 
-    # Call visual debug functions
+            if cv2.imwrite(os.path.join(track_folder, track_name), track): # Save the segmentation tracking mask
+                print(f"Saved '{track_name}'")
+            else:
+                print(f"Error when saving '{track_name}' !")
+
+    # NOTE: Calling visual debug functions
     debug_frames(d_names, d_images, d_drawed_images, d_masks, d_markers)
 
     return None
