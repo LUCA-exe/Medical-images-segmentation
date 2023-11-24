@@ -1,6 +1,6 @@
 """create_mask.py
 
-This is a 'util' file to create segmentation masks from the 'annotation.json' (computed trough VIA).
+This is a 'util' file to create segmentation masks from the 'annotation.json' (computed trough VIA) and the following 'man_trackT.tif'.
 (It is separate from the general repository, just a script that you can call from a notebook cell).
 """
 
@@ -19,7 +19,7 @@ N_IMAGES = 2 # Number of images to debug visually
 
 
 # TODO: Add debug visualization of the first and last frames (import functions from imageUtils)
-def debug_frames(file_names, d_images, d_drawed_images, d_masks):
+def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
     
     # Clean and set up the debugging folder
     try:
@@ -34,10 +34,12 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks):
         img = d_images[i]
         drawed_images = d_drawed_images[i]
         mask = d_masks[i]
+        marker = d_markers[i]
 
         visualize_image(img, os.path.join(DEBUG_PATH, name))
         visualize_image(drawed_images, os.path.join(DEBUG_PATH, f"drawed_{name}"))
         visualize_mask(mask, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
+        visualize_mask(marker, os.path.join(DEBUG_PATH, f"man_track{name.split('t')[-1]}"))
     
     print(f"The {N_IMAGES} images annotation process is shown on the {DEBUG_PATH}!")
 
@@ -45,9 +47,9 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks):
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
-def create_mask_from_json(json_file, images_folder, target_folder):
+def create_masks_from_json(json_file, images_folder, target_folder):
 
-    print("*** Creation of the segmentation mask ***")
+    print("*** Creation of the segmentation masks ***")
     print(f"Working on {json_file} ..")
 
     with open(json_file, 'r') as read_file:
@@ -65,7 +67,7 @@ def create_mask_from_json(json_file, images_folder, target_folder):
             print(f".. Reading {filename} ..")
             images_names.append(filename)
 
-    d_names, d_images, d_drawed_images, d_masks = [], [], [], []  
+    d_names, d_images, d_drawed_images, d_masks, d_markers = [], [], [], [], []  
 
     for name in all_file_names: # Loop over the original filenames - order of the '.json' keys mantained
 
@@ -99,18 +101,39 @@ def create_mask_from_json(json_file, images_folder, target_folder):
             for shape_x, shape_y in zip(shapes_x, shapes_y):
                 multiple_ab.append(np.stack((shape_x, shape_y), axis=1)) # Annotated shape of one obj.
 
-            # NOTE: Every obj. has to have different colour, and the same obj. along the frames has to have the same colour
-            #colour_span = floor(255/len(multiple_ab)) # 255 is the maximum value of the pixel
-            #colours = [colour for colour in range(colour_span, 256, colour_span)] # list comprehension
-
             # Kept for debug purpose.
             img2 = cv2.drawContours(img, multiple_ab, -1, (255,255,255), -1) # Multiple obj. on the same image
             d_drawed_images.append(img2)
 
-            mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint16)
+            mask, track = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint16), np.zeros((img.shape[0], img.shape[1]), dtype=np.uint16)
             
             for idx, obj in enumerate(multiple_ab): # Add one image at the time to manage different color
-                _ = cv2.drawContours(mask, [obj], -1, idx+1, -1) # cv2.drawContours modify inplace AND return an image
+                _ = cv2.drawContours(mask, [obj], -1, idx+1, -1) # cv2.drawContours modify inplace AND return an image - Creation of the mask
+                
+                right_upper_limits = np.squeeze(obj.max(axis=0))
+                left_lower_limits = np.squeeze(obj.min(axis=0))
+                mean_point = np.mean([right_upper_limits, left_lower_limits] ,axis=0) # Get the central point of the shape (in my case the shape are all full rounds)
+                
+                #print(right_upper_limits)
+                #print(left_lower_limits)
+                #print(mean_point)
+
+                
+
+                # NOTE: My tracking marker is built as a square (4 corners) inside the shape.
+                left_upper_corner = [int(np.mean([left_lower_limits[0], mean_point[0]])), int(np.mean([right_upper_limits[1], mean_point[1]]))]
+                right_upper_corner = [int(np.mean([right_upper_limits[0], mean_point[0]])), int(np.mean([right_upper_limits[1], mean_point[1]]))]
+                left_lower_corner = [int(np.mean([left_lower_limits[0], mean_point[0]])), int(np.mean([left_lower_limits[1], mean_point[1]]))]
+                right_lower_corner = [int(np.mean([right_upper_limits[0], mean_point[0]])), int(np.mean([left_lower_limits[1], mean_point[1]]))]
+                square_marker = np.asarray([left_upper_corner, right_upper_corner, right_lower_corner, left_lower_corner]) # Order is important to construct the figure
+                
+                #print(f"Round shape: {obj}")
+                #print(f"Square marker: {square_marker}")
+                #exit(1)
+                _ = cv2.drawContours(track, [square_marker], -1, idx+1, -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask
+
+                
+            d_markers.append(track)
             d_masks.append(mask)
             
             mask_name = f'man_seg'+ image_name.split('.')[0].split('t')[-1] +'.tif' # Save the mask with the name of segmentation masks in the CTC datasets
@@ -121,6 +144,6 @@ def create_mask_from_json(json_file, images_folder, target_folder):
                 print(f"Error when saving '{mask_name}' !")
 
     # Call visual debug functions
-    debug_frames(d_names, d_images, d_drawed_images, d_masks)
+    debug_frames(d_names, d_images, d_drawed_images, d_masks, d_markers)
 
     return None
