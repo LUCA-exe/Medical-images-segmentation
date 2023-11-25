@@ -1,6 +1,7 @@
 """main_img.py
 
-This is the main executable file for running the processing functions for the images/masks.
+This is the main executable file for running the analysis and plotting functions for the 
+images and masks.
 """
 
 from copy import deepcopy
@@ -12,7 +13,7 @@ from matplotlib import pyplot as plt
 import tifffile as tiff
 import cv2
 from collections import defaultdict
-from img_processing.imageUtils import * # Remember to write the path the the 'importer' of this file is calling
+from img_processing.imageUtils import * # Remember to write the path that the 'importer' of this file is calling
 
 class images_processor:
 
@@ -51,7 +52,7 @@ class images_processor:
 
         # This function will process images; cleaning the './tmp' folder
         if os.listdir(self.debug_folder): # 'Debug dir' has some files: delete all
-            self.log.debug(f"Folder '{self.debug_folder}' contains files, It will be cleaned")
+            self.log.debug(f"Folder '{self.debug_folder}' contains files, It will be cleaned ..")
             for file_name in os.listdir(self.debug_folder):
                 os.remove(os.path.join(self.debug_folder, file_name))
              
@@ -77,6 +78,7 @@ class images_processor:
             stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
 
             if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks
+            
             for file_name in files_name:
                 current_mask_path = os.path.join(current_path, file_name)
                 # For evey mask path, fetch the proper image path (images masks less than total of the images)
@@ -131,8 +133,8 @@ class images_processor:
         print(f"> Valori degli oggetti (incluso background): {np.unique(mask)}")
 
         # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
-        #thr = 7000 # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
-        mean_cells, std_cells, dim_cells, dim_cells_variations = [], [], [], [] # Mean, std and number of pixels of the segmented cells (both total and )
+        # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image resolution)
+        mean_cells, std_cells, dim_cells, dim_cells_variations, cells_pixel = [], [], [], [], [] # Mean, std and number of pixels of the segmented cells (both total and )
         obj_values = np.unique(mask) # Store the pixel value for each object
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
@@ -148,6 +150,7 @@ class images_processor:
                 # WARNING:  BUG on some dataset in the pixels value
                 current_pixels[current_pixels > 255] = 255 # Cap the value of the pixels to the actual RGB limit channel values
                 
+                cells_pixel.extend(current_pixels)
                 mean_cells.append(np.mean(current_pixels))
                 std_cells.append(np.std(current_pixels))
                 dim_cells.append(len(current_pixels)/tot_pixels) # Get a ratio (this way it depends less on the resolution of the images)
@@ -172,14 +175,16 @@ class images_processor:
         visualize_image(image, os.path.join(self.debug_folder, image_name))
         
         signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells values pixels
-        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells values pixels std.
+        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells hetereogenity
+        # TODO: Finish this metrics
+        signals_dict['ch'] = np.std(cells_pixel) # Cell hetereogenity: measure of the hetereogenity of the signals among the cells in the frame
         signals_dict['cdr'] = np.mean(dim_cells[1:]) # Cell dimensions ratio: avg. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['cdvr'] = np.std(dim_cells[1:]) # Cell dimensions variations ratio: std. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
         signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
 
         # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
-        signals_dict['ccd'] = abs(np.mean(mean_cells[1:]) - mean_cells[0]) # Cells Contrast Difference: Absoluth difference in avg. pixel values between beackground and segmented cells
+        signals_dict['ccd'] = abs(np.mean(mean_cells[1:]) - mean_cells[0])/255 # Cells Contrast Difference: Ratio in avg. pixel values between beackground and segmented cells over the maximum pixel value
         signals_dict['bh'] = abs(max(background_patches)-min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
         
         return signals_dict
