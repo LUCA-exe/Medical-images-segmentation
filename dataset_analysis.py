@@ -11,7 +11,7 @@ from download_data import download_datasets
 
 def main():
     """ Main function to call in order to run all the project classes and 
-        functions about images download and properties gathering
+        functions about images download and properties gathering.
     """
     log = create_logging() # Set up 'logger' object 
 
@@ -21,21 +21,21 @@ def main():
     env = {} # TODO: Load this from a '.json' file
     env['logger'] = log # Move the object through 'env' dict
 
-    log.info(f"args: {args}") # Print overall args 
-    log.debug(f"env: {env}")
+    log.info(f"Args: {args}") # Print overall args.
+    log.debug(f"Env varibles: {env}")
 
-    if args.download: # Check if is is requested the donwloading of datasets
+    if args.download: # Check if is is requested the downloading of datasets.
         download_datasets(log, args)
 
     if args.compute_signals:
-        # Process single folders signals and aggregate for the current dataset chosen by args
+        # Process single folders signals and aggregate for the current dataset chosen by args.
         processor = images_processor(env, args)
         processor.collect_signals()
 
     if args.compare_signals:
         visualizator = signalsVisualizator(env, args)
-        #visualizator.visualize_signals() # WORK IN PROGRESS: Compute single dataset signals
-        signalsVisualizator.dataset_signals_comparison(log) # Compare single signals from different datasets
+        #visualizator.visualize_signals() # WORK IN PROGRESS: Compute single dataset signals.
+        signalsVisualizator.dataset_signals_comparison(log) # Compare single signals from different datasets (when available).
 
 
 if __name__ == "__main__":

@@ -72,21 +72,10 @@ def log_image_characteristics(log, image_obj, name_obj):
         None
     """
     if name_obj == 'mask':
-        log.debug(f"First {name_obj} analyzed > shape: {image_obj.shape} max/min pixel values: {np.max(image_obj)} - {np.min(image_obj)} Different pixel values: {len(np.unique(image_obj))}")
+        log.debug(f"First {name_obj} analyzed > Shape: {image_obj.shape} Max/Min pixel values: {np.max(image_obj)}/{np.min(image_obj)} Different pixel values: {len(np.unique(image_obj))}")
     else:
-        log.debug(f"First {name_obj} analyzed > shape: {image_obj.shape} max/min pixel values: {np.max(image_obj)} - {np.min(image_obj)}")
+        log.debug(f"First {name_obj} analyzed > Shape: {image_obj.shape} Max/Min pixel values: {np.max(image_obj)}/{np.min(image_obj)}")
     return None
-
-def __load_image__(image_folder): # Util function of this class. Check if this pattern make sense
-    """ Load the single channel or multiple channels of the required image.
-        It return a dict with id and all the different images for each 'version' (only nuclei, only boundaries etc ..)
-
-    Args:
-        image_folder (str): Path to the different version of the image
-
-    Returns:
-        dict: {'id': image_folder, 'dapi': Image object, 'fitc': image object .. }
-    """
 
 
 def fetch_image_path(mask_path, images_folder):
@@ -124,10 +113,10 @@ def to_single_channel(image):
         print(f"image has more than 3 dims!")
         return None
 
-    else:
+    else: # Consider all object in the image.
         return np.sum(image, axis=2) # Sum the pixels value along the last dim.
     
-def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # Fow now don't pass files name as list, This function will retrieve them
+def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # Fow now don't pass files name as list, This function will retrieve them.
     """ Create a '*.json' file that contains signals gathered for every image.
 
     Args:
@@ -139,7 +128,7 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
     Returns:
         None
     """
-    if os.path.exists(os.path.join(file_path, name + ext)): # Check if the file already exist, if already existing it contains already all the 'key'(images name)
+    if os.path.exists(os.path.join(file_path, name + ext)): # Check if the file already exist, if already existing it contains already all the 'key'(images name).
         log.info(f"Signals file already existing in {file_path}, It will be not subscribed!")
         return None
     
@@ -155,7 +144,7 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
 
     return None
 
-# NOTE: It requires time complexity but It is modular: the information data can be filled in different times
+# NOTE: It requires time complexity but It is modular: the information data can be filled in different times.
 def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json'):
     """ Read the '*.json' file and complement/insert the additional infomation for each images
 
@@ -186,7 +175,7 @@ def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json
 
     return None
 
-# WARNING: The data will be saved in a file, if the '*.json' already exist It will be overwrite
+# WARNING: The data will be saved in a file, if the '*.json' already exist It will be overwrited.
 def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ext='.json'):
     """ Save the aggregated signals dict of a dataset in a '*.json'
 
@@ -213,9 +202,9 @@ def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ex
 
     return None
 
-# Function used from both 'image_processor' and 'imageVisualizator', moved in the utils
+
 def aggregate_signals(log, signals_list, method='mean'):
-    """ Create a dict that contains aggregated signals gathered for every image of a dataset.
+    """ Create a dict that contains aggregated signals gathered for every image in the folders of a dataset.
 
     Args:
         signals_list (obj): List of dict; every dict contains the signals of a single image
@@ -227,7 +216,7 @@ def aggregate_signals(log, signals_list, method='mean'):
     # TODO: Upgrade and add functionalities: for now just compute the mean for every aggregated signals 
     total_dict = defaultdict(list)
     
-    for single_dict in signals_list: # for every image dict
+    for single_dict in signals_list: # For every image metrics dict
         for key, value in single_dict.items(): # Append the value to the 'total_dict'
             total_dict[key].append(value)
 
@@ -268,44 +257,3 @@ def debug_segmentation_masks(seg_masks_path):
     print("*** Debug maks properties complete! ***")
 
     return None
-
-
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-     
-
-

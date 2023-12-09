@@ -8,6 +8,7 @@ from copy import deepcopy
 import json
 from math import floor
 import os
+import shutil
 import numpy as np
 from matplotlib import pyplot as plt
 import tifffile as tiff
@@ -20,14 +21,14 @@ class images_processor:
     def __init__(self, env, args, task='SEG'):
         """Class to create a obj. that gather images signals from segmentation masks"""
 
-        self.log = env['logger'] # Extract the needed evn. variables
-        self.args = args # TODO: Select just the needed args
+        self.log = env['logger'] # Extract the needed env. variables - log
+        self.args = args
         self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path in which the json will be saved
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
         self.considered_images = args.max_images # Set a limit to the number of masks to use
 
-        os.makedirs('tmp', exist_ok=True) # Set up a './tmp' folder for debugging images
+        os.makedirs('tmp', exist_ok=True) # Set up a './tmp' folder for debugging images processing
         self.debug_folder = 'tmp'
 
         self.log.info(f"'Image processor' object instantiated: working on '{self.images_folder}'")
@@ -50,11 +51,11 @@ class images_processor:
         """
         self.log.info(f"Collecting properties (max {self.considered_images} for every masks folders) of '{self.images_folder}' ..")
 
-        # This function will process images; cleaning the './tmp' folder
+        # This function will process images: cleaning the './tmp' folder first.
         if os.listdir(self.debug_folder): # 'Debug dir' has some files: delete all
             self.log.debug(f"Folder '{self.debug_folder}' contains files, It will be cleaned ..")
-            for file_name in os.listdir(self.debug_folder):
-                os.remove(os.path.join(self.debug_folder, file_name))
+            shutil.rmtree(self.debug_folder)
+            os.makedirs(self.debug_folder, exist_ok=True)
              
         # Start collecting the folders path for the current dataset
         folders = os.listdir(self.images_folder)
@@ -77,12 +78,11 @@ class images_processor:
             create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
             stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
 
-            if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks
+            if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks for current folders
             
             for file_name in files_name:
                 current_mask_path = os.path.join(current_path, file_name)
-                # For evey mask path, fetch the proper image path (images masks less than total of the images)
-                image_name = fetch_image_path(current_mask_path, current_images_path)
+                image_name = fetch_image_path(current_mask_path, current_images_path) # For evey mask path, fetch the proper image path (images masks less than total of the images)
                 current_image_path = os.path.join(current_images_path, image_name)
 
                 # Ready to compute the signals for the coupled mask - image
@@ -96,7 +96,7 @@ class images_processor:
 
         self.log.info(f".. Aggregating images signals from all folders ..")
         total_dict = aggregate_signals(self.log, total_stats, 'none') # Aggregate the signals of the current dataset in a single dict (format = 'metric': [list of values])
-        save_aggregated_signals(self.log, self.images_folder, total_dict) # Save the 'dict' on the root folder of the dataset
+        save_aggregated_signals(self.log, self.images_folder, total_dict) # Save the 'dict' on the root folder of the dataset.
 
         return None
 
@@ -115,7 +115,7 @@ class images_processor:
         image = tiff.imread(image_path)
         if (len(image.shape) > 2):
             image = to_single_channel(image) # Convert the image if needed
-            self.log.debug(f".. image '{os.path.basename(image_path)}' converted to one channel ..")
+            self.log.debug(f".. image '{os.path.basename(image_path)}' converted to one channel keeping all objects ..")
 
         mask = tiff.imread(mask_path)
         signals_dict = {} # Init. the dict for the signals
@@ -139,7 +139,7 @@ class images_processor:
         obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
         
         # DEBUG console visualization
-        print(f"> List of 'pixels value' - 'number of pixel'")
+        print(f"> List format: 'pixels value' - 'number of pixel'")
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
             
             print(f"   {value} - {count}")
@@ -148,7 +148,7 @@ class images_processor:
                 current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
                 
                 # WARNING:  BUG on some dataset in the pixels value
-                current_pixels[current_pixels > 255] = 255 # Cap the value of the pixels to the actual RGB limit channel values
+                current_pixels[current_pixels > 255] = 255 # Cap the value of the pixels to the actual RGB limit channel values.
                 
                 cells_pixel.extend(current_pixels)
                 mean_cells.append(np.mean(current_pixels))
@@ -159,25 +159,23 @@ class images_processor:
         print(f"> Background pixels shape: {background_pixels.shape}") # DEBUG console visualization
         
         step = floor(perc_pixels * len(background_pixels))
-        background_patches = [] # List containing the avg. value of a patches of background pixels
+        background_patches = [] # List containing the avg. value of a patches of background pixels.
         for limit in range(step, len(background_pixels), step): # Take window of N pixels (N pixels given a certain percent of the total mask dim)
             
             current_patches = background_pixels[limit-step: limit] # Take one patches from the total pixels
             background_patches.append(np.mean(current_patches))
             print(f"   Background pixels patches - {len(current_patches)} - {np.mean(current_patches)}")
         
-        #mask = np.ma.masked_array(mask, mask==0) # TODO: Check if the mask has to be modified already here - It should just be a conversion of array 0 values 
-
         # Visualization for DEBUG purpose - both image/mask saved inside the 'self.debug_folder'
         mask_name = os.path.basename(mask_path).split('.')[0]
         visualize_mask(mask, os.path.join(self.debug_folder, mask_name))
         image_name = os.path.basename(image_path).split('.')[0]
         visualize_image(image, os.path.join(self.debug_folder, image_name))
         
-        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells values pixels
-        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells hetereogenity
-        # TODO: Finish this metrics
-        signals_dict['ch'] = np.std(cells_pixel) # Cell hetereogenity: measure of the hetereogenity of the signals among the cells in the frame
+        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells values pixels.
+        signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells internal hetereogenity.
+        #signals_dict['ch'] = np.std(cells_pixel) # Cell hetereogenity: measure of the hetereogenity of the signals among the cells in the frame.
+        signals_dict['ch'] = np.std(mean_cells[1:]) # Cell hetereogenity: measure of the hetereogenity of the signals among the cells in the frame.
         signals_dict['cdr'] = np.mean(dim_cells[1:]) # Cell dimensions ratio: avg. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['cdvr'] = np.std(dim_cells[1:]) # Cell dimensions variations ratio: std. of the number of pixels of the cells (in percentage over the total image)
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
@@ -185,37 +183,12 @@ class images_processor:
 
         # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
         signals_dict['ccd'] = abs(np.mean(mean_cells[1:]) - mean_cells[0])/255 # Cells Contrast Difference: Ratio in avg. pixel values between beackground and segmented cells over the maximum pixel value
-        signals_dict['bh'] = abs(max(background_patches)-min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
+        signals_dict['bh'] = abs(max(background_patches) - min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
         
         return signals_dict
 
-    # TODO: Remove from here - moved to utils
-    def __aggregate_signals(self, signals_list, method='mean'):
-        """ Create a dict that contains aggregated signals gathered for every image of a dataset.
-
-        Args:
-            signals_list (obj): List of dict; every dict contains the signals of a single image
-
-        Returns:
-            (dict): Return a unique dict of aggregated signals
-        """
-
-        # TODO: Upgrade and add functionalities: for now just compute the mean for every aggregated signals 
-        total_dict = defaultdict(list)
-        
-        for single_dict in signals_list: # for every image dict
-
-            for key, value in single_dict.items(): # Append the value to the 'total_dict'
-                total_dict[key].append(value)
-
-        for k in total_dict.keys(): # Just aggregate with the chosen method
-            total_dict[k] = np.mean(total_dict[k]) # Even if the defaultdict is set to list It works just with void key.
-
-        self.log.debug(f"Signals of the current dataset aggregated correctly!")
-        return total_dict
 
 
-# TODO: Follow the standard format for name object classes
 class signalsVisualizator: # Object to plot signals of a single dataset (both aggregated/single mask folder): for now mantain this design - (To oeprate on multiple dataset just create a appropriate main script).
  
     def __init__(self, env, args, task='SEG'):
@@ -231,6 +204,8 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         self.log.info(f"Obj. to plot the computed signals instantiated: working on '{self.images_folder}'")
 
+
+    # TODO: Finish th eplotting function
     def visualize_signals(self): # Save a plot for every '*.json' that can find
 
         # DEBUG console
@@ -271,6 +246,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             
         return None
 
+    # TODO: Finish the plotting function.
     def __plot_signals(self, data, file_name, path): # Plot the dict metrics of a dataset's single folder (every metric contains a list of value)
         """ Read the list of dict and plot a graph for every metrics contained
 
@@ -300,102 +276,10 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         return None
 
-    # NOTE: WORK IN PROGRESS! (To debug the actual values..)
+
     @staticmethod
-    def plot_signals_comparison(log, split_folder='training_data', folders_sample = '01_GT', task='SEG'):
-        """ Read the list of dict (one for each datasets) and plot a graph for every metrics contained
-
-        Args:
-            folders_sample (str): Folders to search for '*.json' to compare among different datasets
-
-        Returns:
-            None
-        """
-
-        os.makedirs('visualization_results', exist_ok=True) # Set up a folder that will contains the final plots
-        log.info(f"Comparison of different datasets signals (used the folders '{folders_sample}' in the split '{split_folder}')")
-        # Comparare le metriche divise per folder divise per dataset - salvare file su visualization results
-        
-        # For every dataset, take the signals computed in the '01_GT' folder
-        dataset_folders = os.listdir(split_folder)
-        dataset_folders = [s for s in dataset_folders if not s.startswith("__")]
-        print(dataset_folders) 
-        
-        # List of dict: every dict contains the metric and values of the images in a 'folders_sample' of the current dataset
-        comparison_list = [] 
-        names_list = [] # Name of the dataset (for the label in the final plots)
-
-        for folder in dataset_folders: # Enter in the single mask folder
-            curr_json_path = os.path.join(split_folder, folder, folders_sample, task)
-            print(curr_json_path)
-            log.info(f".. searching signals for '{curr_json_path}'")
-            
-            # TODO: Make this an args/const/params in a config file
-            json_file = 'dataset_signals.json'
-
-            if json_file in os.listdir(curr_json_path):
-                f = open(os.path.join(curr_json_path, json_file)) # Open the single folder 'signals'
-                signals_dict = json.load(f)
-                log.info(f"File found succesfully!")
-
-                # DEBUG
-                print(f"data : {signals_dict}")
-
-                # TODO: Make this an utils function.. used often
-                data_list = [] # List of images signals of the current folder
-                for key in signals_dict.keys(): # Create a list of dict (one dict for every image)
-                    data_list.append(deepcopy(signals_dict[key]))
-
-                # Store the values for every metric of the current folder
-                comparison_list.append(aggregate_signals(log, data_list, 'none')) # Get list of values for every metrics starting from the signals dict
-
-            else:
-                # Just explore other folders
-                log.info(f"File not found .. still to compute!")
-        
-        # DEBUG
-        print(f"data (converted) : {comparison_list}")
-        print(f"Number of dataset read: {len(comparison_list)}")
-
-        # TODO: Move this to another function (utils - plot a sequence of dict)
-        if comparison_list:
-            metrics = list(comparison_list[0].keys()) # Cast to list from 'dict_keys' obj.
-            print(f"Keys to print: {metrics}")
-            
-            # Plot for every metrics all the values for every dataset (of the sample folder chosen)
-            for key in metrics:
-                
-                current_values = [] # List to collect the values for every dataset for a metrics
-                for single_dict in comparison_list:
-                    current_values.append(single_dict[key])
-
-                # DEBUG
-                print(f"For the key '{key}' there are {len(current_values)} array of values to plot!")
-
-                # Open, plot the array with the proper name and save the fig. for every metric
-                for idx, values in enumerate(current_values):
-                    plt.plot(values, 'o', label = dataset_folders[idx])
-                
-                plt.legend(fontsize="8")
-                plt.xlabel("Time frame")
-                plt.ylabel(key)
-
-                plt.savefig(os.path.join('visualization_results', key))
-                plt.close() # Close the picture of this metric
-
-
-        else:
-            # No signals json is found ..
-            log.info(f"There are not signals computed in the datasets!")
-            
-
-        return None
-
-    
-    # WORK IN PROGRESS: Dataset comparison (both box-plots for every metrics and normal line plot)
-    @staticmethod
-    def dataset_signals_comparison(log, split_folder='training_data'):
-        """ Read all the 'aggregated_signals' from the different datasets folders and plots the comparison graph
+    def dataset_signals_comparison(log, split_folder='training_data', target_folder='./visualization_results'):
+        """ Read all the 'aggregated_signals' from the different datasets folders and plots the comparison graph.
 
         Args:
             folders_sample (str): Folders to search for '*.json' to compare among different datasets (normally the training folder)
@@ -403,14 +287,10 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         Returns:
             None
         """
-        target_folder = 'visualization_results' # TODO: Make a const of the object .. (outside the init)
-
         os.makedirs(target_folder, exist_ok=True) # Set up a folder that will contains the final plots
 
         log.info(f"Comparison of different datasets signals (used the dataset folders in the split '{split_folder}')")
-        # Comparare le metriche divise per folder divise per dataset - salvare file su visualization results
         
-        # For every dataset, take the signals computed in the '01_GT' folder
         dataset_folders = os.listdir(split_folder)
         dataset_folders = [s for s in dataset_folders if not s.startswith("__")]
 
@@ -421,13 +301,12 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         for dataset in dataset_folders:
             
             json_file = [s for s in os.listdir(os.path.join(split_folder, dataset)) if s.endswith(".json")] # Search for the 'aggregated_signals.json'
-            
             if json_file:
                 log.info(f".. extracting {dataset} data ..")
                 dataset_list.append(dataset)
 
-                f = open(os.path.join(split_folder, dataset, json_file[0])) # Open the current 'aggregated' data
-                signals_dict = json.load(f)
+                f = open(os.path.join(split_folder, dataset, json_file[0])) # Open the current 'aggregated' data.
+                signals_dict = json.load(f) # The 'aggregated_signals.json' doesn't differentiate between '01_GT' and '02_GT'.
 
                 for metric, value in signals_dict.items(): # The 'value from the 'aggregated*.json' are lists of value
                     datasets_dict[metric].append(value)
@@ -437,8 +316,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
                         
         log.debug(f"Total dataset considered are : {dataset_list}")
 
-        # BOX PLOT to compare the different datasets
-        log.info(f"The graphs will be saved in './{target_folder}'")
+        log.info(f"The graphs will be saved in '{target_folder}'")
         signalsVisualizator.__box_plots(log, datasets_dict, dataset_list, target_folder)
         signalsVisualizator.__line_plots(log, datasets_dict, dataset_list, target_folder)
         return None

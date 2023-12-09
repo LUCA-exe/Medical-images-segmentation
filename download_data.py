@@ -11,7 +11,8 @@ import tifffile as tiff
 
 from img_processing.imageUtils import *
 
-# TODO: Move this to a 'config file' inside the repository
+# TODO: Move this to a 'config file' inside the repository.
+# TODO: If my dataset will become public, manage the download from this script as additional option.
 DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
             "PhC-C2DH-U373", "PhC-C2DL-PSC", "Fluo-N2DH-SIM+"]
 
@@ -38,7 +39,7 @@ def __download_data(log, url, target): # Download the datasets chosen with a spe
     return local_filename
 
 
-def __check_dataset(log, dataset_path, url): # Check if It is alredy available, if not donwload it (function used both for test/train splits)
+def __check_dataset(log, dataset_path, url): # Check if It is alredy available, if not download it (function used both for test/train splits)
     
     dataset = dataset_path.split('/')[-1] # Extract the name
 
@@ -105,15 +106,21 @@ def download_datasets(log, args): # Main function to download the chosen dataset
             __check_dataset(log, current_test_path, TESTDATA_URL)
 
     else: # Download single dataset if it is present in the list
-        log.info(f"Dataset that will be downloaded: {args.download_dataset}")
-        current_train_path = os.path.join(args.train_images_path, args.download_dataset)
-        current_test_path = os.path.join(args.test_images_path, args.download_dataset)
 
-        __check_dataset(log, current_train_path, TRAINDATA_URL)
-        __check_dataset(log, current_test_path, TESTDATA_URL)
+        if args.download_dataset in DATASETS:
+            log.info(f"Dataset that will be downloaded: {args.download_dataset}")
+            current_train_path = os.path.join(args.train_images_path, args.download_dataset)
+            current_test_path = os.path.join(args.test_images_path, args.download_dataset)
 
-    log.info(f"Data downloads completed!")
+            __check_dataset(log, current_train_path, TRAINDATA_URL)
+            __check_dataset(log, current_test_path, TESTDATA_URL)
 
+            log.info(f"Data downloads completed!")
+        
+        else:
+            log.info(f"Dataset {args.download_dataset} not found in the available list!")
+
+    log.info(f"Program terminated")
     return None
 
 
