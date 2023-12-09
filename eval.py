@@ -23,6 +23,9 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
 
+    # Load paths
+    
+
     
 
 
