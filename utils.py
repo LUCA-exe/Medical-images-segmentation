@@ -56,27 +56,38 @@ def create_logging():
 
   return logger
 
-# TODO: Deprecated
-def download_images(env, args):
-  """ Function to download the images in the path passed by arguments.
-      Dataset folder structure is fixed.
 
-    Args:
-        args (dict): Arguments usefull for the download and creation of the images folder
+class EvalArgs(object): # Class containings inference and post-processing parameters
+    """ Class with post-processing parameters.
 
-    Returns:
-        None
-  """
-  os.makedirs(args.images_path, exist_ok=True) # Create the folder if it does not exist
-  log = env['logger'] # Load the logger from the environment variable
+    """
 
-  # TODO: Download images from an external API
-  
-  log.info(f"Images donwloaded from {args.link_images} in the {args.images_path} folder!")
+    def __init__(self, th_cell, th_seed, scale, cell_type,
+                 artifact_correction, apply_merging):
+        """
 
-  return None
-
-
-
-
-
+        :param th_cell: Mask / cell size threshold.
+            :type th_cell: float
+        :param th_seed: Seed / marker threshold.
+            :type th_seed: float
+        :param n_splitting: Number of detected cells above which to apply additional splitting (only for 3D).
+            :type n_splitting: int
+        :param apply_clahe: Apply contrast limited adaptive histogram equalization (CLAHE).
+            :type apply_clahe: bool
+        :param scale: Scale factor for downsampling.
+            :type scale: float
+        :param cell_type: Cell type.
+            :type cell_type: str
+        :param save_raw_pred: Save (some) raw predictions.
+            :type save_raw_pred: bool
+        :param artifact_correction: Apply artifact correction post-processing.
+            :type artifact_correction: bool
+        :param fuse_z_seeds: Fuse seeds in z-direction / axial direction.
+            :type fuse_z_seeds: bool
+        """
+        self.th_cell = th_cell
+        self.th_seed = th_seed
+        self.scale = scale
+        self.cell_type = cell_type
+        self.artifact_correction = artifact_correction
+        self.apply_merging = apply_merging

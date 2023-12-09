@@ -62,7 +62,22 @@ def get_parser():
                             default = False,
                             type = bool,
                             help="Compare signals for all the dataset with computed signals.")
-                            
+
+    # Inference/Evaluation args
+    parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fecth the chosen model")
+    parser.add_argument("--models_name", default="none", type=str, help="model's name to fetch")
+    parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing')
+    parser.add_argument('--artifact_correction', '-ac', default=False, action='store_true', help='Artifact correction')
+    parser.add_argument('--batch_size', '-bs', default=1, type=int, help='Batch size')
+    parser.add_argument('--cell_type', '-ct', nargs='+', required=True, help='Cell type(s)')
+    parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / evaluation mode')
+    parser.add_argument('--models', required=True, type=str, help='Models to evaluate (prefix)')
+    parser.add_argument('--multi_gpu', '-mgpu', default=False, action='store_true', help='Use multiple GPUs')
+    parser.add_argument('--scale', '-sc', default=1, type=float, help='Scale factor (0: get from trainset info.json') # json file with per-dataset parameters
+    parser.add_argument('--subset', '-s', default='01', type=str, help='Subset to evaluate on')
+    parser.add_argument('--th_cell', '-tc', default=0.07, nargs='+', help='Threshold for adjusting cell size')
+    parser.add_argument('--th_seed', '-ts', default=0.45, nargs='+', help='Threshold for seeds')
+
     args = parser.parse_args()
     return args
 
