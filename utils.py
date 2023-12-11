@@ -4,6 +4,7 @@
 - Parsing functions
 """
 
+import torch
 import os
 import logging
 from datetime import datetime
@@ -57,6 +58,17 @@ def create_logging():
   return logger
 
 
+# For now the repository is implemented for single-gpu usage.
+def set_device():
+    # Set device for using CPU or GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if str(device) == 'cuda':
+        torch.backends.cudnn.benchmark = True
+        num_gpus = 1
+
+    return device
+
+
 class EvalArgs(object): # Class containings inference and post-processing parameters
     """ Class with post-processing parameters.
 
@@ -91,3 +103,10 @@ class EvalArgs(object): # Class containings inference and post-processing parame
         self.cell_type = cell_type
         self.artifact_correction = artifact_correction
         self.apply_merging = apply_merging
+
+
+
+
+
+
+        

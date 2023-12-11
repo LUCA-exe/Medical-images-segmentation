@@ -29,6 +29,21 @@ def get_parser():
                             type=str,
                             help="Which folder to access")
 
+    parser.add_argument("--models_folder",
+                            default="./models/all/",
+                            type=str,
+                            help="Which folder to access for train/test models")
+
+    parser.add_argument("--save_model",
+                            default="./models/best/",
+                            type=str,
+                            help="Which folder to access for saving best model files/metrics")
+
+    parser.add_argument("--evaluation_software",
+                            default="./model_util/evaluation_software/", # Specific folder to save the evaluation software 
+                            type=str,
+                            help="Path to access for loading the evaluation software of Cell Tracking Challenge")
+
     parser.add_argument("--download",
                             default=False,
                             type=bool,
