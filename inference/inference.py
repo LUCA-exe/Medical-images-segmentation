@@ -59,7 +59,6 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         net.load_state_dict(torch.load(str(model), map_location=device))
     
     log.info(f"Model correctly set")
-
     # Prepare model for evaluation
     net.eval()
     torch.set_grad_enabled(False)
@@ -81,9 +80,12 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
     if num_workers <= 2:  # Probably Google Colab --> use 0
         num_workers = 0
     num_workers = np.minimum(num_workers, 16)
+    log.debug(f"Number of workers set for the dataloader: {num_workers}")
+
     dataloader = torch.utils.data.DataLoader(ctc_dataset, batch_size=batchsize, shuffle=False, pin_memory=True,
                                              num_workers=num_workers)
 
+    batch_counter = 0
     # Predict images (iterate over images/files)
     for sample in dataloader:
 
@@ -97,6 +99,8 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         # Prediction
         prediction_border_batch, prediction_cell_batch = net(img_batch)
 
+        log.debug(f".. predicted batch {batch_counter} ..")
+
         # Get rid of pads
         prediction_cell_batch = prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
         prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
@@ -108,7 +112,7 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         # Go through predicted batch and apply post-processing (not parallelized)
         for h in range(len(prediction_border_batch)):
 
-            print('         ... processing {0} ...'.format(ids_batch[h]))
+            print('.. processing {0} ..'.format(ids_batch[h]))
 
             # Get actual file number:
             file_num = int(ids_batch[h].split('t')[-1])
@@ -158,7 +162,7 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         for prediction_instance_id in prediction_instance_ids:
             prediction_instance = tiff.imread(str(prediction_instance_id))
             prediction_instance = prediction_instance * roi
-            tiff.imsave(str(prediction_instance_id), prediction_instance.astype(np.uint16), compress=1)
+            tiff.imwrite(str(prediction_instance_id), prediction_instance.astype(np.uint16))
 
     # Clear memory
     del net

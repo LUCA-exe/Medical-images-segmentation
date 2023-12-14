@@ -33,6 +33,10 @@ class CTCDataSet(Dataset):
 
         img = tiff.imread(str(img_id))
 
+        if len(img.shape) > 2: # Preferred choice
+            img = np.sum(img, axis=2) # Keep all object
+            img = img[1024:, 1024:]
+
         sample = {'image': img,
                   'id': img_id.stem}
 

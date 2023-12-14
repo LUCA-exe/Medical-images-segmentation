@@ -36,7 +36,7 @@ def main():
         raise ValueError("The '{path_data}' provided is not existent")
 
     # Check wich set of metrics you want to use
-    if args.eval_metric == 'software'
+    if args.eval_metric == 'software':
         if not os.path.isdir(path_ctc_metric): # Check if evaluation software is available
             raise Exception('No evaluation software found. Run the script download_data.py')
 
