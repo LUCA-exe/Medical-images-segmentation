@@ -76,7 +76,8 @@ class EvalArgs(object): # Class containings inference and post-processing parame
 
     """
 
-    def __init__(self, th_cell, th_seed, apply_clahe, scale, save_raw_pred,
+    def __init__(self, th_cell, th_seed, apply_clahe, scale, cell_type,
+                 save_raw_pred,
                  artifact_correction, apply_merging):
         """
 
@@ -103,9 +104,15 @@ class EvalArgs(object): # Class containings inference and post-processing parame
         self.th_seed = th_seed
         self.apply_clahe = apply_clahe
         self.scale = scale
+        self.cell_type = cell_type
         self.save_raw_pred = save_raw_pred
         self.artifact_correction = artifact_correction
         self.apply_merging = apply_merging
+
+    # Override default class function
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"TrialClass({attributes})"
 
 
         

@@ -4,9 +4,9 @@ This is the evaluation main function that call inference and the metrics computa
 """
 import os
 from os.path import join, exists
-from utils import create_logging, download_images, set_device, EvalArgs
+from utils import create_logging,  set_device, EvalArgs
 from parser import get_parser, get_processed_args
-from download_data import download_datasets
+from inference.inference import inference_2d_ctc
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
     device = set_device() # Set device: cpu or single-gpu usage
-    log.debug(f"-----------------------------------------------\nEvaluation")
+    log.debug(f">>>   Evaluation   <<<")
 
     # Load paths
     path_data = join(args.train_images_path, args.dataset)
@@ -65,15 +65,18 @@ def main():
                 # Set up current results folder
                 path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model}_{th_seed}_{th_cell}")
                 log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
-                path_seg_results.mkdir(exist_ok=True)
+                os.makedirs(path_seg_results, exist_ok=True)
 
                 # Get post-processing settings
                 eval_args = EvalArgs(th_cell=float(th_cell), th_seed=float(th_seed),
                                         apply_clahe=args.apply_clahe,
                                         scale=scale_factor,
-                                        save_raw_prediction=args.save_raw_prediction,
+                                        cell_type=args.cell_type,
+                                        save_raw_pred=args.save_raw_pred,
                                         artifact_correction=args.artifact_correction,
                                         apply_merging=args.apply_merging)
+
+                log.debug(eval_args)
                 
                 # Inference on the chosen train set
                 inference_2d_ctc(log=log, model=model_path,
@@ -85,8 +88,6 @@ def main():
                              num_gpus=1) # Warning: Fixed for now at 1.
 
                 # TODO: Gather metrics and evaluate dict for gathering metrics results
-
-
 
 
 if __name__ == "__main__":

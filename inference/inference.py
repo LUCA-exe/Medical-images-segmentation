@@ -3,6 +3,7 @@ import json
 import tifffile as tiff
 import torch
 import numpy as np
+from pathlib import Path
 
 from multiprocessing import cpu_count
 from skimage.measure import regionprops, label
@@ -33,9 +34,10 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
     :return: None
     """
     log.info(f"Loading model '{model}' information ..")
+    result_path = Path(result_path) # Cast from str to Path type
 
     # Load model json file to get architecture + filters
-    with open(model.split('.')[0] + '.json') as f: # Fetch model info from saved '*.json'
+    with open('.' + model.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
         model_settings = json.load(f) # Load model structure
 
     # Build model
@@ -85,9 +87,8 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
     dataloader = torch.utils.data.DataLoader(ctc_dataset, batch_size=batchsize, shuffle=False, pin_memory=True,
                                              num_workers=num_workers)
 
-    batch_counter = 0
     # Predict images (iterate over images/files)
-    for sample in dataloader:
+    for idx, sample in enumerate(dataloader):
 
         img_batch, ids_batch, pad_batch, img_size = sample
         img_batch = img_batch.to(device)
@@ -99,7 +100,7 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         # Prediction
         prediction_border_batch, prediction_cell_batch = net(img_batch)
 
-        log.debug(f".. predicted batch {batch_counter} ..")
+        log.debug(f".. predicted batch {idx} ..")
 
         # Get rid of pads
         prediction_cell_batch = prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
@@ -112,7 +113,7 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         # Go through predicted batch and apply post-processing (not parallelized)
         for h in range(len(prediction_border_batch)):
 
-            print('.. processing {0} ..'.format(ids_batch[h]))
+            log.debug('.. processing {0} ..'.format(ids_batch[h]))
 
             # Get actual file number:
             file_num = int(ids_batch[h].split('t')[-1])

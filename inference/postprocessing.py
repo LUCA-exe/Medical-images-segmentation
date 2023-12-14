@@ -9,7 +9,7 @@ from skimage.morphology import binary_closing
 from net_utils.utils import get_nucleus_ids
 
 
-def foi_correction(mask, cell_type):
+def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..
     """ Field of interest correction for Cell Tracking Challenge data (see
     https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf and
     https://public.celltrackingchallenge.net/documents/Annotation%20procedure.pdf )
@@ -136,12 +136,6 @@ def distance_postprocessing(border_prediction, cell_prediction, args, input_3d=F
         seeds = measure.label(seeds)
 
         apply_splitting = True
-
-    if args.fuse_z_seeds:
-        seeds = seeds > 0
-        kernel = np.ones(shape=(3, 1, 1))
-        seeds = binary_closing(seeds, kernel)
-        seeds = measure.label(seeds, background=0)
 
     # Marker-based watershed
     prediction_instance = watershed(image=-cell_prediction, markers=seeds, mask=mask, watershed_line=False)

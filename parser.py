@@ -125,6 +125,9 @@ def get_processed_args(args):
     if not isinstance(args.th_cell, list):
         args.th_cell = [args.th_cell]
 
+    # TODO: Check if this method is the best
+    args.cell_type = args.dataset
+
     return args
 
 
