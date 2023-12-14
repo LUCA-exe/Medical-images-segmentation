@@ -2,6 +2,7 @@ import gc
 import json
 import tifffile as tiff
 import torch
+import numpy as np
 
 from multiprocessing import cpu_count
 from skimage.measure import regionprops, label
@@ -12,7 +13,7 @@ from inference.postprocessing import *
 from net_utils.unets import build_unet
 
 
-def inference_2d_ctc(model, data_path, result_path, device, batchsize, args, num_gpus=None):
+def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args, num_gpus=None):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -31,12 +32,14 @@ def inference_2d_ctc(model, data_path, result_path, device, batchsize, args, num
         :type num_gpus: int
     :return: None
     """
+    log.info(f"Loading model '{model}' information ..")
 
     # Load model json file to get architecture + filters
     with open(model.split('.')[0] + '.json') as f: # Fetch model info from saved '*.json'
-        model_settings = json.load(f)
+        model_settings = json.load(f) # Load model structure
 
     # Build model
+    log.info(f"Bulding model '{model}' ..")
     net = build_unet(unet_type=model_settings['architecture'][0],
                      act_fun=model_settings['architecture'][2],
                      pool_method=model_settings['architecture'][1],
@@ -54,12 +57,20 @@ def inference_2d_ctc(model, data_path, result_path, device, batchsize, args, num
         net.module.load_state_dict(torch.load(str(model), map_location=device))
     else:
         net.load_state_dict(torch.load(str(model), map_location=device))
+    
+    log.info(f"Model correctly set")
+
+    # Prepare model for evaluation
     net.eval()
     torch.set_grad_enabled(False)
 
+    log.info(f"Creating inference dataset ..")
     # Get images to predict
     ctc_dataset = CTCDataSet(data_dir=data_path,
                              transform=pre_processing_transforms(apply_clahe=args.apply_clahe, scale_factor=args.scale))
+    
+    log.info(f"Inference dataset correctly set")
+    
     if device.type == "cpu":
         num_workers = 0
     else:
@@ -121,11 +132,12 @@ def inference_2d_ctc(model, data_path, result_path, device, batchsize, args, num
 
             prediction_instance = foi_correction(mask=prediction_instance, cell_type=args.cell_type)
 
-            tiff.imsave(str(result_path / ('mask' + file_id)), prediction_instance, compress=1)
+            # Save images in the 'results' folder
+            tiff.imwrite(str(result_path / ('mask' + file_id)), prediction_instance)
             if save_raw_pred:
-                tiff.imsave(str(result_path / ('cell' + file_id)), prediction_cell_batch[h, ..., 0].astype(np.float32), compress=1)
-                tiff.imsave(str(result_path / ('raw_border' + file_id)), prediction_border_batch[h, ..., 0].astype(np.float32), compress=1)
-                tiff.imsave(str(result_path / ('border' + file_id)), border.astype(np.float32), compress=1)
+                tiff.imwrite(str(result_path / ('cell' + file_id)), prediction_cell_batch[h, ..., 0].astype(np.float32))
+                tiff.imwrite(str(result_path / ('raw_border' + file_id)), prediction_border_batch[h, ..., 0].astype(np.float32))
+                tiff.imwrite(str(result_path / ('border' + file_id)), border.astype(np.float32))
 
     if args.artifact_correction:
         # Artifact correction based on the assumption that the cells are dense and artifacts far away

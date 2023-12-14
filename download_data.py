@@ -20,6 +20,29 @@ DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "F
 # NOTE: For now download just the train/test Datasets from CTC
 TRAINDATA_URL = 'http://data.celltrackingchallenge.net/training-datasets/'
 TESTDATA_URL = 'http://data.celltrackingchallenge.net/test-datasets/'
+SOFTWARE_URL = 'http://public.celltrackingchallenge.net/software/EvaluationSoftware.zip'
+
+# Check if eval. software is already downloaded: if not download it.
+def check_evaluation_software(software_path):
+    
+    # Check if the evaluation folder is already contained
+    files = [name for name in os.listdir(software_path) if not name.startswith(".")]
+    
+    # Download evaluation software if it is not already donwloaded
+    if len(files) <= 1:
+        print(f"Downloading evaluation software to '{software_path}' ..")
+        __download_data(log=None, url=SOFTWARE_URL, target=software_path)
+    else:
+        print(f"Evaluation software already set-up in '{software_path}'")
+        return False # Eval software already set up.
+
+    # Unzip evaluation software
+    print('Unzip evaluation software ..')
+    with zipfile.ZipFile(os.path.join(software_path, SOFTWARE_URL.split('/')[-1]), 'r') as z:
+        z.extractall(software_path)
+    
+    print(f"Evaluation software correctly set up")
+    return True # Evaluation folder correctly set up
 
 
 def __download_data(log, url, target): # Download the datasets chosen with a specific chunk size
@@ -30,8 +53,11 @@ def __download_data(log, url, target): # Download the datasets chosen with a spe
     with requests.get(url, stream=True) as r:
 
         if not r.raise_for_status() is None: # If the method doesn't return NoneType It is bad
-            log.debug(f"Status for the url {url}: {r.raise_for_status()}") # Help debugging error in case of status different from 200
-        
+            if not log is None: 
+                log.debug(f"Status for the url {url}: {r.raise_for_status()}") # Help debugging error in case of status different from 200
+            else: # In case called from the notebook
+                print(f"Status for the url {url}: {r.raise_for_status()}")
+
         with open(local_filename, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)

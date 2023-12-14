@@ -68,12 +68,13 @@ def main():
 
                 # Get post-processing settings
                 eval_args = EvalArgs(th_cell=float(th_cell), th_seed=float(th_seed),
+                                        apply_clahe=args.apply_clahe,
                                         scale=scale_factor,
                                         artifact_correction=args.artifact_correction,
                                         apply_merging=args.apply_merging)
                 
                 # Inference on the chosen train set
-                inference_2d_ctc(model=model_path,
+                inference_2d_ctc(log=log, model=model_path,
                              data_path=path_data,
                              result_path=path_seg_results,
                              device=device,

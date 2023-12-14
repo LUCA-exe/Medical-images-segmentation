@@ -40,7 +40,7 @@ def get_parser():
                             help="Which folder to access for saving best model files/metrics")
 
     parser.add_argument("--evaluation_software",
-                            default="./model_util/evaluation_software/", # Specific folder to save the evaluation software 
+                            default="./net_utils/evaluation_software/", # Specific folder to save the evaluation software 
                             type=str,
                             help="Path to access for loading the evaluation software of Cell Tracking Challenge")
 
@@ -88,6 +88,7 @@ def get_parser():
     parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / evaluation mode')
     parser.add_argument('--models', required=True, type=str, help='Models to evaluate (prefix)')
     parser.add_argument('--multi_gpu', '-mgpu', default=False, action='store_true', help='Use multiple GPUs')
+    parser.add_argument('--apply_clahe', '-acl', default=False, action='store_true', help='CLAHE pre-processing')
     parser.add_argument('--scale', '-sc', default=1, type=float, help='Scale factor (0: get from trainset info.json') # json file with per-dataset parameters
     parser.add_argument('--subset', '-s', default='01', type=str, help='Subset to evaluate on') # Possible options: [01, 02,01+02]
     parser.add_argument('--th_cell', '-tc', default=0.07, nargs='+', help='Threshold for adjusting cell size')
