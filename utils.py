@@ -69,6 +69,7 @@ def set_device():
     return device
 
 
+# TODO: Check compared to the original repository
 class EvalArgs(object): # Class containings inference and post-processing parameters
     """ Class with post-processing parameters.
 
@@ -100,7 +101,6 @@ class EvalArgs(object): # Class containings inference and post-processing parame
         self.th_cell = th_cell
         self.th_seed = th_seed
         self.scale = scale
-        self.cell_type = cell_type
         self.artifact_correction = artifact_correction
         self.apply_merging = apply_merging
 

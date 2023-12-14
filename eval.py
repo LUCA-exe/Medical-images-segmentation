@@ -4,7 +4,7 @@ This is the evaluation main function that call inference and the metrics computa
 """
 import os
 from os.path import join, exists
-from utils import create_logging, download_images
+from utils import create_logging, download_images, set_device, EvalArgs
 from parser import get_parser, get_processed_args
 from download_data import download_datasets
 
@@ -22,6 +22,7 @@ def main():
 
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
+    device = set_device() # Set device: cpu or single-gpu usage
     log.debug(f"-----------------------------------------------\nEvaluation")
 
     # Load paths
@@ -34,25 +35,55 @@ def main():
         log.debug(f"Warning: the '{path_data}' provided is not existent! Interrupting the program...")
         raise ValueError("The '{path_data}' provided is not existent")
 
+    # Check if evaluation metric is available
+    if not os.path.isdir(path_ctc_metric): # TODO: Donwload it automatically if it is not present.
+        raise Exception('No evaluation software found. Run the script download_data.py')
+
+    # Load all models in the chosen folder
     models = [model for model in os.listdir(args.models_folder) if model.endswith('.pth')]
 
     # Load the paths in the log files
     log.debug(f"Dataset folder to evaluate: {path_data}")
     log.debug(f"Folder used to fetch models: {path_models}")
-    log.debug(f"Folder used to save models performances/files: {path_best_models}")
+    log.debug(f"Folder used to save models performances/files: {path_data}") # Saving the results on the folder of the evaluated dataset
     if path_ctc_metric != 'none': # In case of 'none' (str) use custom metrics on the script
         log.debug(f"Evaluation software folder: {path_ctc_metric}")
 
-    # Providing a gridsearch for finetunable parameters - kept from the original repositories
-    if not isinstance(args.th_seed, list):
-        args.th_seed = [args.th_seed]
-    if not isinstance(args.th_cell, list):
-        args.th_cell = [args.th_cell]
+    scores = [] # Temporary list to keep the evaluation results
+    train_sets = args.subset # List of subfolder to eval: already parser from args
+    scale_factor = args.scale # TODO: Get scale from training dataset info if not stated otherwise
+        
     
+    for model in models: # Loop over all the models found
+        model_path = os.path.join(path_models, model) # Create model path
+        for th_seed in args.th_seed:# Go through thresholds
+            for th_cell in args.th_cell:
+                for train_set in train_sets:
+                        log.info(f'Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
 
-    
+                # Set up current results folder
+                path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model}_{th_seed}_{th_cell}")
+                log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
+                path_seg_results.mkdir(exist_ok=True)
 
-    
+                # Get post-processing settings
+                eval_args = EvalArgs(th_cell=float(th_cell), th_seed=float(th_seed),
+                                        scale=scale_factor,
+                                        artifact_correction=args.artifact_correction,
+                                        apply_merging=args.apply_merging)
+                
+                # Inference on the chosen train set
+                inference_2d_ctc(model=model_path,
+                             data_path=path_data,
+                             result_path=path_seg_results,
+                             device=device,
+                             batchsize=args.batch_size,
+                             args=eval_args,
+                             num_gpus=1) # Warning: Fixed for now at 1.
+
+                # TODO: Gather metrics and evaluate dict for gathering metrics results
+
+
 
 
 if __name__ == "__main__":

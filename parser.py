@@ -89,7 +89,7 @@ def get_parser():
     parser.add_argument('--models', required=True, type=str, help='Models to evaluate (prefix)')
     parser.add_argument('--multi_gpu', '-mgpu', default=False, action='store_true', help='Use multiple GPUs')
     parser.add_argument('--scale', '-sc', default=1, type=float, help='Scale factor (0: get from trainset info.json') # json file with per-dataset parameters
-    parser.add_argument('--subset', '-s', default='01', type=str, help='Subset to evaluate on')
+    parser.add_argument('--subset', '-s', default='01', type=str, help='Subset to evaluate on') # Possible options: [01, 02,01+02]
     parser.add_argument('--th_cell', '-tc', default=0.07, nargs='+', help='Threshold for adjusting cell size')
     parser.add_argument('--th_seed', '-ts', default=0.45, nargs='+', help='Threshold for seeds')
 
@@ -98,12 +98,33 @@ def get_parser():
 
 
 def get_processed_args(args):
-  """ Process the args from config file and console to usable format
+    """ Process the args from config file and console to usable format
 
-    Args:
-        output (Tensor): predicted probabilities, higher = more confidence
+        Args:
+            output (Tensor): predicted probabilities, higher = more confidence
 
-    Returns:
-        args (dict):
-  """
-  return args
+        Returns:
+            args (dict):
+    """
+    # Process args before train/eval
+    if args.subset == '01+02':
+        args.subset = ['01','02']
+
+    # Providing a gridsearch for finetunable parameters - kept from the original repository.
+    if not isinstance(args.th_seed, list):
+        args.th_seed = [args.th_seed]
+    if not isinstance(args.th_cell, list):
+        args.th_cell = [args.th_cell]
+
+    return args
+
+
+
+
+
+
+
+
+
+
+
