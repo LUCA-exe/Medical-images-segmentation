@@ -2,6 +2,7 @@
 
 - Logger functions 
 - Parsing functions
+- Containing specific class args parsing
 """
 
 import torch
@@ -75,7 +76,7 @@ class EvalArgs(object): # Class containings inference and post-processing parame
 
     """
 
-    def __init__(self, th_cell, th_seed, apply_clahe, scale, cell_type,
+    def __init__(self, th_cell, th_seed, apply_clahe, scale, save_raw_pred,
                  artifact_correction, apply_merging):
         """
 
@@ -102,6 +103,7 @@ class EvalArgs(object): # Class containings inference and post-processing parame
         self.th_seed = th_seed
         self.apply_clahe = apply_clahe
         self.scale = scale
+        self.save_raw_pred = save_raw_pred
         self.artifact_correction = artifact_correction
         self.apply_merging = apply_merging
 

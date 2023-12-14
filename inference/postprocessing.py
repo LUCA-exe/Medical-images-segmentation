@@ -6,7 +6,7 @@ from skimage import measure
 from skimage.feature import peak_local_max, canny
 from skimage.morphology import binary_closing
 
-from segmentation.utils.utils import get_nucleus_ids
+from net_utils.utils import get_nucleus_ids
 
 
 def foi_correction(mask, cell_type):

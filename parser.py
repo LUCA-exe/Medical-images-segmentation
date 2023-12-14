@@ -39,6 +39,11 @@ def get_parser():
                             type=str,
                             help="Which folder to access for saving best model files/metrics")
 
+    parser.add_argument("--eval_metric",
+                            default="software", # TODO: implement more options.
+                            type=str,
+                            help="Str used to decide which metrics use for evaluation")
+
     parser.add_argument("--evaluation_software",
                             default="./net_utils/evaluation_software/", # Specific folder to save the evaluation software 
                             type=str,
@@ -79,16 +84,17 @@ def get_parser():
                             help="Compare signals for all the dataset with computed signals.")
 
     # Inference/Evaluation args
-    parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fecth the chosen model")
+    parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fetch the chosen model")
     parser.add_argument("--models_name", default="none", type=str, help="model's name to fetch")
     parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing')
     parser.add_argument('--artifact_correction', '-ac', default=False, action='store_true', help='Artifact correction')
     parser.add_argument('--batch_size', '-bs', default=1, type=int, help='Batch size')
-    parser.add_argument('--cell_type', '-ct', nargs='+', required=True, help='Cell type(s)')
+    #parser.add_argument('--cell_type', '-ct', nargs='+', required=True, help='Cell type(s)')
     parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / evaluation mode')
-    parser.add_argument('--models', required=True, type=str, help='Models to evaluate (prefix)')
+    #parser.add_argument('--models', required=True, type=str, help='Models to evaluate (prefix)')
     parser.add_argument('--multi_gpu', '-mgpu', default=False, action='store_true', help='Use multiple GPUs')
     parser.add_argument('--apply_clahe', '-acl', default=False, action='store_true', help='CLAHE pre-processing')
+    parser.add_argument('--save_raw_pred', '-srp', default=False, action='store_true', help='Save some raw predictions')
     parser.add_argument('--scale', '-sc', default=1, type=float, help='Scale factor (0: get from trainset info.json') # json file with per-dataset parameters
     parser.add_argument('--subset', '-s', default='01', type=str, help='Subset to evaluate on') # Possible options: [01, 02,01+02]
     parser.add_argument('--th_cell', '-tc', default=0.07, nargs='+', help='Threshold for adjusting cell size')
@@ -110,6 +116,8 @@ def get_processed_args(args):
     # Process args before train/eval
     if args.subset == '01+02':
         args.subset = ['01','02']
+    else:
+        args.subset = [args.subset]
 
     # Providing a gridsearch for finetunable parameters - kept from the original repository.
     if not isinstance(args.th_seed, list):

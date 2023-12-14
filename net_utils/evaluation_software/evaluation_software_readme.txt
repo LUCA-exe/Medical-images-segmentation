@@ -1,0 +1,1 @@
+Folder that will contain the evaluation software issued by the CTC if the download is requested

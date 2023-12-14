@@ -35,9 +35,10 @@ def main():
         log.debug(f"Warning: the '{path_data}' provided is not existent! Interrupting the program...")
         raise ValueError("The '{path_data}' provided is not existent")
 
-    # Check if evaluation metric is available
-    if not os.path.isdir(path_ctc_metric): # TODO: Donwload it automatically if it is not present.
-        raise Exception('No evaluation software found. Run the script download_data.py')
+    # Check wich set of metrics you want to use
+    if args.eval_metric == 'software'
+        if not os.path.isdir(path_ctc_metric): # Check if evaluation software is available
+            raise Exception('No evaluation software found. Run the script download_data.py')
 
     # Load all models in the chosen folder
     models = [model for model in os.listdir(args.models_folder) if model.endswith('.pth')]
@@ -53,13 +54,13 @@ def main():
     train_sets = args.subset # List of subfolder to eval: already parser from args
     scale_factor = args.scale # TODO: Get scale from training dataset info if not stated otherwise
         
-    
+    # NOTE: For now it is implemented evaluation for one dataset
     for model in models: # Loop over all the models found
         model_path = os.path.join(path_models, model) # Create model path
         for th_seed in args.th_seed:# Go through thresholds
             for th_cell in args.th_cell:
                 for train_set in train_sets:
-                        log.info(f'Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
+                        log.info(f'---- ---- ----\nEvaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
 
                 # Set up current results folder
                 path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model}_{th_seed}_{th_cell}")
@@ -70,12 +71,13 @@ def main():
                 eval_args = EvalArgs(th_cell=float(th_cell), th_seed=float(th_seed),
                                         apply_clahe=args.apply_clahe,
                                         scale=scale_factor,
+                                        save_raw_prediction=args.save_raw_prediction,
                                         artifact_correction=args.artifact_correction,
                                         apply_merging=args.apply_merging)
                 
                 # Inference on the chosen train set
                 inference_2d_ctc(log=log, model=model_path,
-                             data_path=path_data,
+                             data_path=os.path.join(path_data, train_set),
                              result_path=path_seg_results,
                              device=device,
                              batchsize=args.batch_size,

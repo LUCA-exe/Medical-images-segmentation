@@ -1,13 +1,14 @@
 import numpy as np
 import tifffile as tiff
 import torch
+from pathlib import Path
 
 from skimage.exposure import equalize_adapthist
 from skimage.transform import rescale
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from segmentation.utils.utils import zero_pad_model_input
+from net_utils.utils import zero_pad_model_input
 
 
 class CTCDataSet(Dataset):
@@ -20,7 +21,7 @@ class CTCDataSet(Dataset):
         :param transform:
         """
 
-        self.img_ids = sorted(data_dir.glob('t*.tif'))
+        self.img_ids = sorted(Path(data_dir).glob('t*.tif'))
         self.transform = transform
 
     def __len__(self):
