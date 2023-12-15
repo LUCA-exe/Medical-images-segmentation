@@ -4,10 +4,11 @@ This is the evaluation main function that call inference and the metrics computa
 """
 import os
 from os.path import join, exists
-from colletions import defaultdict
+from collections import defaultdict
 from utils import create_logging,  set_device, EvalArgs
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d_ctc
+from net_utils.metrics import count_det_errors, ctc_metrics
 
 
 def main():
@@ -24,7 +25,7 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
     device = set_device() # Set device: cpu or single-gpu usage
-    log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline}   <<<")
+    log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline} metrics {args.eval_metric} <<<")
 
     # Load paths
     path_data = join(args.train_images_path, args.dataset)
@@ -52,11 +53,10 @@ def main():
 
     scores = [] # Temporary list to keep the evaluation results
     train_sets = args.subset # List of subfolder to eval: already parser from args
-    scale_factor = args.scale # TODO: Get scale from training dataset info if not stated otherwise
     
     # NOTE: For now it is implemented evaluation for one dataset
     if args.model_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
-        kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, scale_factor, args)
+        kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, args.scale, args)
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
@@ -105,8 +105,7 @@ def main():
 # TODO: Implementing kit-ge inference loop.
 def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, scale_factor, args):
 
-    # Get dict to store results
-    # TODO: Implementing .. .. ..
+    # TODO: Get dict to store results - implementing .. .. ..
     results = defaultdict(dict)
 
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
@@ -144,6 +143,19 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                 num_gpus=1, # Warning: Fixed for now at 1.
                                 model_pipeline=args.model_pipeline,
                                 post_processing_pipeline=args.post_processing_pipeline) 
+
+                    if args.eval_metric == 'software':
+                        seg_measure, det_measure = ctc_metrics(path_data=path_data,
+                                                                path_results=path_seg_results,
+                                                                path_software=args.evaluation_software,
+                                                                subset=train_set,
+                                                                mode=args.mode)
+                    else:
+                        raise NotImplementedError(f"Other metrics not implemented yet ..")
+
+                    # DEBUG
+                    print(seg_measure)
+                    print(det_measure)
             
                     # Save parameters of the model and post_processing
                     results[f"model.split('.')[0]"] = {'model':args_used, 

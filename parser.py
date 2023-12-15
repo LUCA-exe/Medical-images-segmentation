@@ -45,7 +45,7 @@ def get_parser():
                             help="Str used to decide which metrics use for evaluation")
 
     parser.add_argument("--evaluation_software",
-                            default="./net_utils/evaluation_software/", # Specific folder to save the evaluation software 
+                            default="./net_utils/evaluation_software/", # Specific folder to save the evaluation software - should be treated as const
                             type=str,
                             help="Path to access for loading the evaluation software of Cell Tracking Challenge")
 

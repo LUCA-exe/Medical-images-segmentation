@@ -178,4 +178,4 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
     del net
     gc.collect()
 
-    return None
+    return model_settings # Return this params to save in the results dict
