@@ -1,6 +1,6 @@
 ''' ./net_utils/utils.py
 This file contains all the function to process images during train/inference with 
-models.
+models (debug functions to inspects results).
 '''
 import json
 import numpy as np

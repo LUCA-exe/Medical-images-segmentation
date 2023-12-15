@@ -14,7 +14,8 @@ from inference.postprocessing import *
 from net_utils.unets import build_unet
 
 
-def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args, num_gpus=None):
+# For now use this simple 'dataloader' loop for evaluation of different pipelines.
+def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args, num_gpus=None, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -42,15 +43,18 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
 
     # Build model
     log.info(f"Bulding model '{model}' ..")
-    net = build_unet(unet_type=model_settings['architecture'][0],
-                     act_fun=model_settings['architecture'][2],
-                     pool_method=model_settings['architecture'][1],
-                     normalization=model_settings['architecture'][3],
-                     device=device,
-                     num_gpus=num_gpus,
-                     ch_in=1,
-                     ch_out=1,
-                     filters=model_settings['architecture'][4])
+
+    # TODO: Check which model to build (implement different pipelines/options to build the model)
+    if model_pipeline == 'kit-ge':
+        net = build_unet(unet_type=model_settings['architecture'][0],
+                        act_fun=model_settings['architecture'][2],
+                        pool_method=model_settings['architecture'][1],
+                        normalization=model_settings['architecture'][3],
+                        device=device,
+                        num_gpus=num_gpus,
+                        ch_in=1,
+                        ch_out=1,
+                        filters=model_settings['architecture'][4])
 
     # Get number of GPUs to use and load weights
     if not num_gpus:
@@ -125,9 +129,14 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
                 save_raw_pred = False
 
             file_id = ids_batch[h].split('t')[-1] + '.tif'
-            prediction_instance, border = distance_postprocessing(border_prediction=prediction_border_batch[h],
-                                                                  cell_prediction=prediction_cell_batch[h],
-                                                                  args=args)
+
+            # TODO: Implement different post-processing options.
+            if post_processing_pipeline == 'kit-ge':
+                prediction_instance, border = distance_postprocessing(border_prediction=prediction_border_batch[h],
+                                                                    cell_prediction=prediction_cell_batch[h],
+                                                                    args=args)
+
+
             if args.scale < 1:
                 prediction_instance = resize(prediction_instance,
                                              img_size,

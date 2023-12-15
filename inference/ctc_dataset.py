@@ -1,3 +1,6 @@
+'''
+This script helps the creation of the inference (evaluation/test) dataset.
+'''
 import numpy as np
 import tifffile as tiff
 import torch
