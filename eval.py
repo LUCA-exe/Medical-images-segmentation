@@ -100,6 +100,8 @@ def main():
                     raise NotImplementedError(f"Other inference options not implemented yet ..")
 
                 # TODO: Gather metrics and evaluate dict for gathering metrics results'''
+    
+    log.info(">>> Evaluation script ended correctly")
 
 
 # TODO: Implementing kit-ge inference loop.
@@ -115,7 +117,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
             for th_cell in args.th_cell:
                 for train_set in train_sets:
 
-                    log.info(f'>>> Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
+                    log.info(f'> Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
 
                     # Set up current results folder for the segmentation maps
                     path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model.split('.')[0]}_{th_seed}_{th_cell}")
@@ -123,14 +125,17 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     os.makedirs(path_seg_results, exist_ok=True)
 
                     # Get post-processing settings
-                    eval_args = EvalArgs(th_cell=float(th_cell), th_seed=float(th_seed),
+                    eval_args = EvalArgs(args.post_processing_pipeline,
+                                            th_cell=float(th_cell), 
+                                            th_seed=float(th_seed),
                                             apply_clahe=args.apply_clahe,
                                             scale=scale_factor,
                                             cell_type=args.cell_type,
                                             save_raw_pred=args.save_raw_pred,
                                             artifact_correction=args.artifact_correction,
                                             apply_merging=args.apply_merging)
-
+                    
+                    # Debug specific args for the current run.
                     log.debug(eval_args)
 
                     # Inference on the chosen train set
@@ -152,10 +157,6 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                                                 mode=args.mode)
                     else:
                         raise NotImplementedError(f"Other metrics not implemented yet ..")
-
-                    # DEBUG
-                    print(seg_measure)
-                    print(det_measure)
             
                     # Save parameters of the model and post_processing
                     results[f"model.split('.')[0]"] = {'model':args_used, 
@@ -163,7 +164,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                                     f'train_set':train_set,
                                                     'results':None} # save metrics
     
-    return
+    return None
 
 
 if __name__ == "__main__":

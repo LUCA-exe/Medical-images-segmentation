@@ -70,23 +70,19 @@ def set_device():
     return device
 
 
-# TODO: Check compared to the original repository
-class EvalArgs(object): # Class containings inference and post-processing parameters
+# TODO: this class offer a customized EvaluationParser for every implemented pipeline.
+class EvalArgs(object): # Class containings inference and post-processing parameters.
     """ Class with post-processing parameters.
-
     """
 
-    def __init__(self, th_cell, th_seed, apply_clahe, scale, cell_type,
-                 save_raw_pred,
-                 artifact_correction, apply_merging):
+    def __init__(self, post_processing_pipeline, th_cell, th_seed, apply_clahe, scale, cell_type,
+                 save_raw_pred,artifact_correction, apply_merging):
         """
-
+        (kit-ge post-processing params)
         :param th_cell: Mask / cell size threshold.
             :type th_cell: float
         :param th_seed: Seed / marker threshold.
             :type th_seed: float
-        :param n_splitting: Number of detected cells above which to apply additional splitting (only for 3D).
-            :type n_splitting: int
         :param apply_clahe: Apply contrast limited adaptive histogram equalization (CLAHE).
             :type apply_clahe: bool
         :param scale: Scale factor for downsampling.
@@ -97,22 +93,21 @@ class EvalArgs(object): # Class containings inference and post-processing parame
             :type save_raw_pred: bool
         :param artifact_correction: Apply artifact correction post-processing.
             :type artifact_correction: bool
-        :param fuse_z_seeds: Fuse seeds in z-direction / axial direction.
-            :type fuse_z_seeds: bool
         """
-        self.th_cell = th_cell
-        self.th_seed = th_seed
-        self.apply_clahe = apply_clahe
-        self.scale = scale
-        self.cell_type = cell_type
-        self.save_raw_pred = save_raw_pred
-        self.artifact_correction = artifact_correction
-        self.apply_merging = apply_merging
+        if post_processing_pipeline == 'kit-ge':
+            self.th_cell = th_cell
+            self.th_seed = th_seed
+            self.apply_clahe = apply_clahe
+            self.scale = scale
+            self.cell_type = cell_type
+            self.save_raw_pred = save_raw_pred
+            self.artifact_correction = artifact_correction
+            self.apply_merging = apply_merging
 
     # Override default class function
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"TrialClass({attributes})"
+        return f"EvalArgs({attributes})"
 
 
         

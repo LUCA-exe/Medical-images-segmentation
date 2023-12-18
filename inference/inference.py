@@ -101,8 +101,9 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
             pad_batch = [pad_batch[i][0] for i in range(len(pad_batch))]
             img_size = [img_size[i][0] for i in range(len(img_size))]
 
-        # Prediction
-        prediction_border_batch, prediction_cell_batch = net(img_batch)
+        # Prediction - dependent on the chosen model pipeline. 
+        if model_pipeline == 'kit-ge':
+            prediction_border_batch, prediction_cell_batch = net(img_batch)
 
         log.debug(f".. predicted batch {idx} ..")
 

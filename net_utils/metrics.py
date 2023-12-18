@@ -26,6 +26,7 @@ def ctc_metrics(path_data, path_results, path_software, subset, mode='GT'):
     path_results = Path(path_results)
     path_software = Path(path_software)
 
+    # Specific dataset parameters
     if path_data.stem == 'BF-C2DL-HSC' or path_data.stem == 'BF-C2DL-MuSC':
         t = '4'
     else:

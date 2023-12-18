@@ -83,9 +83,9 @@ def get_parser():
                             type = bool,
                             help="Compare signals for all the dataset with computed signals.")
 
-    # Building models (pre/post processing methods) args
+    # Building models (models/post processing methods for evaluation) args
     parser.add_argument("--model_pipeline", default="kit-ge", type=str, help="String to chose what models to build")
-    parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operation to do")
+    parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operations/pipeline to do")
 
     # Inference/Evaluation args
     parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fetch the chosen model")
