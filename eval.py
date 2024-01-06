@@ -7,7 +7,7 @@ from os.path import join, exists
 from collections import defaultdict
 from utils import create_logging,  set_device, EvalArgs
 from parser import get_parser, get_processed_args
-from inference.inference import inference_2d_ctc
+from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
 
 
@@ -55,7 +55,7 @@ def main():
     train_sets = args.subset # List of subfolder to eval: already parser from args
     
     # NOTE: For now it is implemented evaluation for one dataset
-    if args.model_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
+    if args.post_processing_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
         kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, args.scale, args)
     
     else: # Call other inference loop ..
@@ -101,10 +101,10 @@ def main():
 
                 # TODO: Gather metrics and evaluate dict for gathering metrics results'''
     
-    log.info(">>> Evaluation script ended correctly")
+    log.info(">>> Evaluation script ended correctly <<<")
 
 
-# TODO: Implementing kit-ge inference loop.
+# Implementing kit-ge inference loop if 'post-processing' selected is theirs.
 def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, scale_factor, args):
 
     # TODO: Get dict to store results - implementing .. .. ..
@@ -145,7 +145,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                 device=device,
                                 batchsize=args.batch_size,
                                 args=eval_args,
-                                num_gpus=1, # Warning: Fixed for now at 1.
+                                num_gpus=1, # NOTE: Fixed for now at 1.
                                 model_pipeline=args.model_pipeline,
                                 post_processing_pipeline=args.post_processing_pipeline) 
 
@@ -159,10 +159,10 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                         raise NotImplementedError(f"Other metrics not implemented yet ..")
             
                     # Save parameters of the model and post_processing
-                    results[f"model.split('.')[0]"] = {'model':args_used, 
+                    '''results[f"model.split('.')[0]"] = {'model':args_used, 
                                                     'post_processing':eval_args,
                                                     f'train_set':train_set,
-                                                    'results':None} # save metrics
+                                                    'results':None} # save metrics'''
     
     return None
 

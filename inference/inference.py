@@ -1,3 +1,6 @@
+'''This file is used for main inference loop: depending on the chosen model and
+post-processing method that can be chosen by parameters'''
+
 import gc
 import json
 import tifffile as tiff
@@ -15,7 +18,7 @@ from net_utils.unets import build_unet
 
 
 # For now use this simple 'dataloader' loop for evaluation of different pipelines.
-def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args, num_gpus=None, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
+def inference_2d(log, model, data_path, result_path, device, batchsize, args, num_gpus=None, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -65,12 +68,13 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
         net.load_state_dict(torch.load(str(model), map_location=device))
     
     log.info(f"Model correctly set")
+    log.debug(f"{net.summary()}")
     # Prepare model for evaluation
     net.eval()
     torch.set_grad_enabled(False)
 
-    log.info(f"Creating inference dataset ..")
     # Get images to predict
+    log.info(f"Creating inference dataset ..")
     ctc_dataset = CTCDataSet(data_dir=data_path,
                              transform=pre_processing_transforms(apply_clahe=args.apply_clahe, scale_factor=args.scale))
     
@@ -101,7 +105,7 @@ def inference_2d_ctc(log, model, data_path, result_path, device, batchsize, args
             pad_batch = [pad_batch[i][0] for i in range(len(pad_batch))]
             img_size = [img_size[i][0] for i in range(len(img_size))]
 
-        # Prediction - dependent on the chosen model pipeline. 
+        # Prediction outputs - dependent on the chosen model pipeline. 
         if model_pipeline == 'kit-ge':
             prediction_border_batch, prediction_cell_batch = net(img_batch)
 

@@ -43,7 +43,7 @@ def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..
     return mask
 
 
-def distance_postprocessing(border_prediction, cell_prediction, args, input_3d=False):
+def distance_postprocessing(border_prediction, cell_prediction, args):
     """ Post-processing for distance label (cell + neighbor) prediction.
 
     :param border_prediction: Neighbor distance prediction.
@@ -57,16 +57,11 @@ def distance_postprocessing(border_prediction, cell_prediction, args, input_3d=F
     :return: Instance segmentation mask.
     """
 
-    # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring)
-    if input_3d:
-        sigma_cell = (0.5, 1.0, 1.0)
-        sigma_border = (0.5, 0.5, 0.5)
-    else:
-        sigma_cell = 1.0
-        sigma_border = 0.5
+    # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring) - Fixed parameters
+    sigma_cell = 1.0
+    sigma_border = 0.5
 
-    apply_splitting = False
-
+    apply_splitting = False # TODO: Move into the eval args parsers
     cell_prediction = gaussian_filter(cell_prediction, sigma=sigma_cell)
     border_prediction = gaussian_filter(border_prediction, sigma=sigma_border)
     border_prediction = np.clip(border_prediction, 0, 1)
@@ -95,7 +90,7 @@ def distance_postprocessing(border_prediction, cell_prediction, args, input_3d=F
         min_area = 0.10 * np.mean(np.array(areas))
     else:
         min_area = 0
-    min_area = np.maximum(min_area, 8) if input_3d else np.maximum(min_area, 4)
+    min_area = np.maximum(min_area, 4)
 
     for i in range(len(props)):
         # if props[i].area <= 4 or (input_3D and props[i].area <= 8):
@@ -113,29 +108,6 @@ def distance_postprocessing(border_prediction, cell_prediction, args, input_3d=F
             if props[i].area <= 4 or (input_3d and props[i].area <= 8):
                 seeds[seeds == props[i].label] = 0
         seeds = measure.label(seeds, background=0)
-
-    # local splitting since the slice-wise predictions tend to undersegmentation
-    if input_3d and np.max(seeds) >= args.n_splitting:
-
-        seeds = ((cell_prediction - 0.5 * borders) > th_local)  # give chance to correct wrong borders
-        seeds = measure.label(seeds, background=0)
-
-        # Remove very small seeds
-        props = measure.regionprops(seeds)
-        for i in range(len(props)):
-            if props[i].area <= 16:  # Due to the smaller threshold also bigger seeds need to be removed
-                seeds[seeds == props[i].label] = 0
-        seeds = measure.label(seeds, background=0)
-
-        prediction = cell_prediction * (seeds > 0)
-
-        seed_list = peak_local_max(prediction, min_distance=6)
-        seeds = np.zeros_like(prediction)
-        for seed in range(len(seed_list)):
-            seeds[seed_list[seed][0], seed_list[seed][1], seed_list[seed][2]] = 1
-        seeds = measure.label(seeds)
-
-        apply_splitting = True
 
     # Marker-based watershed
     prediction_instance = watershed(image=-cell_prediction, markers=seeds, mask=mask, watershed_line=False)

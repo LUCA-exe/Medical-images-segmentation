@@ -39,7 +39,7 @@ def get_parser():
                             type=str,
                             help="Which folder to access for saving best model files/metrics")
 
-    parser.add_argument("--eval_metric",
+    parser.add_argument("--eval_metric", # For now kept as default the CTC evaluation DET and SEG scores
                             default="software", # TODO: implement more options.
                             type=str,
                             help="Str used to decide which metrics use for evaluation")
@@ -87,10 +87,10 @@ def get_parser():
     parser.add_argument("--model_pipeline", default="kit-ge", type=str, help="String to chose what models to build")
     parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operations/pipeline to do")
 
-    # Inference/Evaluation args
+    # Inference/Evaluation args - for now just KIT-GE post-processing pipeline args
     parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fetch the chosen model")
     parser.add_argument("--models_name", default="none", type=str, help="model's name to fetch")
-    parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing')
+    parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing') # merging post-processing (prevents oversegmentation)
     parser.add_argument('--artifact_correction', '-ac', default=False, action='store_true', help='Artifact correction')
     parser.add_argument('--batch_size', '-bs', default=1, type=int, help='Batch size')
     #parser.add_argument('--cell_type', '-ct', nargs='+', required=True, help='Cell type(s)')
