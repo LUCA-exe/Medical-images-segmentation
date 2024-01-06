@@ -107,8 +107,8 @@ def main():
 # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
 def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, scale_factor, args):
 
-    # TODO: Get dict to store results - implementing .. .. ..
-    results = defaultdict(dict)
+    # Prepare dict for the results
+    results = {'model':args.model_pipeline, 'post_processing': args.post_processing_pipeline, }
 
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
     for model in models: # Loop over all the models found
@@ -139,7 +139,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     log.debug(eval_args)
 
                     # Inference on the chosen train set
-                    args_used = inference_2d_ctc(log=log, model=model_path,
+                    args_used = inference_2d(log=log, model=model_path,
                                 data_path=os.path.join(path_data, train_set),
                                 result_path=path_seg_results,
                                 device=device,
@@ -155,9 +155,15 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                                                 path_software=args.evaluation_software,
                                                                 subset=train_set,
                                                                 mode=args.mode)
+                        
+                        _, so, fnv, fpv = count_det_errors(os.path.join(path_seg_results, "DET_log.txt"))
+
                     else:
                         raise NotImplementedError(f"Other metrics not implemented yet ..")
-            
+
+                    # DEBUG
+                    print(f"Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell} --- {seg_measure} {det_measure} {so} {fnv} {fpv}")
+                    
                     # Save parameters of the model and post_processing
                     '''results[f"model.split('.')[0]"] = {'model':args_used, 
                                                     'post_processing':eval_args,

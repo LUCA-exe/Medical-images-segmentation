@@ -4,3 +4,5 @@ __pycache__/
 __MACOSX/
 tmp/
 net_utils/evaluation_software/
+training_data/
+models/all/

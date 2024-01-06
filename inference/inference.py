@@ -49,7 +49,7 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, nu
 
     # TODO: Check which model to build (implement different pipelines/options to build the model)
     if model_pipeline == 'kit-ge':
-        net = build_unet(unet_type=model_settings['architecture'][0],
+        net = build_unet(log, unet_type=model_settings['architecture'][0],
                         act_fun=model_settings['architecture'][2],
                         pool_method=model_settings['architecture'][1],
                         normalization=model_settings['architecture'][3],
@@ -68,7 +68,6 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, nu
         net.load_state_dict(torch.load(str(model), map_location=device))
     
     log.info(f"Model correctly set")
-    log.debug(f"{net.summary()}")
     # Prepare model for evaluation
     net.eval()
     torch.set_grad_enabled(False)
