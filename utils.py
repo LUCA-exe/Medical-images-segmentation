@@ -3,12 +3,14 @@
 - Logger functions 
 - Parsing functions
 - Containing specific class args parsing
+- Handle saving/loading metrics for training/evaluation
 """
 
 import torch
 import os
 import logging
 from datetime import datetime
+import json
 
 LOGS_PATH = "logs" # TODO: Const as the path is fixed. Move this in a 'ENV' dict 
 

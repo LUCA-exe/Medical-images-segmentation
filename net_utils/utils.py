@@ -271,3 +271,26 @@ def zero_pad_model_input(img, pad_val=0):
         img = np.pad(img, ((pads[0], 0), (pads[1], 0)), mode='constant', constant_values=pad_val)
 
     return img, [pads[0], pads[1]]
+
+# Custom saving/loading metrics functions
+def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):
+    
+    file_name = name + ext
+    file_path = os.path.join(dataset_path, file_name)
+
+    # Check if the file already exists
+    if os.path.exists(file_path):
+        log.info("The file {file_name }already exists in {dataset_path}: It will be subscribed.")
+
+    # Save the dict in input in a 'results.json' file in the dataset folder
+    with open(os.path.join(dataset_path, name + ext), "w") as outfile:
+        json.dump(metrics, fp=outfile, indent = 4, sort_keys=True)
+
+    log.info(f"File '{name + ext}' in '{dataset_path}' saved correctly!")
+    return None
+
+
+# TODO: Implement as aggregation of results for visualization purpose.
+def aggregate_metrics():
+    pass
+
