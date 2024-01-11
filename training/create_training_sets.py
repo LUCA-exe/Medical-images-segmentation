@@ -621,7 +621,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
     
     if len(list((path_trainset / 'train').glob('*.tif'))) > 0: # Check if the generated 'train set' already exist
 
-        log.info(f"Training set {path_trainset.stem} already generated, returning to the main train loop")
+        log.info(f"Training set {path_trainset.stem} already generated, returning to the main training loop")
         return None
 
     log.info('   ... create {} training set ...'.format(path_trainset.stem))
@@ -629,31 +629,24 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # From original work: Load split if original 'kit-sch-ge' training sets should be reproduced.
     if split == 'kit-sch-ge':
-        train_val_ids = get_file(path=Path(__file__).parent/'splits'/'ids_{}_{}.json'.format(ct, mode)) # File not present in my repository
+        train_val_ids = get_file(path=Path(__file__).parent/'splits'/'ids_{}_{}.json'.format(cell_type, mode)) # File not present in my repository
         used_crops = get_used_crops(train_val_ids, mode)
     else:
         used_crops = []
 
     # Get ids of segmentation ground truth masks (GTs may not be fully annotated and STs may be erroneous)
-    mask_ids = get_mask_ids(log, path_data=path_data, ct=ct, mode=mode, split=split, st_limit=st_limit)
+    mask_ids = get_mask_ids(log, path_data=path_data, ct=cell_type, mode=mode, split=split, st_limit=st_limit)
 
     # Get settings for distance map creation
     td_settings = get_td_settings(log, mask_id_list=mask_ids, crop_size=crop_size)
-    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, ct # Gathering additional information in the 'properties' dict
+    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, cell_type # Gathering additional information in the 'properties' dict
 
     # Iterate through files and load images and masks (and TRA GT for GT mode)
     log.info(f"Starting loop over the loaded masks {mask_ids}")
     if td_settings['scale'] !=1: log.debug(f"Downsampling operation will be performed due to the suggested 'scale' value {td_settings['scale']}")
     for mask_id in mask_ids: # TODO: To parallelize
  
-        # Load images and masks (get slice and frame first)
-        if len(mask_id.stem.split('_')) > 2:  # only slice annotated
-            frame = mask_id.stem.split('_')[2]
-            slice_idx = int(mask_id.stem.split('_')[3])
-        else:
-            print(f"Should JUST get here.. ondition is for 3D image slices")
-            frame = mask_id.stem.split('man_seg')[-1]
-
+        frame = mask_id.stem.split('man_seg')[-1] # Just 2D images
         # Check if frame is needed to reproduce the kit-sch-ge training sets
         if used_crops and not any(e[1] == frame for e in used_crops): # TODO: To remove
             print(f"Should NOT JUST get here.. should exit the program")
@@ -664,6 +657,10 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         subset = mask_id.parents[1].stem.split('_')[0]
         img = tiff.imread(str(mask_id.parents[2] / subset / "t{}.tif".format(frame)))
 
+        # Adjust the number of channel of my 2D images.
+        if len(img.shape) > 2: # Preferred choice
+            img = np.sum(img, axis=2) # Keep all object (Both EVs, cell boundaries and cell nucleus)
+
         # NOTE: TRA GT (fully annotated, no region information) to detect fully annotated mask GTs later
         if 'GT' in mode:
             tra_gt = tiff.imread(str(mask_id.parents[1] / 'TRA' / "man_track{}.tif".format(frame)))
@@ -671,7 +668,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
             raise TypeError("For now just 'GT' is supported!")
 
         # FOI correction: followin the standard CTC requests for the pixels near the border.
-        img, mask, tra_gt = foi_correction_train(ct, mode, img, mask, tra_gt)
+        img, mask, tra_gt = foi_correction_train(cell_type, mode, img, mask, tra_gt)
 
         # Downsampling
         if td_settings['scale'] != 1:
@@ -684,7 +681,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         img = np.clip(img, 0, 65535).astype(np.uint16) # Kept the requested type 'unsigned' integer 16 bits
 
         # Calculate distance transforms, crop and classify crops into 'A' (fully annotated) and 'B' (>80% annotated)
-        _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=ct,
+        _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=cell_type,
                                       mode=mode, subset=subset, frame=frame, path=path_trainset)
 
     td_settings.pop('used_crops')
@@ -722,5 +719,4 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # NOTE: The original repository contained a beatiful method to merge multiple dataset/cell type patches avoiding a final 'unbalanced' train/val split
     log.info(f"Trainig dataset created correctly")
-    
     return None

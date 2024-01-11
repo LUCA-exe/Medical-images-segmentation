@@ -3,7 +3,7 @@ from scipy import ndimage
 from scipy.ndimage.morphology import distance_transform_edt, grey_closing, generate_binary_structure
 from skimage import measure
 from skimage.morphology import disk
-from segmentation.utils.utils import get_nucleus_ids
+from net_utils.utils import get_nucleus_ids
 
 
 def bottom_hat_closing(label):

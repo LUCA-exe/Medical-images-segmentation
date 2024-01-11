@@ -3,13 +3,13 @@
 This is the train main function that call creation of training set of a dataset
 and train the models.
 """
+
 import os
+from pathlib import Path
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, EvalArgs
+from utils import create_logging, set_device, TrainArgs
 from parser import get_parser, get_processed_args
-from inference.inference import inference_2d # Main inference loop
-from net_utils.metrics import count_det_errors, ctc_metrics, save_metrics
 
 from training.create_training_sets import create_ctc_training_sets
 
@@ -31,8 +31,9 @@ def main():
     log.info(f">>>   Training: pre-processing {args.pre_processing_pipeline} model {args.model_pipeline} <<<")
 
     # Load paths
-    path_data = join(args.train_images_path, args.dataset)
+    path_data = Path(args.train_images_path)
     path_models = args.models_folder # Train all models found here.
+    cell_type = Path(args.dataset)
 
     # TODO: Move this into 'utils' file (called both in 'val' and 'train')
     if not exists(path_data):
@@ -44,10 +45,12 @@ def main():
     # Pre-processing pipeline - implement more pipeline from other papers here ..
     if args.pre_processing_pipeline == 'kit-ge':
         log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline")
-        create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=args.dataset, split=args.split, min_a_images=args.min_a_images)
+        create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
+    model_name = '{}_{}_{}_model'.format(trainset_name, args.mode, args.split)
+    log.info(f"Model name used is {model_name}")
 
     # WORK IN PROGRESS
     log.info(">>> Training script ended correctly <<<")

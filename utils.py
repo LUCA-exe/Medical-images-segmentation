@@ -117,8 +117,8 @@ class TrainArgs(object): # Class containings args for creation of the dataset
     """ Class with training/sets creation parameters.
     """
 
-    def __init__(self, pre_processing_pipeline, th_cell, th_seed, apply_clahe, scale, cell_type,
-                 save_raw_pred,artifact_correction, apply_merging):
+    def __init__(self, pre_processing_pipeline, act_fun, batch_size, filters, iterations,
+    loss, norm_methods, optimizer, pool_method, pre_train, retrain, split):
         """ kit-ge pre-processing params implemented for now.
         """
         if pre_processing_pipeline == 'kit-ge':
@@ -137,7 +137,7 @@ class TrainArgs(object): # Class containings args for creation of the dataset
     # Override default class function
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"EvalArgs({attributes})"
+        return f"TrainArgs({attributes})"
 
 
         

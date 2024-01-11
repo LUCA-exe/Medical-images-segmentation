@@ -4,7 +4,7 @@ This file contains all the functions to store/save results (both models/metrics)
 import json
 import numpy as np
 import shutil
-
+import os
 
 def get_det_score(path):
     """  Get DET metric score.
@@ -297,6 +297,7 @@ def aggregate_metrics():
 
 # Moved from the 'create_training_sets.py' module - function used by 'training' methods
 def write_file(file, path):
-    with open(path, 'w', encoding='utf8') as f:
+    path = str(path) # Conversion needed from Path type variable
+    with open(path, 'w', encoding='UTF-8') as f:
         json.dump(file, f, ensure_ascii=False, indent=2)
     return

@@ -78,7 +78,6 @@ def get_parser():
     # Dataset pre-processing/training - for now just KIT-GE post-processing pipeline args
     parser.add_argument('--min_a_images', '-mai', default=30, type=int, help="Minimum number of 'A' annotated patches, if less take even the 'B' quality patches")
     parser.add_argument('--act_fun', '-af', default='relu', type=str, help='Activation function')
-    parser.add_argument('--batch_size', '-bs', default=2, type=int, help='Batch size') # NOTE: Originally suggested '8'
     parser.add_argument('--filters', '-f', nargs=2, type=int, default=[64, 1024], help='Filters for U-net')
     parser.add_argument('--iterations', '-i', default=1, type=int, help='Number of models to train')
     parser.add_argument('--loss', '-l', default='smooth_l1', type=str, help='Loss function')
@@ -87,20 +86,20 @@ def get_parser():
     parser.add_argument('--pool_method', '-pm', default='conv', type=str, help='Pool method')
     parser.add_argument('--pre_train', '-pt', default=False, action='store_true', help='Auto-encoder pre-training')
     parser.add_argument('--retrain', '-r', default='', type=str, help='Model to retrain')
-    parser.add_argument('--split', '-s', default='01+02', type=str, help='Train/val split')
+    parser.add_argument('--split', '-s', default='01', type=str, help='Train/val split')
 
     # Inference/Evaluation args - for now just KIT-GE post-processing pipeline args
     parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fetch the chosen model")
     parser.add_argument("--models_name", default="none", type=str, help="model's name to fetch")
     parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing') # merging post-processing (prevents oversegmentation)
     parser.add_argument('--artifact_correction', '-ac', default=False, action='store_true', help='Artifact correction')
-    parser.add_argument('--batch_size', '-bs', default=1, type=int, help='Batch size')
+    parser.add_argument('--batch_size', '-bs', default=2, type=int, help='Batch size') # NOTE: Originally suggested '8' - used both for val/training methods
     parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / evaluation mode') # Used both for val/training methods - jsut 'GT' is supported for now
     parser.add_argument('--multi_gpu', '-mgpu', default=False, action='store_true', help='Use multiple GPUs') # Used both for training/validation/test methods
     parser.add_argument('--apply_clahe', '-acl', default=False, action='store_true', help='CLAHE pre-processing')
     parser.add_argument('--save_raw_pred', '-srp', default=False, action='store_true', help='Save some raw predictions')
     parser.add_argument('--scale', '-sc', default=1, type=float, help='Scale factor (0: get from trainset info.json') # json file with per-dataset parameters
-    parser.add_argument('--subset', '-s', default='01', type=str, help='Subset to evaluate on') # Possible options: [01, 02,01+02]
+    parser.add_argument('--subset', '-ss', default='01', type=str, help='Subset to evaluate on') # Possible options: [01, 02,01+02]
     parser.add_argument('--th_cell', '-tc', default=0.07, nargs='+', help='Threshold for adjusting cell size')
     parser.add_argument('--th_seed', '-ts', default=0.45, nargs='+', help='Threshold for seeds')
 
