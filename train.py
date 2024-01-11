@@ -48,33 +48,12 @@ def main():
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
-    # Set-up model name
-    #WORK IN PROGRESS
-        
-    # Load all models in the chosen folder
-    models = [model for model in os.listdir(args.models_folder) if model.endswith('.pth')]
 
-    # Load the paths in the log files
-    log.debug(f"Dataset folder to evaluate: {path_data}")
-    log.debug(f"Folder used to fetch models: {path_models}")
-    log.debug(f"Folder used to save models performances/files: {path_data}") # Saving the results on the folder of the evaluated dataset
-    if path_ctc_metric != 'none': # In case of 'none' (str) use custom metrics on the script
-        log.debug(f"Evaluation software folder: {path_ctc_metric}")
-
-    scores = [] # Temporary list to keep the evaluation results
-    train_sets = args.subset # List of subfolder to eval: already parser from args
-    
-    # NOTE: For now it is implemented evaluation for one dataset
-    if args.post_processing_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
-        kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, args.scale, args)
-    
-    else: # Call other inference loop ..
-        raise NotImplementedError(f"Other inference options not implemented yet ..")
-    
-    log.info(">>> Evaluation script ended correctly <<<")
+    # WORK IN PROGRESS
+    log.info(">>> Training script ended correctly <<<")
 
 
-# Implementing kit-ge pre-processing method.
+# Implementing 'kit-ge' training method - consider to make unique for every chosen pipeline/make modular later.
 def kit_ge_dataset_creation(log, models, path_models, train_sets, path_data, device, scale_factor, args):
     pass
 

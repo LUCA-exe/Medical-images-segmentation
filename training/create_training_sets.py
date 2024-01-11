@@ -703,125 +703,24 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         b_img_ids = sorted((path_trainset / 'B').glob('img*.tif'))
 
     if not split == 'kit-sch-ge':
-        log.info(f"Splitting train/val elements for training with standard 80%/20%") # TODO: To add as argument
+        log.info(f"Splitting train/val elements for training with standard 80% / 20%") # TODO: To add as argument to the main parser and train specific parser
         train_val_ids = get_train_val_split(img_ids, b_img_ids) # Get simple shuffled dict with train/val patches ids.
+    
     log.debug(f"Train patches ids: {train_val_ids['train_ids']}")
     log.debug(f"Train patches ids: {train_val_ids['train_ids']}")
 
-        # Copy images to train/val
-        for train_mode in ['train', 'val']:
-            for idx in train_val_ids[train_mode]:
-                if (path_trainset / "A" / ("img_{}.tif".format(idx))).exists():
-                    source_path = path_trainset / "A"
-                else:
-                    source_path = path_trainset / "B"
-                copy_train_data(source_path, path_trainset / train_mode, idx)
+    # Copy images to train/val
+    for train_mode in ['train', 'val']:
 
-    if len(cell_type_list) > 1:  # Copy train and val sets together but avoid to high imbalance of cell types
+        for idx in train_val_ids[train_mode]:
 
-        if trainset_name == 'all':
-            if mode == 'GT+ST':
-                path_trainset = path_data / "allGT+allST_{}".format(split)
+            if (path_trainset / "A" / ("img_{}.tif".format(idx))).exists():
+                source_path = path_trainset / "A"
             else:
-                path_trainset = path_data / "{}{}_{}".format(trainset_name, mode, split)
-        else:
-            path_trainset = path_data / "{}_{}_{}".format(trainset_name, mode, split)
-        if len(list((path_trainset / 'train').glob('*.tif'))) > 0:
-            print('   ... training set {} already exists ...'.format(path_trainset.stem))
-            return
-        print('   ... create {} training set ...'.format(path_trainset.stem))
-        make_train_dirs(path=path_trainset)
+                source_path = path_trainset / "B"
+            copy_train_data(source_path, path_trainset / train_mode, idx)
 
-        # Load split if original 'kit-sch-ge' training sets should be reproduced
-        train_val_ids = {}
-        if split == 'kit-sch-ge':
-            if mode == 'GT+ST':
-                train_val_ids = get_file(path=Path(__file__).parent/'splits'/'ids_allGT+allST.json')
-            else:
-                train_val_ids = get_file(path=Path(__file__).parent/'splits'/'ids_{}{}.json'.format(trainset_name, mode))
-
-        cell_counts = {'train': {}, 'val': {}}
-        for ct in cell_type_list:
-
-            if 'all' in trainset_name and ct == 'Fluo-C2DL-MSC' and mode == 'GT':  # use no c2dl-msc data since too different to other cells
-                cell_counts['train'][ct], cell_counts['val'][ct] = 0, 0
-                continue
-
-            img_ids = {'train': sorted((path_data / "{}_{}_{}".format(ct, mode, split) / 'train').glob('img*.tif')),
-                       'val': sorted((path_data / "{}_{}_{}".format(ct, mode, split) / 'val').glob('img*.tif'))}
-
-            if mode == 'GT+ST':
-                if not train_val_ids:
-                    n_max = {'train': n_max_train_gt_st, 'val': n_max_val_gt_st}  # maximum number of each cell type
-                    if '3D' in ct or ct == 'Fluo-C2DL-MSC':
-                        n_max = {'train': n_max_train_gt_st // 2, 'val': n_max_val_gt_st // 2}
-                img_ids = {'train': sorted((path_data / "{}_GT+ST_{}".format(ct, split) / 'train').glob('img*.tif')),
-                           'val': sorted((path_data / "{}_GT+ST_{}".format(ct, split) / 'val').glob('img*.tif'))}
-                shuffle(img_ids['train']), shuffle(img_ids['val'])
-                counter = {'train': 0, 'val': 0}
-                for train_mode in ['train', 'val']:
-                    for img_id in img_ids[train_mode]:
-                        if not train_val_ids:
-                            if counter[train_mode] >= n_max[train_mode]:
-                                continue
-                        else:  # ids available
-                            if not (img_id.stem.split('img_')[-1] in train_val_ids[train_mode]):
-                                continue
-                        counter[train_mode] += 1
-                        # Copy img, distance labels and mask
-                        copy_train_data(img_id.parent, path_trainset / train_mode, img_id.stem.split('img_')[-1])
-                    cell_counts[train_mode][ct] = counter[train_mode]
-                continue
-
-            if not train_val_ids:
-                p_neighbor, p_no_neighbor = 1, 1  # keep all crops with neighbor information (exceptions below)
-                if mode == 'ST':
-                    p_neighbor = 0.9  # keep (almost) all crops with neighbor distance information
-                    p_no_neighbor = 0.6  # keep more than half of the other crops
-                    if ct in ['Fluo-C2DL-MSC', 'DIC-C2DH-HeLa']:
-                        p_neighbor = 0.4
-                        p_no_neighbor = 0.2
-                    if ct in ['Fluo-C3DL-MDA231', 'Fluo-C3DH-H157']:
-                        p_neighbor = 0.6
-                        p_no_neighbor = 0.4
-                elif mode == 'GT':
-                    if "3D" in ct:
-                        if len(img_ids['train']) + len(img_ids['val']) > 100:
-                            p_no_neighbor = 0.15  # use only 15% of images with dist_neighbor = 0
-                        elif len(img_ids['train']) + len(img_ids['val']) > 50:
-                            p_no_neighbor = 0.75  # use 3/4 of images with dist_neighbor = 0
-                    else:
-                        if len(img_ids['train']) + len(img_ids['val']) > 150:
-                            p_no_neighbor = 0.5
-                        elif len(img_ids['train']) + len(img_ids['val']) > 75:
-                            p_no_neighbor = 0.75
-
-                for train_mode in ['train', 'val']:
-                    counts = 0
-                    hlist = []
-                    for idx in img_ids[train_mode]:
-                        fname = idx.stem.split('img_')[-1]
-                        if np.sum(tiff.imread(str(idx.parent / 'dist_neighbor_{}.tif'.format(fname))) > 0) == 0:
-                            if random() > p_no_neighbor:
-                                continue
-                        elif p_neighbor < 1:
-                            if random() > p_neighbor:
-                                continue
-                        hlist.append(fname.split('.tif')[0])
-                        source_path = path_data / "{}_{}_{}".format(ct, mode, split) / train_mode
-                        copy_train_data(source_path, path_trainset / train_mode, fname)
-                        counts += 1
-                    cell_counts[train_mode][ct] = counts
-            else:
-                for train_mode in ['train', 'val']:
-                    counts = 0
-                    for idx in img_ids[train_mode]:
-                        fname = idx.stem.split('img_')[-1]
-                        if ct in train_val_ids[train_mode].keys():
-                            if fname.split('.tif')[0] in train_val_ids[train_mode][ct]:
-                                source_path = path_data / "{}_{}_{}".format(ct, mode, split) / train_mode
-                                copy_train_data(source_path, path_trainset / train_mode, fname)
-                                counts += 1
-                    cell_counts[train_mode][ct] = counts
-        cell_counts['scale'] = 1
-        write_file(cell_counts, path_trainset / 'info.json')
+    # NOTE: The original repository contained a beatiful method to merge multiple dataset/cell type patches avoiding a final 'unbalanced' train/val split
+    log.info(f"Trainig dataset created correctly")
+    
+    return None
