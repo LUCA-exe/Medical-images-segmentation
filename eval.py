@@ -96,7 +96,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                             th_seed=float(th_seed),
                                             apply_clahe=args.apply_clahe,
                                             scale=scale_factor,
-                                            cell_type=args.cell_type,
+                                            cell_type=args.dataset,
                                             save_raw_pred=args.save_raw_pred,
                                             artifact_correction=args.artifact_correction,
                                             apply_merging=args.apply_merging)

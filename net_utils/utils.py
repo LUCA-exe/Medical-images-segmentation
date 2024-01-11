@@ -294,3 +294,9 @@ def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):
 def aggregate_metrics():
     pass
 
+
+# Moved from the 'create_training_sets.py' module - function used by 'training' methods
+def write_file(file, path):
+    with open(path, 'w', encoding='utf8') as f:
+        json.dump(file, f, ensure_ascii=False, indent=2)
+    return

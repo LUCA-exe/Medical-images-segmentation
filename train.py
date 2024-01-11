@@ -43,7 +43,8 @@ def main():
 
     # Pre-processing pipeline - implement more pipeline from other papers here ..
     if args.pre_processing_pipeline == 'kit-ge':
-        create_ctc_training_sets(path_data=path_data, mode=args.mode, cell_type_list=args.cell_type, split=args.split)
+        log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline")
+        create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=args.dataset, split=args.split, min_a_images=args.min_a_images)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 

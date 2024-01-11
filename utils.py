@@ -117,34 +117,22 @@ class TrainArgs(object): # Class containings args for creation of the dataset
     """ Class with training/sets creation parameters.
     """
 
-    def __init__(self, post_processing_pipeline, th_cell, th_seed, apply_clahe, scale, cell_type,
+    def __init__(self, pre_processing_pipeline, th_cell, th_seed, apply_clahe, scale, cell_type,
                  save_raw_pred,artifact_correction, apply_merging):
+        """ kit-ge pre-processing params implemented for now.
         """
-        (kit-ge post-processing params)
-        :param th_cell: Mask / cell size threshold.
-            :type th_cell: float
-        :param th_seed: Seed / marker threshold.
-            :type th_seed: float
-        :param apply_clahe: Apply contrast limited adaptive histogram equalization (CLAHE).
-            :type apply_clahe: bool
-        :param scale: Scale factor for downsampling.
-            :type scale: float
-        :param cell_type: Cell type.
-            :type cell_type: str
-        :param save_raw_pred: Save (some) raw predictions.
-            :type save_raw_pred: bool
-        :param artifact_correction: Apply artifact correction post-processing.
-            :type artifact_correction: bool
-        """
-        if post_processing_pipeline == 'kit-ge':
-            self.th_cell = th_cell
-            self.th_seed = th_seed
-            self.apply_clahe = apply_clahe
-            self.scale = scale
-            self.cell_type = cell_type
-            self.save_raw_pred = save_raw_pred
-            self.artifact_correction = artifact_correction
-            self.apply_merging = apply_merging
+        if pre_processing_pipeline == 'kit-ge':
+            self.act_fun = act_fun
+            self.batch_size = batch_size
+            self.filters = filters
+            self.iterations = iterations
+            self.loss = loss
+            self.norm_method = norm_methods
+            self.optimizer = optimizer
+            self.pool_method = pool_method
+            self.pre_train = pre_train
+            self.retrain = retrain
+            self.split = split
 
     # Override default class function
     def __str__(self):

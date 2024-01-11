@@ -76,12 +76,12 @@ def get_parser():
     parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operations/pipeline to do")
 
     # Dataset pre-processing/training - for now just KIT-GE post-processing pipeline args
+    parser.add_argument('--min_a_images', '-mai', default=30, type=int, help="Minimum number of 'A' annotated patches, if less take even the 'B' quality patches")
     parser.add_argument('--act_fun', '-af', default='relu', type=str, help='Activation function')
-    parser.add_argument('--batch_size', '-bs', default=2, type=int, help='Batch size') # NOTE: Originally suggested 8
+    parser.add_argument('--batch_size', '-bs', default=2, type=int, help='Batch size') # NOTE: Originally suggested '8'
     parser.add_argument('--filters', '-f', nargs=2, type=int, default=[64, 1024], help='Filters for U-net')
     parser.add_argument('--iterations', '-i', default=1, type=int, help='Number of models to train')
     parser.add_argument('--loss', '-l', default='smooth_l1', type=str, help='Loss function')
-    parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / training mode')
     parser.add_argument('--norm_method', '-nm', default='bn', type=str, help='Normalization method')
     parser.add_argument('--optimizer', '-o', default='adam', type=str, help='Optimizer')
     parser.add_argument('--pool_method', '-pm', default='conv', type=str, help='Pool method')
@@ -95,9 +95,7 @@ def get_parser():
     parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing') # merging post-processing (prevents oversegmentation)
     parser.add_argument('--artifact_correction', '-ac', default=False, action='store_true', help='Artifact correction')
     parser.add_argument('--batch_size', '-bs', default=1, type=int, help='Batch size')
-    #parser.add_argument('--cell_type', '-ct', nargs='+', required=True, help='Cell type(s)')
-    parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / evaluation mode')
-    #parser.add_argument('--models', required=True, type=str, help='Models to evaluate (prefix)')
+    parser.add_argument('--mode', '-m', default='GT', type=str, help='Ground truth type / evaluation mode') # Used both for val/training methods - jsut 'GT' is supported for now
     parser.add_argument('--multi_gpu', '-mgpu', default=False, action='store_true', help='Use multiple GPUs') # Used both for training/validation/test methods
     parser.add_argument('--apply_clahe', '-acl', default=False, action='store_true', help='CLAHE pre-processing')
     parser.add_argument('--save_raw_pred', '-srp', default=False, action='store_true', help='Save some raw predictions')
@@ -130,9 +128,6 @@ def get_processed_args(args):
         args.th_seed = [args.th_seed]
     if not isinstance(args.th_cell, list):
         args.th_cell = [args.th_cell]
-
-    # TODO: Check if this method is the best
-    args.cell_type = args.dataset
 
     return args
 

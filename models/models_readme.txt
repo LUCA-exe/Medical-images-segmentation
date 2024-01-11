@@ -4,7 +4,9 @@ The folder './models/' contains respectively 4 folders:
 - 'fine_tuned': Models that are fine-tuned after being pre-trained.
 - 'all': model to train/fine-tune/evaluate. Default folder to fetch 
          for training/validation/inference; remember to move the desired 
-         models to evaluate in this location.
+         models to evaluate in this location. (the model in this folder, e.g 
+         for trainig, will be automatically saved in the others folders
+         respectively)
 
 The name format of the model files (doens't matter in which folder and both for '*.pth' and '*.json') is:
 1. <Dataset used for training>_<GT or GT_ST>_model.pth

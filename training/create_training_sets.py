@@ -13,8 +13,8 @@ from skimage.measure import regionprops
 from skimage.morphology import binary_closing, binary_opening
 from skimage.transform import rescale
 
-from segmentation.training.train_data_representations import distance_label_2d
-from segmentation.utils.utils import get_nucleus_ids
+from training.train_data_representations import distance_label_2d
+from net_utils.utils import get_nucleus_ids, write_file
 
 
 def adjust_dimensions(crop_size, *imgs):
@@ -387,7 +387,7 @@ def get_kernel(cell_type):
     return kernel_closing, kernel_opening
 
 
-def get_mask_ids(path_data, ct, mode, split, st_limit):
+def get_mask_ids(log, path_data, ct, mode, split, st_limit):
     """ Get ids of the masks of a specific cell type/dataset.
 
     :param path_data: Path to the directory containing the Cell Tracking Challenge training sets.
@@ -403,6 +403,7 @@ def get_mask_ids(path_data, ct, mode, split, st_limit):
         :type st_limit: int
     :return: mask ids, increment for selecting slices.
     """
+    log.debug(f"Preparing mask ids ..")
 
     # Get mask ids
     mask_ids_01, mask_ids_02 = [], []
@@ -412,62 +413,29 @@ def get_mask_ids(path_data, ct, mode, split, st_limit):
         mask_ids_02 = sorted((path_data / ct / '02_{}'.format(mode) / 'SEG').glob('*.tif'))
     mask_ids = mask_ids_01 + mask_ids_02
 
-    # Go through each slice for 3D annotations if not stated otherwise later
-    slice_increment = 1
-
-    # Reduce amount of STs depending on the available amount of STs (mainly to reduce computation time)
-    if mode == 'ST' and split != 'kit-sch-ge':
-        
-        if len(mask_ids) > st_limit // 2:  # Reduce amount of STs and do not just use all
-            if '3D' in ct:  # Assumption: 3D STs are for late frames maybe not that good --> better use first frames
-                mask_ids = mask_ids_01[:int(st_limit // 2.5)] + mask_ids_02[:int(st_limit // 2.5)]
-            else:
-                if len(mask_ids) > 1000:  # High temporal resolution or many cell divisions --> use more late frames
-                    mask_ids = mask_ids_01[:1000:10] + mask_ids_01[1000::5] + mask_ids_02[:1000:10] + mask_ids_02[1000::5]
-                else:  # Use only half of the frames but increase distance between selected frames
-                    mask_ids = mask_ids[::2]
-
-        if '3D' in ct:  # Reduce further amount of STs for 3D data (each slice is a training sample ...)
-            if len(tiff.imread(str(mask_ids[0]))) > 40:
-                mask_ids = mask_ids[::2]
-                slice_increment = 4
-            elif len(tiff.imread(str(mask_ids[0]))) > 30:
-                mask_ids = mask_ids[::2]
-                slice_increment = 2
-            else:
-                slice_increment = 1
-
-    if mode == 'ST' and split == 'kit-sch-ge':
-        # No need to reduce data (done later --> only used frames/slices are calculated) but the slice increments
-        # accelerate the training data generation.
-        if '3D' in ct:  # Reduce further amount of STs for 3D data (each slice is a training sample ...)
-            if len(tiff.imread(str(mask_ids[0]))) > 40:
-                slice_increment = 4
-            elif len(tiff.imread(str(mask_ids[0]))) > 30:
-                slice_increment = 2
-            else:
-                slice_increment = 1
-        
-    # Shuffle list
+    # NOTE: In the original work it is present processing 'ST' and 3D annotations.
     if not split == 'kit-sch-ge':
         shuffle(mask_ids)
-                
-    return mask_ids, slice_increment
+    log.debug(f"Mask collected (shuffled for training purpose) are: {mask_ids}")
+    return mask_ids
 
 
-def get_td_settings(mask_id_list, crop_size):
+def get_td_settings(log, mask_id_list, crop_size):
     """ Get settings for the training data generation.
 
     :param mask_id_list: List of all segmentation GT ids (list of pathlib Path objects).
         :type mask_id_list: list
     :return: dict with keys 'search_radius', 'min_area', 'max_mal', 'scale', 'crop_size'.
     """
-
+    log.debug(f"Computing the training data properties ..")
     # Load all GT and get cell parameters to adjust parameters for the distance transform calculation
     diameters, major_axes, areas = [], [], []
     for mask_id in mask_id_list:
         mask = tiff.imread(str(mask_id))
-        if len(mask.shape) == 3:
+        if len(mask.shape) == 3: # TODO: To remove
+
+            # DEBUG
+            print(f"SHOULD NOT BE HERE !!! (not 3D dataset)")
             for i in range(len(mask)):
                 props = regionprops(mask[i])
                 for cell in props:  # works not as intended for 3D GTs
@@ -489,7 +457,7 @@ def get_td_settings(mask_id_list, crop_size):
     search_radius = mean_diameter + std_diameter
 
     # Some simple heuristics for large cells. If enough data are available scale=1 should work in most cases
-    if max_diameter > 200 and min_diameter > 35:
+    if max_diameter > 200 and min_diameter > 35: # TODO: Study this function, can be tweaked accordingly/optimized/automated
         if max_mal > 2 * max_diameter:  # very longish and long cells not made for neighbor distance
             scale = 0.5
             search_radius = min_diameter + 0.5 * std_diameter
@@ -506,11 +474,14 @@ def get_td_settings(mask_id_list, crop_size):
     else:
         scale = 1
 
-    return {'search_radius': search_radius,
+    properties_dict = {'search_radius': search_radius,
             'min_area': min_area,
             'max_mal': max_mal,
             'scale': scale,
             'crop_size': crop_size}
+    
+    log.debug(f"Suggested properties gathered for data generation: {properties_dict}")
+    return properties_dict
 
 
 def get_train_val_split(img_idx_list, b_img_idx_list):
@@ -607,14 +578,8 @@ def remove_st_with_gt_annotation(st_ids, annotated_gt_frames):
     return None
 
 
-def write_file(file, path):
-    with open(path, 'w', encoding='utf8') as f:
-        json.dump(file, f, ensure_ascii=False, indent=2)
-    return
-
-
-def create_ctc_training_sets(path_data, mode, cell_type_list, split='01+02', crop_size=320, st_limit=280,
-                             n_max_train_gt_st=150, n_max_val_gt_st=30):
+def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', crop_size=320, st_limit=280,
+                             n_max_train_gt_st=150, n_max_val_gt_st=30, min_a_images=30):
     """ Create training sets for Cell Tracking Challenge data.
 
     In the new version of this code, 2 Fluo-C3DL-MDA231 crops and 1 Fluo-C3DH-H157 crop differ slightly from the
@@ -646,212 +611,102 @@ def create_ctc_training_sets(path_data, mode, cell_type_list, split='01+02', cro
     """
 
     if split == 'kit-sch-ge':
-        st_limit = 280  # needed for reproducibility (smaller values will just not work to reproduce that split)
+        st_limit = 280  # ORIGINAL NOTE: needed for reproducibility (smaller values will just not work to reproduce that split)
 
-    # Check if multiple cell types are selected
-    if len(cell_type_list) > 1:
-        trainset_name = hashlib.sha1(str(cell_type_list).encode("UTF-8")).hexdigest()[:10]
-        print('Multiple cell types, dataset name: {}'.format(trainset_name))
-    elif cell_type_list[0] == 'all':
-        trainset_name = 'all'
-        # Use cell types included in the primary track
-        cell_type_list = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-MSC", "Fluo-C3DH-A549",
-                          "Fluo-C3DH-H157", "Fluo-C3DL-MDA231", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa", "Fluo-N3DH-CE",
-                          "Fluo-N3DH-CHO", "PhC-C2DH-U373", "PhC-C2DL-PSC"]
+    # Implemented for one cell_type (my 'dataset' variable)
+    trainset_name = cell_type
+
+    # Create needed training data sets - check if data set already exists
+    path_trainset = path_data / "{}_{}_{}".format(cell_type, mode, split) # Name of the generated train set in the chosen dataset folder
+    
+    if len(list((path_trainset / 'train').glob('*.tif'))) > 0: # Check if the generated 'train set' already exist
+
+        log.info(f"Training set {path_trainset.stem} already generated, returning to the main train loop")
+        return None
+
+    log.info('   ... create {} training set ...'.format(path_trainset.stem))
+    make_train_dirs(path=path_trainset)
+
+    # From original work: Load split if original 'kit-sch-ge' training sets should be reproduced.
+    if split == 'kit-sch-ge':
+        train_val_ids = get_file(path=Path(__file__).parent/'splits'/'ids_{}_{}.json'.format(ct, mode)) # File not present in my repository
+        used_crops = get_used_crops(train_val_ids, mode)
     else:
-        trainset_name = cell_type_list[0]
+        used_crops = []
 
-    # Create needed training data sets (for multiple selected cell types the data sets are copied together later)
-    # For mode == 'GT+ST', the required GT and ST data sets need to be generated first 
-    for ct in cell_type_list:
+    # Get ids of segmentation ground truth masks (GTs may not be fully annotated and STs may be erroneous)
+    mask_ids = get_mask_ids(log, path_data=path_data, ct=ct, mode=mode, split=split, st_limit=st_limit)
 
-        # Check if data set already exists
-        path_trainset = path_data / "{}_{}_{}".format(ct, mode, split)
-        if len(list((path_trainset / 'train').glob('*.tif'))) > 0:
-            print('   ... training set {} already exists ...'.format(path_trainset.stem))
-            continue
-        print('   ... create {} training set ...'.format(path_trainset.stem))
-        make_train_dirs(path=path_trainset)
+    # Get settings for distance map creation
+    td_settings = get_td_settings(log, mask_id_list=mask_ids, crop_size=crop_size)
+    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, ct # Gathering additional information in the 'properties' dict
 
-        # Load split if original 'kit-sch-ge' training sets should be reproduced
-        if split == 'kit-sch-ge':
-            train_val_ids = get_file(path=Path(__file__).parent/'splits'/'ids_{}_{}.json'.format(ct, mode))
-            used_crops = get_used_crops(train_val_ids, mode)
+    # Iterate through files and load images and masks (and TRA GT for GT mode)
+    log.info(f"Starting loop over the loaded masks {mask_ids}")
+    if td_settings['scale'] !=1: log.debug(f"Downsampling operation will be performed due to the suggested 'scale' value {td_settings['scale']}")
+    for mask_id in mask_ids: # TODO: To parallelize
+ 
+        # Load images and masks (get slice and frame first)
+        if len(mask_id.stem.split('_')) > 2:  # only slice annotated
+            frame = mask_id.stem.split('_')[2]
+            slice_idx = int(mask_id.stem.split('_')[3])
         else:
-            used_crops = []
+            print(f"Should JUST get here.. ondition is for 3D image slices")
+            frame = mask_id.stem.split('man_seg')[-1]
 
-        if mode == 'GT+ST':  # simply copy existing datasets together
-            # Copy GT train/val to GT+ST train/val and get number of GT crops (train/val)
-            copy_train_set(path_data / "{}_GT_{}".format(ct, split), path_trainset, mode='GT')
-            num_gt_train = len(list((path_trainset / 'train').glob('img*.tif')))
-            num_gt_val = len(list((path_trainset / 'val').glob('img*.tif')))
-            # Copy ST temporarily to GT+ST folder and get number of STs to add (idea: use more GT than ST)
-            copy_train_set(path_data / "{}_ST_{}".format(ct, split), path_trainset, mode='ST')
-            num_add_st_train = np.maximum(int(0.33 * num_gt_train), 75 - num_gt_train)
-            num_add_st_val = np.maximum(int(0.25 * num_gt_val), 15 - num_gt_val)
-            if get_file(path_data / "{}_GT_{}".format(ct, split) / 'info.json')['scale'] != get_file(path_data / "{}_ST_{}".format(ct, split) / 'info.json')['scale']:
-                num_add_st_train, num_add_st_val = 1e3, 1e3  # just use all ST due to different scaling
-            # Go through ST crops and remove crop if frame has a corresponding GT annotation
-            st_train_ids = sorted((path_trainset / 'train_st').glob('img*.tif'))
-            st_val_ids = sorted((path_trainset / 'val_st').glob('img*.tif'))
-            annotated_gt_frames = get_annotated_gt_frames(path_data / ct)
-            remove_st_with_gt_annotation(st_train_ids + st_val_ids, annotated_gt_frames)
-            # Get ids of usable crops in ST_train/ST_val
-            st_train_ids = list((path_trainset / 'train_st').glob('img*.tif'))
-            st_val_ids = list((path_trainset / 'val_st').glob('img*.tif'))
-            shuffle(st_train_ids), shuffle(st_val_ids)
-            # Set counters for new splits
-            counter, counter_val = 0, 0
-            # Go through ST train files
-            for st_train_id in st_train_ids:
-                if split == 'kit-sch-ge':
-                    if not (st_train_id.stem.split('img_')[-1] in train_val_ids['train_st']):
-                        continue
-                else:
-                    if counter >= num_add_st_train:
-                        continue
-                # Copy img, distance labels and mask
-                copy_train_data(path_trainset / 'train_st', path_trainset / 'train', st_train_id.stem.split('img_')[-1])
-                counter += 1
-            # Go through ST val files
-            for st_val_id in st_val_ids:
-                if split == 'kit-sch-ge':
-                    if not (st_val_id.stem.split('img_')[-1] in train_val_ids['val_st']):
-                        continue
-                else:
-                    if counter_val >= num_add_st_val:
-                        continue
-                # Copy img, distance labels and mask
-                copy_train_data(path_trainset / 'val_st', path_trainset / 'val', st_val_id.stem.split('img_')[-1])
-                counter_val += 1
-            td_settings = {'scale': 1, 'cell_type': ct}  # For simplicity: just scale 1 for all cell types
-            write_file(td_settings, path_trainset / 'info.json')
-            # Remove temporary directories
-            shutil.rmtree(str(path_trainset / 'train_st')), shutil.rmtree(str(path_trainset / 'val_st'))
-            shutil.rmtree(str(path_trainset / 'A')), shutil.rmtree(str(path_trainset / 'B'))
-            continue
+        # Check if frame is needed to reproduce the kit-sch-ge training sets
+        if used_crops and not any(e[1] == frame for e in used_crops): # TODO: To remove
+            print(f"Should NOT JUST get here.. should exit the program")
 
-        # Get ids of segmentation ground truth masks (GTs may not be fully annotated and STs may be erroneous)
-        mask_ids, slice_increment = get_mask_ids(path_data=path_data, ct=ct, mode=mode, split=split, st_limit=st_limit)
+        # Load image and mask and get subset from which they are
+        log.debug(f"... working with {mask_id} mask ...")
+        mask = tiff.imread(str(mask_id))
+        subset = mask_id.parents[1].stem.split('_')[0]
+        img = tiff.imread(str(mask_id.parents[2] / subset / "t{}.tif".format(frame)))
 
-        # Get settings for distance map creation
-        td_settings = get_td_settings(mask_id_list=mask_ids, crop_size=crop_size)
-        td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, ct
+        # NOTE: TRA GT (fully annotated, no region information) to detect fully annotated mask GTs later
+        if 'GT' in mode:
+            tra_gt = tiff.imread(str(mask_id.parents[1] / 'TRA' / "man_track{}.tif".format(frame)))
+        else:  # Do not use TRA GT to detect high quality STs (to be able to compare ST and GT results)
+            raise TypeError("For now just 'GT' is supported!")
 
-        # Iterate through files and load images and masks (and TRA GT for GT mode)
-        running_index = 0
-        for mask_id in mask_ids:
+        # FOI correction: followin the standard CTC requests for the pixels near the border.
+        img, mask, tra_gt = foi_correction_train(ct, mode, img, mask, tra_gt)
 
-            if mode == 'ST' and split != 'kit-sch-ge' and running_index > st_limit:
-                continue
+        # Downsampling
+        if td_settings['scale'] != 1:
+            img = downscale(img=img, scale=td_settings['scale'], order=2)
+            mask = downscale(img=mask, scale=td_settings['scale'], order=0, aa=False)
+            tra_gt = downscale(img=tra_gt, scale=td_settings['scale'], order=0, aa=False)
 
-            # Load images and masks (get slice and frame first)
-            if len(mask_id.stem.split('_')) > 2:  # only slice annotated
-                frame = mask_id.stem.split('_')[2]
-                slice_idx = int(mask_id.stem.split('_')[3])
-            else:
-                frame = mask_id.stem.split('man_seg')[-1]
+        # Normalization: min-max normalize image to [0, 65535] - Can be automated optimized
+        img = 65535 * (img.astype(np.float32) - img.min()) / (img.max() - img.min())
+        img = np.clip(img, 0, 65535).astype(np.uint16) # Kept the requested type 'unsigned' integer 16 bits
 
-            # Check if frame is needed to reproduce the kit-sch-ge training sets
-            if used_crops and not any(e[1] == frame for e in used_crops):
-                continue
-
-            # Load image and mask and get subset from which they are
-            mask = tiff.imread(str(mask_id))
-            subset = mask_id.parents[1].stem.split('_')[0]
-            img = tiff.imread(str(mask_id.parents[2] / subset / "t{}.tif".format(frame)))
-
-            # TRA GT (fully annotated, no region information) to detect fully annotated mask GTs later
-            if 'GT' in mode:
-                tra_gt = tiff.imread(str(mask_id.parents[1] / 'TRA' / "man_track{}.tif".format(frame)))
-            else:  # Do not use TRA GT to detect high quality STs (to be able to compare ST and GT results)
-                tra_gt = np.copy(mask)
-
-            # FOI correction
-            img, mask, tra_gt = foi_correction_train(ct, mode, img, mask, tra_gt)
-
-            # Downsampling
-            if td_settings['scale'] != 1:
-                img = downscale(img=img, scale=td_settings['scale'], order=2)
-                mask = downscale(img=mask, scale=td_settings['scale'], order=0, aa=False)
-                tra_gt = downscale(img=tra_gt, scale=td_settings['scale'], order=0, aa=False)
-
-            # Normalization: min-max normalize image to [0, 65535]
-            img = 65535 * (img.astype(np.float32) - img.min()) / (img.max() - img.min())
-            img = np.clip(img, 0, 65535).astype(np.uint16)
-
-            # Calculate distance transforms, crop and classify crops into 'A' (fully annotated) and 'B' (>80% annotated)
-            if len(mask.shape) == 3:  # 3D annotation
-                if mode == 'ST':  # Select slices which contain cells first (just looking at masks not sufficient)
-                    img_mean, img_std = np.mean(img), np.std(img)
-                    for i in range(len(img)):
-                        if i % slice_increment == 0:
-                            if slice_increment > 1:  # high axial resolution --> + 0.1 * img_std
-                                if np.mean(img[i]) < img_mean + 0.1 * img_std or np.sum(mask[i] == 0) < 0.02 * img.shape[1] * img.shape[2]:
-                                    continue
-                            else:  # low axial resolution --> -0.1 * img_std (just heuristics which seem to work ...)
-                                if np.mean(img[i]) < img_mean - 0.1 * img_std or np.sum(mask[i] > 0) < 0.02 * img.shape[1] * img.shape[2]:
-                                    continue
-
-                            # Check if slice is needed to reproduce the kit-sch-ge training sets
-                            if used_crops and not any(e[1:3] == [frame, "{:02d}".format(i)] for e in used_crops):
-                                continue
-
-                            # Get slices
-                            img_slice, mask_slice = img[i], mask[i]
-                            # Opening + closing
-                            kernel_closing, kernel_opening = get_kernel(cell_type=ct)
-                            mask_slice = close_mask(mask_slice, True, kernel_closing, kernel_opening)
-                            if ct == 'Fluo-N3DH-CE':
-                                for nucleus in regionprops(mask_slice):
-                                    if nucleus.bbox_area < 20 * 20:
-                                        mask_slice[mask_slice == nucleus.label] = 0
-
-                            # No running index --> create all crops and select later
-                            running_index = generate_data(img=img_slice, mask=mask_slice, tra_gt=mask_slice,
-                                                          td_settings=td_settings, cell_type=ct, mode=mode,
-                                                          subset=subset, frame=frame, path=path_trainset,
-                                                          slice_idx=i, crop_idx=running_index)
-
-                else:
-                    for i in range(len(mask)):
-                        img_slice, mask_slice = img[i].copy(), mask[i].copy()
-                        if np.max(mask_slice) == 0:  # empty frame
-                            continue
-                        mask_slice = close_mask(mask=mask_slice, kernel_closing=np.ones((5, 5)))
-                        tr_gt_slice = mask_slice.copy()  # assumption: in 3D GT annotations all cells are annotated
-                        _ = generate_data(img=img_slice, mask=mask_slice, tra_gt=tr_gt_slice, td_settings=td_settings,
-                                          cell_type=ct,  mode=mode, subset=subset, frame=frame, path=path_trainset,
-                                          slice_idx=i)
-            else:
-                if '3D' in ct:  # 3D data but 2D annotation (only for GT)
-                    img = img[slice_idx]
-                    # Needed seed could be outside the slice --> maximum intensity projection
-                    slice_min, slice_max = np.maximum(slice_idx - 2, 0), np.minimum(slice_idx + 2, len(img) - 1)
-                    tra_gt = np.max(tra_gt[slice_min:slice_max], axis=0)  # best bring seed size to min_area ...
-                    mask = close_mask(mask=mask, kernel_closing=np.ones((5, 5)))
-
-                if mode == 'ST':
-                    if ct == 'DIC-C2DH-HeLa':
-                        mask = close_mask(mask=mask, apply_opening=True)
-                    running_index = generate_data(img=img, mask=mask, tra_gt=mask, td_settings=td_settings,
-                                                  cell_type=ct, mode=mode, subset=subset, frame=frame,
-                                                  path=path_trainset, crop_idx=running_index)
-                else:
-                    _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=ct,
+        # Calculate distance transforms, crop and classify crops into 'A' (fully annotated) and 'B' (>80% annotated)
+        _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=ct,
                                       mode=mode, subset=subset, frame=frame, path=path_trainset)
 
-        td_settings.pop('used_crops')
-        if mode == 'GT':
-            td_settings.pop('st_limit')
-        write_file(td_settings, path_trainset / 'info.json')
+    td_settings.pop('used_crops')
+    if mode == 'GT':
+        td_settings.pop('st_limit')
+    else: 
+        raise TypeError("For now just 'GT' is supported!")
 
-        # Create train/val split
-        img_ids, b_img_ids = sorted((path_trainset / 'A').glob('img*.tif')), []
-        if mode == 'GT' and len(img_ids) <= 30:  # Use also "B" quality images when too few "A" quality images are available
-            b_img_ids = sorted((path_trainset / 'B').glob('img*.tif'))
-        if not split == 'kit-sch-ge':
-            train_val_ids = get_train_val_split(img_ids, b_img_ids)
+    log.info(f"Saving suggested data generation settings in '{path_trainset}'")
+    write_file(td_settings, path_trainset / 'info.json')
+
+    # Create train/val split
+    img_ids, b_img_ids = sorted((path_trainset / 'A').glob('img*.tif')), []
+    if mode == 'GT' and len(img_ids) <= min_a_images:  # Use also "B" quality images when too few "A" quality images are available - default kept as 30 elements
+        log.debug(f"Using {len(b_img_ids)} 'B' quality standard images, the 'A' quality patches are {len(img_ids)}")
+        b_img_ids = sorted((path_trainset / 'B').glob('img*.tif'))
+
+    if not split == 'kit-sch-ge':
+        log.info(f"Splitting train/val elements for training with standard 80%/20%") # TODO: To add as argument
+        train_val_ids = get_train_val_split(img_ids, b_img_ids) # Get simple shuffled dict with train/val patches ids.
+    log.debug(f"Train patches ids: {train_val_ids['train_ids']}")
+    log.debug(f"Train patches ids: {train_val_ids['train_ids']}")
 
         # Copy images to train/val
         for train_mode in ['train', 'val']:
