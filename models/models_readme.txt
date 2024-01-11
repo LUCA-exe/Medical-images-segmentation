@@ -1,7 +1,7 @@
 The folder './models/' contains respectively 4 folders:
 - 'trained': Models that are end_to_end trained on a dataset and ready to be evaluated.
-- 'pre-trained': Models that are trained on a dataset and waiting to be fine-tuned.
-- 'fine-tuned': Models that are fine-tuned after being pre-trained.
+- 'pre_trained': Models that are trained on a dataset and waiting to be fine-tuned.
+- 'fine_tuned': Models that are fine-tuned after being pre-trained.
 - 'all': model to train/fine-tune/evaluate. Default folder to fetch 
          for training/validation/inference; remember to move the desired 
          models to evaluate in this location.
