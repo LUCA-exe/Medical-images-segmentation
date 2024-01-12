@@ -5,6 +5,8 @@ import json
 import numpy as np
 import shutil
 import os
+from pathlib import Path
+import tifffile as tiff
 
 def get_det_score(path):
     """  Get DET metric score.
@@ -297,7 +299,42 @@ def aggregate_metrics():
 
 # Moved from the 'create_training_sets.py' module - function used by 'training' methods
 def write_file(file, path):
-    path = str(path) # Conversion needed from Path type variable
+    #path = str(path) # Conversion needed from Path type variable
     with open(path, 'w', encoding='UTF-8') as f:
         json.dump(file, f, ensure_ascii=False, indent=2)
     return
+
+
+# Simple function to show images sample from the training set creation (depending
+# on the pre-processing pipeline used)
+def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_samples):
+
+    if pipeline == 'kit-ge':
+
+        # Get train set cell distance maps
+        path_data = Path(dataset_path)
+        img_ids = (path_data / f"{cell_type}_{mode}_{split}" / 'train').glob('img*')
+        # Show 'n_samples' examples (image, mask, cell distance, neighbor distance)
+        images = []
+        
+        for img_idx in img_ids:
+            fname = img_idx.name.split('img')[-1]
+            img = tiff.imread(str(img_idx))
+            mask = tiff.imread(str(img_idx.parent / f"mask{fname}"))
+            cell_dist = tiff.imread(str(img_idx.parent / f"dist_cell{fname}"))
+            neighbor_dist = tiff.imread(str(img_idx.parent / f"dist_neighbor{fname}"))
+            images.append([img, mask, cell_dist, neighbor_dist])
+            if len(images) == 3:
+                break
+
+
+
+
+
+
+
+
+
+
+
+

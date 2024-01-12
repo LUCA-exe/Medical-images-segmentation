@@ -639,7 +639,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # Get settings for distance map creation
     td_settings = get_td_settings(log, mask_id_list=mask_ids, crop_size=crop_size)
-    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, cell_type # Gathering additional information in the 'properties' dict
+    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, str(cell_type) # Gathering additional information in the 'properties' dict
 
     # Iterate through files and load images and masks (and TRA GT for GT mode)
     log.info(f"Starting loop over the loaded masks {mask_ids}")
@@ -691,6 +691,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         raise TypeError("For now just 'GT' is supported!")
 
     log.info(f"Saving suggested data generation settings in '{path_trainset}'")
+    # Saved the 'info.json' file with settings for data tranformations
     write_file(td_settings, path_trainset / 'info.json')
 
     # Create train/val split
@@ -703,8 +704,8 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         log.info(f"Splitting train/val elements for training with standard 80% / 20%") # TODO: To add as argument to the main parser and train specific parser
         train_val_ids = get_train_val_split(img_ids, b_img_ids) # Get simple shuffled dict with train/val patches ids.
     
-    log.debug(f"Train patches ids: {train_val_ids['train_ids']}")
-    log.debug(f"Train patches ids: {train_val_ids['train_ids']}")
+    log.debug(f"Train patches ids: {train_val_ids['train']}")
+    log.debug(f"Val patches ids: {train_val_ids['val']}")
 
     # Copy images to train/val
     for train_mode in ['train', 'val']:
