@@ -11,72 +11,50 @@ def get_parser():
         Returns:
             Object: parser
     """
-    parser = ArgumentParser(description="Medical images segmentation")
+    parser = ArgumentParser(description="Medical images segmentation arguments")
 
-    # Path args
-    parser.add_argument("--train_images_path",
-                            default="training_data/",
-                            type=str,
-                            help="Path to the train images dataset")
+    # Path arguments use trhoughout the repository
 
-    parser.add_argument("--test_images_path",
-                            default="test_data/",
-                            type=str,
-                            help="Path to the test images dataset")
-
-    parser.add_argument("--dataset", # Default parameter is my traind dataset
-                            default="Fluo-E2DV-train",
-                            type=str,
-                            help="Which folder to access")
-
+    parser.add_argument("--train_images_path",default="training_data/", type=str, help="Path to the train images dataset")
+    parser.add_argument("--test_images_path", default="test_data/", type=str, help="Path to the test images dataset")
+    # Default parameter is my traind dataset (Experiment 01 annotation 02)
+    parser.add_argument("--dataset", default="Fluo-E2DV-train", type=str, help="Which folder to access")
     parser.add_argument("--models_folder", default="./models/all/", type=str, help="Which folder to access for train/val/test models")
-
-    parser.add_argument("--save_model",
-                            default="./models/best/",
-                            type=str,
-                            help="Which folder to access for saving best model files/metrics")
-
-    parser.add_argument("--eval_metric", # For now kept as default the CTC evaluation DET and SEG scores
-                            default="software", # TODO: implement more options.
-                            type=str,
-                            help="Str used to decide which metrics use for evaluation")
-    
+    # TODO: Decided how to use this folder - require manual supervision to analyze its results
+    parser.add_argument("--save_model", default="./models/best/", type=str, help="Which folder to access for saving best model files/metrics")
+    # For now kept as default the CTC evaluation DET and SEG scores -  can be implemented more options
+    parser.add_argument("--eval_metric", default="software", type=str, help="Str used to decide which metrics use for evaluation")
     # Specific folder to save the evaluation software - should be treated as const
     parser.add_argument("--evaluation_software", default="./net_utils/evaluation_software/", type=str, help="Path to access for loading the evaluation software of Cell Tracking Challenge")
     parser.add_argument("--download", default=False, type=bool, help="Boolean value to check for download online single or multiple datasets")
     # TODO: Expand the dataset options from other challenges/websites - what dataset to download (from CTC website)
     parser.add_argument("--download_dataset", default = "all", type=str, help="Name of the dataset to download (else 'all')")
     
-    # Starting args used for the image characteristics gathering
+    # Parameters used for the image characteristics gathering (analyze image properties)
 
     # TODO: Kept fixed as arguments.. maybe should be extracted from a '*.json' file with a finetuned dimension for every seen dataset..
-    parser.add_argument("--cell_dim",
-                            default = 7000, # My dataset has an avg of 4000 EVs dim in pixels (It depends on the resolution).
-                            type=int,
-                            help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
+    parser.add_argument("--cell_dim", default = 7000, type=int, help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
+    # NOTE: My dataset has an avg of 4000 EVs dim in pixels (It depends on the resolution).
+    parser.add_argument("--max_images", default = 15, type=int, help="Max. number of images to take for the gathering of signals (for every folder ('01', '02') separately)")
+    # Gather signals for a dataset 
+    parser.add_argument("--compute_signals", default = False, type = bool, help="Compute signals for the chosen dataset")
+    # Compare signals for all datasets (both box-plots and line-plots) 
+    parser.add_argument("--compare_signals", default = False, type = bool, help="Compare signals for all the dataset with computed signals.")
 
-    parser.add_argument("--max_images", 
-                            default = 15,
-                            type=int,
-                            help="Max. number of images to take for the gathering of signals (for every folder separately)")
-     
-    parser.add_argument("--compute_signals", # Gather signals for a dataset 
-                            default = False,
-                            type = bool,
-                            help="Compute signals for the chosen dataset")
+    # Mixed pipelines parameters (pre-processing for training/models/post processing methods for evaluation)
 
-    parser.add_argument("--compare_signals", # Compare signals for all datasets (both box-plots and line-plots) 
-                            default = False,
-                            type = bool,
-                            help="Compare signals for all the dataset with computed signals.")
-
-    # Building models (pre-processing for training/models/post processing methods for evaluation)
     parser.add_argument("--pre_processing_pipeline", default="kit-ge", type=str, help="Chosing what pre-processing operations/pipeline to do")
+    parser.add_argument('--train_loop', '-tl', default=True, type=bool, help='If exectue the training loop after the dataset creation')
     parser.add_argument("--model_pipeline", default="kit-ge", type=str, help="String to chose what models to build")
     parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operations/pipeline to do")
 
-    # Dataset pre-processing/training - for now just KIT-GE post-processing pipeline args
+    # Dataset pre-processing args - for now just KIT-GE post-processing pipeline it is implemented
+
     parser.add_argument('--min_a_images', '-mai', default=30, type=int, help="Minimum number of 'A' annotated patches, if less take even the 'B' quality patches")
+    parser.add_argument('--crop_size', '-cs', default=640, type=int, help="Crop size for creating the dataset")
+    
+    # Training args - for now just KIT-GE post-processing pipeline args it is implemented
+
     parser.add_argument('--act_fun', '-af', default='relu', type=str, help='Activation function')
     parser.add_argument('--filters', '-f', nargs=2, type=int, default=[64, 1024], help='Filters for U-net')
     parser.add_argument('--iterations', '-i', default=1, type=int, help='Number of models to train')
@@ -88,7 +66,8 @@ def get_parser():
     parser.add_argument('--retrain', '-r', default='', type=str, help='Model to retrain')
     parser.add_argument('--split', '-s', default='01', type=str, help='Train/val split')
 
-    # Inference/Evaluation args - for now just KIT-GE post-processing pipeline args
+    # Evaluation args - for now just KIT-GE post-processing pipeline args it is implemented
+    
     parser.add_argument("--models_split", default="models/trained", type=str, help="Path to fetch the chosen model")
     parser.add_argument("--models_name", default="none", type=str, help="model's name to fetch")
     parser.add_argument('--apply_merging', '-am', default=False, action='store_true', help='Merging post-processing') # merging post-processing (prevents oversegmentation)

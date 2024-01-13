@@ -3,7 +3,7 @@
 - Logger functions 
 - Parsing functions
 - Containing specific class args parsing
-- Handle saving/loading metrics for training/evaluation
+- Set the device for train/eval
 """
 
 import torch
@@ -113,15 +113,15 @@ class EvalArgs(object): # Class containings inference and post-processing parame
 
 
 # TODO: this class offer a customized TrainingParser for every implemented pipeline.
-class TrainArgs(object): # Class containings args for creation of the dataset
-    """ Class with training/sets creation parameters.
+class TrainArgs(object):
+    """ Class with training creation parameters.
     """
 
-    def __init__(self, pre_processing_pipeline, act_fun, batch_size, filters, iterations,
+    def __init__(self, model_pipeline, act_fun, batch_size, filters, iterations,
     loss, norm_methods, optimizer, pool_method, pre_train, retrain, split):
-        """ kit-ge pre-processing params implemented for now.
+        """ kit-ge training params implemented for now.
         """
-        if pre_processing_pipeline == 'kit-ge':
+        if model_pipeline == 'kit-ge':
             self.act_fun = act_fun
             self.batch_size = batch_size
             self.filters = filters

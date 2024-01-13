@@ -40,24 +40,46 @@ def main():
         log.info(f"Warning: the '{path_data}' provided is not existent! Interrupting the program...")
         raise ValueError("The '{path_data}' provided is not existent")
     else:
-        trainset_name = args.dataset # 'atgs.dataset' used as cell type
+        trainset_name = args.dataset # 'args.dataset' used as cell type
 
     # Pre-processing pipeline - implement more pipeline from other papers here ..
     if args.pre_processing_pipeline == 'kit-ge':
         log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline")
-        create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images)
+        create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images, crop_size = args.crop_size)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
+
+    # If it is desired to just create the training set
+    if args.train_loop == False: log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
 
     model_name = '{}_{}_{}_model'.format(trainset_name, args.mode, args.split)
     log.info(f"Model name used is {model_name}")
 
+    # As in 'eval.py', the args for training are split in a specific parser for readibility
+    # Get training settings
+    train_args = TrainArgs(model_pipeline = args.model_pipeline,
+                            act_fun = args.act_fun,
+                            batch_size = args.batch_size, 
+                            filters = args.filters,
+                            iterations = args.iterations,
+                            loss = args.loss,
+                            norm_method = args.norm_methods,
+                            optimizer = args.optimizer,
+                            pool_method = args.pool_method,
+                            pre_train = args.pre_train,
+                            retrain = args.retrain,
+                            split = args.split)
+                            
+    log.info(f"Training parameters {train_args}")
+
     # WORK IN PROGRESS
+
+
     log.info(">>> Training script ended correctly <<<")
 
 
 # Implementing 'kit-ge' training method - consider to make unique for every chosen pipeline/make modular later.
-def kit_ge_dataset_creation(log, models, path_models, train_sets, path_data, device, scale_factor, args):
+def kit_ge_model_pipeline(log, models, path_models, train_sets, path_data, device, scale_factor, args):
     pass
 
 

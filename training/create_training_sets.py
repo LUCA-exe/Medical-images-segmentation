@@ -579,7 +579,7 @@ def remove_st_with_gt_annotation(st_ids, annotated_gt_frames):
 
 
 def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', crop_size=320, st_limit=280,
-                             n_max_train_gt_st=150, n_max_val_gt_st=30, min_a_images=30):
+                             n_max_train_gt_st=150, n_max_val_gt_st=30, min_a_images=30, crop_size):
     """ Create training sets for Cell Tracking Challenge data.
 
     In the new version of this code, 2 Fluo-C3DL-MDA231 crops and 1 Fluo-C3DH-H157 crop differ slightly from the
