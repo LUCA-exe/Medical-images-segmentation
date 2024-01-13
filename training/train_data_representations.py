@@ -167,8 +167,12 @@ def distance_label_2d(label, cell_radius, neighbor_radius):
 
     # Scale neighbor distances
     label_dist_neighbor = 1 / np.sqrt(0.65 + 0.5 * np.exp(-11 * (label_dist_neighbor - 0.75))) - 0.19
+
+    # DEBUG - understand the values for every image/mask couple (print the different quantiles)
+    #print(f"Scaled label dist neighbor (still with local minima): {label_dist_neighbor}")
+
     label_dist_neighbor = np.clip(label_dist_neighbor, 0, 1)
-    label_dist_neighbor = grey_closing(label_dist_neighbor, size=(3, 3))
+    label_dist_neighbor = grey_closing(label_dist_neighbor, size=(3, 3)) # The action of a grayscale closing with a flat structuring element amounts to smoothen deep local minima.
 
     return label_dist.astype(np.float32), label_dist_neighbor.astype(np.float32)
 
