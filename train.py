@@ -45,25 +45,27 @@ def main():
     # Pre-processing pipeline - implement more pipeline from other papers here ..
     if args.pre_processing_pipeline == 'kit-ge':
         log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline")
-        create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images, crop_size = args.crop_size)
+        
+        for crop_size in args.crop_size: # If you want to create more dataset
+            create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images, crop_size = crop_size)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
     # If it is desired to just create the training set
     if args.train_loop == False: log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
 
-    model_name = '{}_{}_{}_model'.format(trainset_name, args.mode, args.split)
-    log.info(f"Model name used is {model_name}")
+    for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
+        model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, args.crop_size)
+        log.info(f"{idx} Model name used is {model_name}")
 
-    # As in 'eval.py', the args for training are split in a specific parser for readibility
-    # Get training settings
+    # Get training settings - As in 'eval.py', the args for training are split in a specific parser for readibility
     train_args = TrainArgs(model_pipeline = args.model_pipeline,
                             act_fun = args.act_fun,
                             batch_size = args.batch_size, 
                             filters = args.filters,
                             iterations = args.iterations,
                             loss = args.loss,
-                            norm_method = args.norm_methods,
+                            norm_method = args.norm_method,
                             optimizer = args.optimizer,
                             pool_method = args.pool_method,
                             pre_train = args.pre_train,

@@ -44,14 +44,14 @@ def get_parser():
     # Mixed pipelines parameters (pre-processing for training/models/post processing methods for evaluation)
 
     parser.add_argument("--pre_processing_pipeline", default="kit-ge", type=str, help="Chosing what pre-processing operations/pipeline to do")
-    parser.add_argument('--train_loop', '-tl', default=True, type=bool, help='If exectue the training loop after the dataset creation')
+    parser.add_argument('--train_loop', '-tl', default=False, action="store_true", help='If exectue the training loop after the dataset creation')
     parser.add_argument("--model_pipeline", default="kit-ge", type=str, help="String to chose what models to build")
     parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operations/pipeline to do")
 
     # Dataset pre-processing args - for now just KIT-GE post-processing pipeline it is implemented
 
     parser.add_argument('--min_a_images', '-mai', default=30, type=int, help="Minimum number of 'A' annotated patches, if less take even the 'B' quality patches")
-    parser.add_argument('--crop_size', '-cs', default=640, type=int, help="Crop size for creating the dataset")
+    parser.add_argument('--crop_size', '-cs', default=320, type=int, nargs='+', help="Crop size for creating the dataset")
     
     # Training args - for now just KIT-GE post-processing pipeline args it is implemented
 
@@ -104,8 +104,13 @@ def get_processed_args(args):
     # Providing a gridsearch for finetunable parameters - kept from the original repository.
     if not isinstance(args.th_seed, list):
         args.th_seed = [args.th_seed]
+
     if not isinstance(args.th_cell, list):
         args.th_cell = [args.th_cell]
+
+    if not isinstance(args.crop_size, list):
+        args.crop_size = [args.crop_size]
+
 
     return args
 

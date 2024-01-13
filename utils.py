@@ -118,7 +118,7 @@ class TrainArgs(object):
     """
 
     def __init__(self, model_pipeline, act_fun, batch_size, filters, iterations,
-    loss, norm_methods, optimizer, pool_method, pre_train, retrain, split):
+    loss, norm_method, optimizer, pool_method, pre_train, retrain, split):
         """ kit-ge training params implemented for now.
         """
         if model_pipeline == 'kit-ge':
@@ -127,7 +127,7 @@ class TrainArgs(object):
             self.filters = filters
             self.iterations = iterations
             self.loss = loss
-            self.norm_method = norm_methods
+            self.norm_method = norm_method
             self.optimizer = optimizer
             self.pool_method = pool_method
             self.pre_train = pre_train

@@ -432,22 +432,12 @@ def get_td_settings(log, mask_id_list, crop_size):
     diameters, major_axes, areas = [], [], []
     for mask_id in mask_id_list:
         mask = tiff.imread(str(mask_id))
-        if len(mask.shape) == 3: # TODO: To remove
-
-            # DEBUG
-            print(f"SHOULD NOT BE HERE !!! (not 3D dataset)")
-            for i in range(len(mask)):
-                props = regionprops(mask[i])
-                for cell in props:  # works not as intended for 3D GTs
-                    major_axes.append(cell.major_axis_length)
-                    diameters.append(cell.equivalent_diameter)
-                    areas.append(cell.area)
-        else:
-            props = regionprops(mask)
-            for cell in props:
-                major_axes.append(cell.major_axis_length)
-                diameters.append(cell.equivalent_diameter)
-                areas.append(cell.area)
+        props = regionprops(mask)
+        # NOTE: In the original repository It was supported the computation on 3D images slices.
+        for cell in props:
+            major_axes.append(cell.major_axis_length)
+            diameters.append(cell.equivalent_diameter)
+            areas.append(cell.area)
 
     # Get maximum and minimum diameter and major axis length and set search radius for distance transform
     max_diameter, min_diameter = int(np.ceil(np.max(np.array(diameters)))), int(np.ceil(np.min(np.array(diameters))))
@@ -579,7 +569,7 @@ def remove_st_with_gt_annotation(st_ids, annotated_gt_frames):
 
 
 def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', crop_size=320, st_limit=280,
-                             n_max_train_gt_st=150, n_max_val_gt_st=30, min_a_images=30, crop_size):
+                             n_max_train_gt_st=150, n_max_val_gt_st=30, min_a_images=30):
     """ Create training sets for Cell Tracking Challenge data.
 
     In the new version of this code, 2 Fluo-C3DL-MDA231 crops and 1 Fluo-C3DH-H157 crop differ slightly from the
@@ -617,7 +607,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
     trainset_name = cell_type
 
     # Create needed training data sets - check if data set already exists
-    path_trainset = path_data / "{}_{}_{}".format(cell_type, mode, split) # Name of the generated train set in the chosen dataset folder
+    path_trainset = path_data / "{}_{}_{}_{}".format(cell_type, mode, split, crop_size) # Name of the generated train set in the chosen dataset folder
     
     if len(list((path_trainset / 'train').glob('*.tif'))) > 0: # Check if the generated 'train set' already exist
 
@@ -696,8 +686,9 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # Create train/val split
     img_ids, b_img_ids = sorted((path_trainset / 'A').glob('img*.tif')), []
+    log.info(f"Number of 'A' quality patches are {len(img_ids)}")
     if mode == 'GT' and len(img_ids) <= min_a_images:  # Use also "B" quality images when too few "A" quality images are available - default kept as 30 elements
-        log.debug(f"Using {len(b_img_ids)} 'B' quality standard images, the 'A' quality patches are {len(img_ids)}")
+        log.debug(f"Using {len(b_img_ids)} 'B' quality images, the 'A' quality patches are less than {min_a_images}")
         b_img_ids = sorted((path_trainset / 'B').glob('img*.tif'))
 
     if not split == 'kit-sch-ge':

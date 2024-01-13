@@ -7,6 +7,7 @@ import shutil
 import os
 from pathlib import Path
 import tifffile as tiff
+import matplotlib.pyplot as plt
 
 def get_det_score(path):
     """  Get DET metric score.
@@ -304,15 +305,15 @@ def write_file(file, path):
     return
 
 
-# Simple function to show images sample from the training set creation (depending
-# on the pre-processing pipeline used)
-def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_samples):
+# Util to show specific pipeline's training sets
+def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_samples, crop_size):
 
     if pipeline == 'kit-ge':
 
         # Get train set cell distance maps
         path_data = Path(dataset_path)
-        img_ids = (path_data / f"{cell_type}_{mode}_{split}" / 'train').glob('img*')
+        # As default fetch from the selected 'train' images
+        img_ids = (path_data / f"{cell_type}_{mode}_{split}_{crop_size}" / 'train').glob('img*')
         # Show 'n_samples' examples (image, mask, cell distance, neighbor distance)
         images = []
         
@@ -323,9 +324,26 @@ def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_s
             cell_dist = tiff.imread(str(img_idx.parent / f"dist_cell{fname}"))
             neighbor_dist = tiff.imread(str(img_idx.parent / f"dist_neighbor{fname}"))
             images.append([img, mask, cell_dist, neighbor_dist])
-            if len(images) == 3:
+            if len(images) == n_samples:
                 break
 
+        print(f"Original images patches available {len([id for id in img_ids])}")
+        n_patch = 4
+        cmap_mask = plt.get_cmap("prism")
+        cmap_mask.set_bad(color="k")
+        fig, axs = plt.subplots(len(images), n_patch, figsize=(12, 12)) # NOTE: 'kit-ge' pipeline use 4 patches for every training sample
+        fig.suptitle('Exemplary training data (image, mask, cell distance, neighbor distance)')
+        for i in range(len(images)):
+            for j in range(n_patch):
+                if j == 1:
+                    mask = np.ma.masked_array(images[i][j], images[i][j]==0)
+                    axs[i, j].imshow(np.squeeze(mask), cmap=cmap_mask)
+                else:
+                    axs[i, j].imshow(np.squeeze(images[i][j]), cmap='gray')
+            axs[i, j].axis('off')
+        fig.tight_layout()
+
+    return None
 
 
 
