@@ -442,7 +442,7 @@ def get_td_settings(log, mask_id_list, crop_size):
     # Get maximum and minimum diameter and major axis length and set search radius for distance transform
     max_diameter, min_diameter = int(np.ceil(np.max(np.array(diameters)))), int(np.ceil(np.min(np.array(diameters))))
     mean_diameter, std_diameter = int(np.ceil(np.mean(np.array(diameters)))), int(np.std(np.array(diameters)))
-    max_mal = int(np.ceil(np.max(np.array(major_axes))))
+    max_mal = int(np.ceil(np.max(np.array(major_axes)))) # Take the approximated 'ellipse' maximum axe.
     min_area = int(0.95 * np.floor(np.min(np.array(areas))))
     search_radius = mean_diameter + std_diameter
 
@@ -470,7 +470,7 @@ def get_td_settings(log, mask_id_list, crop_size):
             'scale': scale,
             'crop_size': crop_size}
     
-    log.debug(f"Suggested properties gathered for data generation: {properties_dict}")
+    log.debug(f"Current suggested properties gathered for data generation: {properties_dict}")
     return properties_dict
 
 
@@ -629,7 +629,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # Get settings for distance map creation
     td_settings = get_td_settings(log, mask_id_list=mask_ids, crop_size=crop_size)
-    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, str(cell_type) # Gathering additional information in the 'properties' dict
+    td_settings['used_crops'],  td_settings['st_limit'], td_settings['cell_type'] = used_crops, st_limit, str(cell_type) # Gathering additional information in the 'properties' dict.
 
     # Iterate through files and load images and masks (and TRA GT for GT mode)
     log.info(f"Starting loop over the loaded masks {mask_ids}")
@@ -648,8 +648,8 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         img = tiff.imread(str(mask_id.parents[2] / subset / "t{}.tif".format(frame)))
 
         # Adjust the number of channel of my 2D images.
-        if len(img.shape) > 2: # Preferred choice
-            img = np.sum(img, axis=2) # Keep all object (Both EVs, cell boundaries and cell nucleus)
+        if len(img.shape) > 2: 
+            img = np.sum(img, axis=2) # NOTE: Keep all object (Both EVs, cell boundaries and cell nucleus)
 
         # NOTE: TRA GT (fully annotated, no region information) to detect fully annotated mask GTs later
         if 'GT' in mode:

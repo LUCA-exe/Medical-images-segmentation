@@ -69,7 +69,7 @@ def border_label_2d(label):
 
 
 def distance_label_2d(label, cell_radius, neighbor_radius):
-    """ Cell and neigbhor distance label creation (Euclidean distance).
+    """ Cell and neigbhour distance label creation (Euclidean distance).
 
     :param label: Intensity-coded instance segmentation label image.
         :type label:
