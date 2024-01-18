@@ -69,7 +69,7 @@ def set_device():
         torch.backends.cudnn.benchmark = True
         num_gpus = 1
 
-    return device
+    return device, num_gpus
 
 
 # NOTE: Updating to be used by all modules in this project
