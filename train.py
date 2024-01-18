@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, TrainArgs
+from utils import create_logging, set_device, set_environment_paths, TrainArgs
 from parser import get_parser, get_processed_args
 
 from training.create_training_sets import create_ctc_training_sets
@@ -28,6 +28,7 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
     device = set_device() # Set device: cpu or single-gpu usage
+    set_environment_paths()
     log.info(f">>>   Training: pre-processing {args.pre_processing_pipeline} model {args.model_pipeline} <<<")
 
     # Load paths
@@ -44,7 +45,7 @@ def main():
 
     # Pre-processing pipeline - implement more pipeline from other papers here ..
     if args.pre_processing_pipeline == 'kit-ge':
-        log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline")
+        log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline for {args.crop_size} crops")
         
         for crop_size in args.crop_size: # If you want to create more dataset
             create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images, crop_size = crop_size)
@@ -54,11 +55,7 @@ def main():
     # If it is desired to just create the training set
     if args.train_loop == False: log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
 
-    for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
-        model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, args.crop_size)
-        log.info(f"{idx} Model name used is {model_name}")
-
-    # Get training settings - As in 'eval.py', the args for training are split in a specific parser for readibility
+    # Get training settings - As in 'eval.py', the args for training are split in a specific parser for readibility.
     train_args = TrainArgs(model_pipeline = args.model_pipeline,
                             act_fun = args.act_fun,
                             batch_size = args.batch_size, 
@@ -71,8 +68,16 @@ def main():
                             pre_train = args.pre_train,
                             retrain = args.retrain,
                             split = args.split)
-                            
+
+    # Training parameters used for all the iterations/crop options given                         
     log.info(f"Training parameters {train_args}")
+
+    for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
+        model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, args.crop_size)
+        log.info(f"{idx} Model used is {model_name}")
+
+
+    
 
     # WORK IN PROGRESS
 

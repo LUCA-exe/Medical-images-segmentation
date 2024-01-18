@@ -72,6 +72,14 @@ def set_device():
     return device
 
 
+# NOTE: Updating to be used by all modules in this project
+def set_environment_paths(debug_folder_path='./tmp'):
+    # Set-up and load the folders paths on the environment project
+    os.makedirs(debug_folder_path, exist_ok=True)
+    os.environ["DEBUG_FOLDER"] = debug_folder_path
+
+    return None
+
 # TODO: this class offer a customized EvaluationParser for every implemented pipeline.
 class EvalArgs(object): # Class containings inference and post-processing parameters.
     """ Class with post-processing parameters.

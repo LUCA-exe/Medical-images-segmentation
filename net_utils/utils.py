@@ -346,7 +346,22 @@ def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_s
     return None
 
 
+# Used in train/validation phase to perform further analysis - e.g. in the 'border_label_2d' to debug visually the highlighted borders
+def save_image(img, path, title, use_cmap = False):
+    
+    # Ensure the folder exists
+    os.makedirs(path, exist_ok=True)
+    # Create the full path for saving the image
+    image_path = os.path.join(path, f"{title}.png")
 
+    # Plot the image using matplotlib
+    plt.imshow(img, cmap='gray' if use_cmap else None)
+    plt.title(title)
+    plt.axis('off')  # Turn off axis labels
+    plt.savefig(image_path, bbox_inches='tight', pad_inches=0.1)
+    plt.close()  # Close the plot to free up resources
+
+    return None
 
 
 
