@@ -7,7 +7,7 @@ from skimage.exposure import equalize_adapthist, rescale_intensity
 from skimage.transform import rescale
 from torchvision import transforms
 
-from segmentation.utils.utils import min_max_normalization
+from net_utils.utils import min_max_normalization
 
 
 def augmentors(label_type, min_value, max_value):

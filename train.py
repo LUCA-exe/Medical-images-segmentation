@@ -10,7 +10,7 @@ from os.path import join, exists
 from collections import defaultdict
 from utils import create_logging, set_device, set_environment_paths, TrainArgs
 from parser import get_parser, get_processed_args
-from net_utils.utils import unique_path
+from net_utils.utils import unique_path, write_train_info
 from net_utils import unets
 from training.create_training_sets import create_ctc_training_sets, get_file
 from training.training import train, train_auto, get_max_epochs, get_weights
@@ -33,12 +33,13 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
     device, num_gpus = set_device() # Set device: cpu or single-gpu usage
+    log.info(f"System detected {device} device and {num_gpus} GPUs available.")
     set_environment_paths()
     log.info(f">>>   Training: pre-processing {args.pre_processing_pipeline} model {args.model_pipeline} <<<")
 
     # Load paths
     path_data = Path(args.train_images_path)
-    path_models = args.models_folder # Train all models found here.
+    path_models = Path(args.models_folder) # Train all models found here.
     cell_type = Path(args.dataset)
 
     # TODO: Move this into 'utils' file (called both in 'val' and 'train')
@@ -58,7 +59,7 @@ def main():
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
     # If it is desired to just create the training set
-    if args.train_loop == False:
+    if not args.train_loop:
         log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
         return None # Exit the script
 
@@ -90,7 +91,7 @@ def main():
                     }
 
     # Building the architecture that will be used for every 
-    net = unets.build_unet(unet_type=train_configs['architecture'][0],
+    net = unets.build_unet(log, unet_type=train_configs['architecture'][0],
                         act_fun=train_configs['architecture'][2],
                         pool_method=train_configs['architecture'][1],
                         normalization=train_configs['architecture'][3],
@@ -100,20 +101,20 @@ def main():
                         ch_out=1,
                         filters=train_configs['architecture'][4])
 
-
-
-
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
         model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, args.crop_size)
-        log.info(f"{idx} Model used is {model_name}")
+        
+        log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
         # Train multiple models
         for i in range(args.iterations):
-
-            run_name = unique_path(path_models, model_name + '_{:02d}.pth').stem
             
-            # Update the configurations
-            train_configs['run_name']=run_name
+            run_name = unique_path(path_models, model_name + '_{:02d}.pth').stem
+
+            log.debug(f"-- Run name: {run_name} - Iteration: {i} --")
+            
+            # Update the current configurations - there will be other updates, the core parameters will remain the same (e.g. architecture)
+            train_configs['run_name'] = run_name
 
             if args.pre_train and args.retrain:
                 raise Exception('Use either the pre-train option --pre_train or the retrain option --retrain')
@@ -152,7 +153,7 @@ def main():
                                           transform=data_transforms_auto)
 
                 
-                # Train model
+                # Train model (pre-training configurations)
                 train_auto(net=net_auto, dataset=datasets, configs=train_configs, device=device,  path_models=path_models)
 
                 # Load best weights and load best weights into encoder before the fine-tuning.
@@ -168,13 +169,38 @@ def main():
             data_transforms = augmentors(label_type=train_configs['label_type'], min_value=0, max_value=65535)
             train_configs['data_transforms'] = str(data_transforms)
             dataset_name = "{}_{}_{}_{}".format(trainset_name, args.mode, args.split, crop_size)
-
-            # WORK IN PROGRESS !!!
+            log.debug(f".. Reading dataset: {dataset_name} ..")
             
             # In the original script it was implemented the 'all' dataset plus ST option.
             datasets = {x: CellSegDataset(root_dir=path_data / dataset_name, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
 
+            # Get number of training epochs depending on dataset size (just roughly to decrease training time):
+            train_configs['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']))
+
+            # Train model
+            best_loss = train(net=net, datasets=datasets, configs=train_configs, device=device, path_models=path_models)
+
+             # Fine-tune with cosine annealing for Ranger models
+            if train_configs['optimizer'] == 'ranger':
+                # NOTE: No-update on training configurations.
+                net = unets.build_unet(unet_type=train_configs['architecture'][0],
+                                    act_fun=train_configs['architecture'][2],
+                                    pool_method=train_configs['architecture'][1],
+                                    normalization=train_configs['architecture'][3],
+                                    device=device,
+                                    num_gpus=num_gpus,
+                                    ch_in=1,
+                                    ch_out=1,
+                                    filters=train_configs['architecture'][4])
+
+                # Get best weights as starting point
+                net = get_weights(net=net, weights=str(path_models / '{}.pth'.format(run_name)), num_gpus=num_gpus, device=device)
+                # Train further
+                _ = train(net=net, datasets=datasets, configs=train_configs, device=device, path_models=path_models, best_loss=best_loss)
+
+            # Write information to json-file
+            write_train_info(configs=train_configs, path=path_models)
 
     log.info(">>> Training script ended correctly <<<")
 

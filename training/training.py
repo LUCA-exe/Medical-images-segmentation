@@ -8,8 +8,8 @@ import torch.optim as optim
 from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 
-from segmentation.training.ranger2020 import Ranger
-from segmentation.training.losses import get_loss
+from training.ranger2020 import Ranger
+from training.losses import get_loss
 
 
 def get_max_epochs(n_samples):
@@ -57,7 +57,8 @@ def get_weights(net, weights, device, num_gpus):
     return net
 
 
-def train(net, datasets, configs, device, path_models, best_loss=1e4):
+# TODO: Passing the log object along the functions is the best way?
+def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
     """ Train the model.
 
     :param net: Model/Network to train.
@@ -78,6 +79,11 @@ def train(net, datasets, configs, device, path_models, best_loss=1e4):
 
     print('-' * 20)
     print('Train {0} on {1} images, validate on {2} images'.format(configs['run_name'],
+                                                                   len(datasets['train']),
+                                                                   len(datasets['val'])))
+    
+    # Added info on the log file (preferred debug for now)
+    log.debug('Train {0} on {1} images, validate on {2} images'.format(configs['run_name'],
                                                                    len(datasets['train']),
                                                                    len(datasets['val'])))
 

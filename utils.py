@@ -68,6 +68,8 @@ def set_device():
     if str(device) == 'cuda':
         torch.backends.cudnn.benchmark = True
         num_gpus = 1
+    else:
+        num_gpus = 0
 
     return device, num_gpus
 
