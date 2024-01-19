@@ -8,7 +8,8 @@ from collections import defaultdict
 from utils import create_logging, set_device, EvalArgs
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
-from net_utils.metrics import count_det_errors, ctc_metrics, save_metrics
+from net_utils.metrics import count_det_errors, ctc_metrics
+from net_utils.utils import save_metrics
 
 # CONSTS
 SOFTWARE_DET_FILE = "DET_log.txt"
@@ -26,7 +27,7 @@ def main():
 
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
-    device = set_device() # Set device: cpu or single-gpu usage
+    device, num_gpus = set_device() # Set device: cpu or single-gpu usage
     log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline} metrics {args.eval_metric} <<<")
 
     # Load paths

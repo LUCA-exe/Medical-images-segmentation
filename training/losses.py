@@ -9,6 +9,8 @@ def get_loss(loss_function):
     :return: Loss function / dict of loss functions.
     """
 
+    # NOTE: Can be applied different loss functions for the double output 
+
     if loss_function == 'l1':
         border_criterion = nn.L1Loss()
         cell_criterion = nn.L1Loss()

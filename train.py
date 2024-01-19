@@ -102,7 +102,7 @@ def main():
                         filters=train_configs['architecture'][4])
 
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
-        model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, args.crop_size)
+        model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, crop_size)
         
         log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
@@ -177,9 +177,11 @@ def main():
 
             # Get number of training epochs depending on dataset size (just roughly to decrease training time):
             train_configs['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']))
+            # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
+            print(f"Number of epochs without improvement allowed {2 * train_configs['max_epochs'] // 20 + 5}")
 
             # Train model
-            best_loss = train(net=net, datasets=datasets, configs=train_configs, device=device, path_models=path_models)
+            best_loss = train(log=log, net=net, datasets=datasets, configs=train_configs, device=device, path_models=path_models)
 
              # Fine-tune with cosine annealing for Ranger models
             if train_configs['optimizer'] == 'ranger':
