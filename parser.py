@@ -26,7 +26,8 @@ def get_parser():
     parser.add_argument("--eval_metric", default="software", type=str, help="Str used to decide which metrics use for evaluation")
     # Specific folder to save the evaluation software - should be treated as const
     parser.add_argument("--evaluation_software", default="./net_utils/evaluation_software/", type=str, help="Path to access for loading the evaluation software of Cell Tracking Challenge")
-    parser.add_argument("--download", default=False, type=bool, help="Boolean value to check for download online single or multiple datasets")
+    parser.add_argument('--download', '-dl', default=False, action="store_true", help='Boolean value to check for download (single or multiple datasets)')
+    
     # TODO: Expand the dataset options from other challenges/websites - what dataset to download (from CTC website)
     parser.add_argument("--download_dataset", default = "all", type=str, help="Name of the dataset to download (else 'all')")
     
@@ -36,11 +37,10 @@ def get_parser():
     parser.add_argument("--cell_dim", default = 7000, type=int, help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
     # NOTE: My dataset has an avg of 4000 EVs dim in pixels (It depends on the resolution).
     parser.add_argument("--max_images", default = 15, type=int, help="Max. number of images to take for the gathering of signals (for every folder ('01', '02') separately)")
-    # Gather signals for a dataset 
-    parser.add_argument("--compute_signals", default = False, type = bool, help="Compute signals for the chosen dataset")
-    # Compare signals for all datasets (both box-plots and line-plots) 
-    parser.add_argument("--compare_signals", default = False, type = bool, help="Compare signals for all the dataset with computed signals.")
-
+    parser.add_argument('--compute_signals', default=False, action="store_true", help='Compute signals for the single chosen dataset')
+    parser.add_argument('--compare_signals', default=False, action="store_true", help='Aggregate and compare signals for all the dataset with computed signals.')
+    
+   
     # Mixed pipelines parameters (pre-processing for training/models/post processing methods for evaluation)
 
     parser.add_argument("--pre_processing_pipeline", default="kit-ge", type=str, help="Chosing what pre-processing operations/pipeline to do")

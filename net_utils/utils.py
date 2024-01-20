@@ -352,6 +352,7 @@ def save_image(img, path, title, use_cmap = False):
     
     # Ensure the folder exists
     os.makedirs(path, exist_ok=True)
+    
     # Create the full path for saving the image
     image_path = os.path.join(path, f"{title}.png")
 
@@ -361,7 +362,6 @@ def save_image(img, path, title, use_cmap = False):
     plt.axis('off')  # Turn off axis labels
     plt.savefig(image_path, bbox_inches='tight', pad_inches=0.1)
     plt.close()  # Close the plot to free up resources
-
     return None
 
 

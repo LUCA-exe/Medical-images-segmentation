@@ -5,7 +5,7 @@ This is the evaluation main function that call inference and the metrics computa
 import os
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, EvalArgs
+from utils import create_logging, set_device, set_environment_paths, EvalArgs
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
@@ -28,6 +28,7 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
     device, num_gpus = set_device() # Set device: cpu or single-gpu usage
+    set_environment_paths() # Save folders/folder paths in the env.
     log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline} metrics {args.eval_metric} <<<")
 
     # Load paths
@@ -59,7 +60,7 @@ def main():
     
     # NOTE: For now it is implemented evaluation for one dataset
     if args.post_processing_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
-        kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, args.scale, args)
+        kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
@@ -68,9 +69,9 @@ def main():
 
 
 # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
-def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, scale_factor, args):
+def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
 
-    # Prepare dict for the results of this specific post-processsing loop
+    # Prepare dict for the results of this specific post-processing loop.
     results = {'model':args.model_pipeline, 
                'post_processing': args.post_processing_pipeline, # NOTE: It is possible to add more fixed args in the dict
                'data': path_data,
@@ -96,7 +97,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                             th_cell=float(th_cell), 
                                             th_seed=float(th_seed),
                                             apply_clahe=args.apply_clahe,
-                                            scale=scale_factor,
+                                            scale=args.scale,
                                             cell_type=args.dataset,
                                             save_raw_pred=args.save_raw_pred,
                                             artifact_correction=args.artifact_correction,
@@ -112,7 +113,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                 device=device,
                                 batchsize=args.batch_size,
                                 args=eval_args,
-                                num_gpus=1, # NOTE: Fixed for now at 1.
+                                num_gpus=num_gpus,
                                 model_pipeline=args.model_pipeline,
                                 post_processing_pipeline=args.post_processing_pipeline) 
 
@@ -131,9 +132,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     # Kept the internal structure as simple as possble for custom aggregation later (both for visualization/tranform in '*.csv' file)
                     results['results'][curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
                     curr_experiment += 1
-                    # DEBUG
-                    #print(f"Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell} --- {seg_measure} {det_measure} {so} {fnv} {fpv}")
-
+                   
     # Save the metrics
     save_metrics(log, results, path_data, name = 'eval_results')
     return None
