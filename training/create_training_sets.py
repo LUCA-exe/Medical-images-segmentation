@@ -695,8 +695,8 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         log.info(f"Splitting train/val elements for training with standard 80% / 20%") # TODO: To add as argument to the main parser and train specific parser
         train_val_ids = get_train_val_split(img_ids, b_img_ids) # Get simple shuffled dict with train/val patches ids.
     
-    log.debug(f"Train patches ids: {train_val_ids['train']}")
-    log.debug(f"Val patches ids: {train_val_ids['val']}")
+    log.debug(f"Train patches ids ({len(train_val_ids['train'])}): {train_val_ids['train']}")
+    log.debug(f"Val patches ids ({len(train_val_ids['val'])}): {train_val_ids['val']}")
 
     # Copy images to train/val
     for train_mode in ['train', 'val']:
