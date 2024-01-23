@@ -464,8 +464,8 @@ def get_td_settings(log, mask_id_list, crop_size, evs_presence = True):
     else:
         scale = 1
 
-    # NOTE: Check if there is evs in the data: if yes increment the search radius by a fixed factor - can be optimized
-    if evs_presence: search_radius = search_radius * 0.5 # Decrement in order to not highlight too much the cells...
+    # NOTE: Check if there is evs in the data: if yes increment/decrement the search radius by a fixed factor - can be optimized
+    if evs_presence: search_radius = search_radius * 1.5 # More the increment, more the neighbor considered.
 
     properties_dict = {'search_radius': search_radius,
             'min_area': min_area,
