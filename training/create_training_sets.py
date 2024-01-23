@@ -419,8 +419,8 @@ def get_mask_ids(log, path_data, ct, mode, split, st_limit):
     log.debug(f"Mask collected (shuffled for training purpose) are: {mask_ids}")
     return mask_ids
 
-
-def get_td_settings(log, mask_id_list, crop_size):
+# NOTE: Adjusted 'td_settings' for my dataset ('search_radius' it is interesting to study)
+def get_td_settings(log, mask_id_list, crop_size, evs_presence = True):
     """ Get settings for the training data generation.
 
     :param mask_id_list: List of all segmentation GT ids (list of pathlib Path objects).
@@ -463,6 +463,9 @@ def get_td_settings(log, mask_id_list, crop_size):
 
     else:
         scale = 1
+
+    # NOTE: Check if there is evs in the data: if yes increment the search radius by a fixed factor - can be optimized
+    if evs_presence: search_radius = search_radius * 0.5 # Decrement in order to not highlight too much the cells...
 
     properties_dict = {'search_radius': search_radius,
             'min_area': min_area,
