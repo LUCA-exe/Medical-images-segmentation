@@ -8,7 +8,8 @@ import os
 from net_utils.utils import save_image
 
 
-def bottom_hat_closing(label, radius_disk = 6):
+# TODO: Get this info as value in the settings... ('td_settings')
+def bottom_hat_closing(label, radius_disk = 3):
     """ Bottom-hat-transform based grayscale closing.
 
     :param label: Intensity coded label image.
@@ -80,7 +81,7 @@ def border_label_2d(label, intensity_factor = 1):
     return label_border
 
 
-def distance_label_2d(label, cell_radius, neighbor_radius):
+def distance_label_2d(label, cell_radius, neighbor_radius, radius_disk):
     """ Cell and neigbhour distance label creation (Euclidean distance).
 
     :param label: Intensity-coded instance segmentation label image.
@@ -156,7 +157,8 @@ def distance_label_2d(label, cell_radius, neighbor_radius):
         ] += nucleus_neighbor_crop_dist
 
     # Add neighbor distances in-between close but not touching cells with bottom-hat transform -  This is used to fill gaps between close but not touching cells.
-    label_closed, label_closed_corr = bottom_hat_closing(label=label)
+    label_closed, label_closed_corr = bottom_hat_closing(label=label, radius_disk=radius_disk)
+    
     #save_image(label, os.environ.get("DEBUG_FOLDER"), title = "mask", use_cmap = False)
     #save_image(label_closed, os.environ.get("DEBUG_FOLDER"), title = "label_closed", use_cmap = False)
     #save_image(label_closed_corr, os.environ.get("DEBUG_FOLDER"), title = "label_closed_corr", use_cmap = False)

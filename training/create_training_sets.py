@@ -225,7 +225,8 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
     # Calculate train data representations
     cell_dist, neighbor_dist = distance_label_2d(label=mask,
                                                  cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
-                                                 neighbor_radius=td_settings['search_radius'])
+                                                 neighbor_radius=td_settings['search_radius'], 
+                                                 disk_radius = td_settings['radius_disk'])
 
     # Adjust image dimensions for appropriate cropping
     img, mask, cell_dist, neighbor_dist, tra_gt = adjust_dimensions(td_settings['crop_size'], img, mask, cell_dist,
@@ -420,7 +421,7 @@ def get_mask_ids(log, path_data, ct, mode, split, st_limit):
     return mask_ids
 
 # NOTE: Adjusted 'td_settings' for my dataset ('search_radius' it is interesting to study)
-def get_td_settings(log, mask_id_list, crop_size, evs_presence = True):
+def get_td_settings(log, mask_id_list, crop_size, evs_presence = False):
     """ Get settings for the training data generation.
 
     :param mask_id_list: List of all segmentation GT ids (list of pathlib Path objects).
@@ -468,6 +469,7 @@ def get_td_settings(log, mask_id_list, crop_size, evs_presence = True):
     if evs_presence: search_radius = search_radius * 1.5 # More the increment, more the neighbor considered.
 
     properties_dict = {'search_radius': search_radius,
+            'radius_disk': 3, #TODO: Automatize in respect to the cells dimensions - fixed for now.
             'min_area': min_area,
             'max_mal': max_mal,
             'scale': scale,
