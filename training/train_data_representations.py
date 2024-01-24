@@ -9,7 +9,7 @@ from net_utils.utils import save_image
 
 
 # TODO: Get this info as value in the settings... ('td_settings')
-def bottom_hat_closing(label, radius_disk = 3):
+def bottom_hat_closing(label, disk_radius = 3):
     """ Bottom-hat-transform based grayscale closing.
 
     :param label: Intensity coded label image.
@@ -23,11 +23,11 @@ def bottom_hat_closing(label, radius_disk = 3):
     nucleus_ids = get_nucleus_ids(label)
     for nucleus_id in nucleus_ids:
         nucleus = (label == nucleus_id)
-        nucleus = ndimage.binary_closing(nucleus, disk(radius_disk))
+        nucleus = ndimage.binary_closing(nucleus, disk(disk_radius))
         label_bin[nucleus] = True
 
     # Bottom-hat-transform
-    label_bottom_hat = ndimage.binary_closing(label_bin, disk(radius_disk)) ^ label_bin
+    label_bottom_hat = ndimage.binary_closing(label_bin, disk(disk_radius)) ^ label_bin
     # Decrease slightly yhe bottom_hat representation 
     label_closed = (~label_bin) & label_bottom_hat
 
@@ -39,7 +39,7 @@ def bottom_hat_closing(label, radius_disk = 3):
     props = measure.regionprops(label_closed)
     label_closed_corr = (label_closed > 0).astype(np.float32)
     for i in range(len(props)):
-        if props[i].minor_axis_length >= radius_disk:
+        if props[i].minor_axis_length >= disk_radius:
             single_gap = label_closed == props[i].label
             single_gap_border = single_gap ^ ndimage.binary_erosion(single_gap, generate_binary_structure(2, 1))
             label_closed_corr[single_gap] = 1
@@ -81,7 +81,7 @@ def border_label_2d(label, intensity_factor = 1):
     return label_border
 
 
-def distance_label_2d(label, cell_radius, neighbor_radius, radius_disk):
+def distance_label_2d(label, cell_radius, neighbor_radius, disk_radius):
     """ Cell and neigbhour distance label creation (Euclidean distance).
 
     :param label: Intensity-coded instance segmentation label image.
@@ -157,7 +157,7 @@ def distance_label_2d(label, cell_radius, neighbor_radius, radius_disk):
         ] += nucleus_neighbor_crop_dist
 
     # Add neighbor distances in-between close but not touching cells with bottom-hat transform -  This is used to fill gaps between close but not touching cells.
-    label_closed, label_closed_corr = bottom_hat_closing(label=label, radius_disk=radius_disk)
+    label_closed, label_closed_corr = bottom_hat_closing(label=label, disk_radius=disk_radius)
     
     #save_image(label, os.environ.get("DEBUG_FOLDER"), title = "mask", use_cmap = False)
     #save_image(label_closed, os.environ.get("DEBUG_FOLDER"), title = "label_closed", use_cmap = False)

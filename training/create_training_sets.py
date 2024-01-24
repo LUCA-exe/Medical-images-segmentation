@@ -226,7 +226,7 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
     cell_dist, neighbor_dist = distance_label_2d(label=mask,
                                                  cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
                                                  neighbor_radius=td_settings['search_radius'], 
-                                                 disk_radius = td_settings['radius_disk'])
+                                                 disk_radius = td_settings['disk_radius'])
 
     # Adjust image dimensions for appropriate cropping
     img, mask, cell_dist, neighbor_dist, tra_gt = adjust_dimensions(td_settings['crop_size'], img, mask, cell_dist,
@@ -469,7 +469,7 @@ def get_td_settings(log, mask_id_list, crop_size, evs_presence = False):
     if evs_presence: search_radius = search_radius * 1.5 # More the increment, more the neighbor considered.
 
     properties_dict = {'search_radius': search_radius,
-            'radius_disk': 3, #TODO: Automatize in respect to the cells dimensions - fixed for now.
+            'disk_radius': 3, #TODO: Automatize in respect to the cells dimensions - fixed for now.
             'min_area': min_area,
             'max_mal': max_mal,
             'scale': scale,
