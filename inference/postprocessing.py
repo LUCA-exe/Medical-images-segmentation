@@ -58,12 +58,10 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
     """
 
     # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring) - Fixed parameters
-    sigma_cell = 1.0
-    sigma_border = 0.5
+    sigma_cell = 0.5
 
     apply_splitting = False # TODO: Move into the eval args parsers
     cell_prediction = gaussian_filter(cell_prediction, sigma=sigma_cell)
-    border_prediction = gaussian_filter(border_prediction, sigma=sigma_border)
     border_prediction = np.clip(border_prediction, 0, 1)
 
     th_seed = args.th_seed
@@ -75,6 +73,7 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
 
     # Get seeds for marker-based watershed
     borders = np.tan(border_prediction ** 2)
+    # Empirical threhsolds
     borders[borders < 0.05] = 0
     borders = np.clip(borders, 0, 1)
     cell_prediction_cleaned = (cell_prediction - borders)
@@ -105,7 +104,7 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
         seeds = measure.label(seeds, background=0)
         props = measure.regionprops(seeds)
         for i in range(len(props)):
-            if props[i].area <= 4 or (input_3d and props[i].area <= 8):
+            if props[i].area <= 4:
                 seeds[seeds == props[i].label] = 0
         seeds = measure.label(seeds, background=0)
 
