@@ -26,6 +26,8 @@ def get_parser():
     parser.add_argument("--eval_metric", default="software", type=str, help="Str used to decide which metrics use for evaluation")
     # Specific folder to save the evaluation software - should be treated as const
     parser.add_argument("--evaluation_software", default="./net_utils/evaluation_software/", type=str, help="Path to access for loading the evaluation software of Cell Tracking Challenge")
+    
+    # WARNING: Deprecated - if you call the 'download_data.py' script it is obviuos.
     parser.add_argument('--download', '-dl', default=False, action="store_true", help='Boolean value to check for download (single or multiple datasets)')
     
     # TODO: Expand the dataset options from other challenges/websites - what dataset to download (from CTC website)

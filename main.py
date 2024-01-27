@@ -1,10 +1,8 @@
 """main_signals.py
 
-This is a temporary main executable file for running the repository functionalities about download dataset,
+This is a TEMPORARY main executable (soon to be deprecated) file for running the repository functionalities about download dataset,
 gather images properties and compare signals among the images for dataset benchmarking.
 
-Helpful resources:
-    - 
 """
 from utils import create_logging, download_images
 from parser import get_parser, get_processed_args
@@ -42,5 +40,3 @@ def main():
 
 if __name__ == "__main__":
     main() # For now just donwload, compute and visualize signals
-
-
