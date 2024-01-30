@@ -105,26 +105,26 @@ TESTDATA_URL = 'http://data.celltrackingchallenge.net/test-datasets/'
 SOFTWARE_URL = 'http://public.celltrackingchallenge.net/software/EvaluationSoftware.zip'
 
 # Check if eval. software is already downloaded: if not download it.
-def check_evaluation_software(software_path):
+def check_evaluation_software(log, software_path):
     
     # Check if the evaluation folder is already contained
     files = [name for name in os.listdir(software_path) if not name.startswith(".")]
     
-    # Download evaluation software if it is not already donwloaded
+    # Download evaluation software if it is not already donwloaded (there is just one file in the '*/evaluation software' folder)
     if len(files) <= 1:
-        print(f"Downloading evaluation software to '{software_path}' ..")
+        log.info(f"Downloading evaluation software to '{software_path}' ..")
         __download_data(log=None, url=SOFTWARE_URL, target=software_path)
     else:
-        print(f"Evaluation software already set-up in '{software_path}'")
+        log.info(f"Evaluation software already set-up in '{software_path}'")
         return False # Eval software already set up.
 
     # Unzip evaluation software
-    print('Unzip evaluation software ..')
+    log.info('Unzip evaluation software ..')
     with zipfile.ZipFile(os.path.join(software_path, SOFTWARE_URL.split('/')[-1]), 'r') as z:
         z.extractall(software_path)
     
-    print(f"Evaluation software correctly set up")
-    return True # Evaluation folder correctly set up
+    log.info(f"Evaluation software correctly set up")
+    return None # Evaluation folder correctly set up
 
 
 def __download_data(log, url, target): # Download the datasets chosen with a specific chunk size
@@ -143,7 +143,6 @@ def __download_data(log, url, target): # Download the datasets chosen with a spe
         with open(local_filename, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
-                
     return local_filename
 
 
@@ -227,7 +226,6 @@ def download_datasets(log, args): # Main function to download the chosen dataset
 
             __check_dataset(log, current_train_path, TRAINDATA_URL)
             __check_dataset(log, current_test_path, TESTDATA_URL)
-
             log.info(f"Data downloads completed!")
         
         else:

@@ -14,29 +14,32 @@ from matplotlib import pyplot as plt
 import tifffile as tiff
 import cv2
 from collections import defaultdict
-from img_processing.imageUtils import * # Remember to write the path that the 'importer' of this file is calling
+from img_processing.imageUtils import *
+
+# TODO: Move to a .env file
+TEMPORARY_FOLDER = "./tmp"
 
 class images_processor:
 
-    def __init__(self, env, args, task='SEG'):
-        """Class to create a obj. that gather images signals from segmentation masks"""
+    def __init__(self, env, args, dataset, task='SEG'):
+        """Class to create an obj. that gather images signals from segmentation masks"""
 
         self.log = env['logger'] # Extract the needed env. variables - log
         self.args = args
-        self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path in which the json will be saved
+        self.images_folder = os.path.join(args.train_images_path, dataset) # Path in which the json will be saved
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
         self.considered_images = args.max_images # Set a limit to the number of masks to use
 
-        os.makedirs('tmp', exist_ok=True) # Set up a './tmp' folder for debugging images processing
-        self.debug_folder = 'tmp'
+        os.makedirs(TEMPORARY_FOLDER, exist_ok=True) # Set up a './tmp' folder for debugging images processing
+        self.debug_folder = TEMPORARY_FOLDER
 
         self.log.info(f"'Image processor' object instantiated: working on '{self.images_folder}'")
         
         
     def set_dataset(self, new_images_path, new_dataset): # Change the target repository
         self.images_folder = os.path.join(new_images_path, new_dataset)
-        self.log.info(f"Dataset considered by the processor object changed correctly to {new_dataset}!" )
+        self.log.info(f"Dataset considered by the processor object changed to {new_dataset}!" )
         return None
 
     # TODO: Verifiy that 'perc_pixels' should be a parameters callable from the main and NOT a paramereter on the program
@@ -186,7 +189,6 @@ class images_processor:
         signals_dict['bh'] = abs(max(background_patches) - min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
         
         return signals_dict
-
 
 
 class signalsVisualizator: # Object to plot signals of a single dataset (both aggregated/single mask folder): for now mantain this design - (To oeprate on multiple dataset just create a appropriate main script).

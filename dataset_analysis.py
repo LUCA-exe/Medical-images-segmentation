@@ -1,9 +1,9 @@
 """dataset_analysis.py
 
-This is the main executable file for running the repository functionalities about download dataset,
-gather images properties and compare signals among the images for dataset benchmarking.
+This is the main executable file for gather images properties and compare 
+signals among the images for dataset benchmarking.
 """
-from utils import create_logging, download_images
+from utils import create_logging
 from parser import get_parser, get_processed_args
 from img_processing.main_img import * # Import gather and visualizator of images property
 from download_data import download_datasets
@@ -24,12 +24,11 @@ def main():
     log.info(f"Args: {args}") # Print overall args.
     log.debug(f"Env varibles: {env}")
 
-    if args.download: # Check if is is requested the downloading of datasets.
-        download_datasets(log, args)
+    log.info(f"--- Computing image characteristics ---")
 
-    if args.compute_signals:
-        # Process single folders signals and aggregate for the current dataset chosen by args.
-        processor = images_processor(env, args)
+    # Process single folders signals and aggregate for the current dataset chosen by args.
+    for dataset in args.dataset:
+        processor = images_processor(env, args, dataset)
         processor.collect_signals()
 
     if args.compare_signals:

@@ -1,7 +1,7 @@
 """download_data.py
 
-This file contains the function to download and set up the train/test data.
-
+This file contains the function to download and set up the train/test data 
+and the evaluation software.
 """
 
 import os
@@ -28,9 +28,10 @@ def main():
     log.info(f"args: {args}") # Print overall args 
     log.debug(f"env: {env}")
 
-    download_datasets(log, args) # Call the 'util' function
+    logging.info(f"--- Downloading data and software ---")
+    download_datasets(log, args) # Call the 'util' function.
+    check_evaluation_software(log, args.evaluation_software_path)
 
-    # NOTE: Add the evalutation sofwtare donwload id resuested and not already present.
     log.info("Downloads ended correctly :)")
 
 if __name__ == "__main__":

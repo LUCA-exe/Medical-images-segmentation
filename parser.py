@@ -18,18 +18,14 @@ def get_parser():
     parser.add_argument("--train_images_path",default="training_data/", type=str, help="Path to the train images dataset")
     parser.add_argument("--test_images_path", default="test_data/", type=str, help="Path to the test images dataset")
     # Default parameter is my traind dataset (Experiment 01 annotation 02)
-    parser.add_argument("--dataset", default="Fluo-E2DV-train", type=str, help="Which folder to access")
+    parser.add_argument("--dataset", default="Fluo-E2DV-train", nargs='+', type=str, help="Which dataset folder to access (ca be multiple)")
     parser.add_argument("--models_folder", default="./models/all/", type=str, help="Which folder to access for train/val/test models")
     # TODO: Decided how to use this folder - require manual supervision to analyze its results
     parser.add_argument("--save_model", default="./models/best/", type=str, help="Which folder to access for saving best model files/metrics")
     # For now kept as default the CTC evaluation DET and SEG scores -  can be implemented more options
     parser.add_argument("--eval_metric", default="software", type=str, help="Str used to decide which metrics use for evaluation")
     # Specific folder to save the evaluation software - should be treated as const
-    parser.add_argument("--evaluation_software", default="./net_utils/evaluation_software/", type=str, help="Path to access for loading the evaluation software of Cell Tracking Challenge")
-    
-    # WARNING: Deprecated - if you call the 'download_data.py' script it is obviuos.
-    parser.add_argument('--download', '-dl', default=False, action="store_true", help='Boolean value to check for download (single or multiple datasets)')
-    
+    parser.add_argument("--evaluation_software_path", default="./net_utils/evaluation_software/", type=str, help="Path to access for loading the evaluation software of Cell Tracking Challenge")
     # TODO: Expand the dataset options from other challenges/websites - what dataset to download (from CTC website)
     parser.add_argument("--download_dataset", default = "all", type=str, help="Name of the dataset to download (else 'all')")
     
@@ -39,7 +35,6 @@ def get_parser():
     parser.add_argument("--cell_dim", default = 7000, type=int, help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
     # NOTE: My dataset has an avg of 4000 EVs dim in pixels (It depends on the resolution).
     parser.add_argument("--max_images", default = 15, type=int, help="Max. number of images to take for the gathering of signals (for every folder ('01', '02') separately)")
-    parser.add_argument('--compute_signals', default=False, action="store_true", help='Compute signals for the single chosen dataset')
     parser.add_argument('--compare_signals', default=False, action="store_true", help='Aggregate and compare signals for all the dataset with computed signals.')
     
    
@@ -113,6 +108,8 @@ def get_processed_args(args):
     if not isinstance(args.crop_size, list):
         args.crop_size = [args.crop_size]
 
+    if not isinstance(args.dataset, list):
+        args.dataset = [args.dataset]
 
     return args
 
