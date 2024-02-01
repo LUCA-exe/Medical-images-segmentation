@@ -33,7 +33,6 @@ def main():
 
     if args.compare_signals:
         visualizator = signalsVisualizator(env, args)
-        #visualizator.visualize_signals() # WORK IN PROGRESS: Compute single dataset signals.
         signalsVisualizator.dataset_signals_comparison(log) # Compare single signals from different datasets (when available).
 
 

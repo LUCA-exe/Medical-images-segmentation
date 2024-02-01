@@ -18,6 +18,7 @@ from img_processing.imageUtils import *
 
 # TODO: Move to a .env file
 TEMPORARY_FOLDER = "./tmp"
+VISUALIZATION_FOLDER = "./results"
 
 class images_processor:
 
@@ -67,7 +68,7 @@ class images_processor:
         masks_folders = [s for s in folders if s.endswith("GT")]
         self.log.debug(f"Folders with the masks: {masks_folders}")
         
-        total_stats = [] # List of dicts containing all the computed signals - It is not a 'dict' cause we can lose the 'name' of the image for the final aggregation
+        total_stats = [] # List of dicts containing all the computed signals - It is not a 'dict' cause we can lose the 'name' of the image for the final aggregation.
 
         for folder in masks_folders: # Main loop: for every folder gather the data
 
@@ -129,7 +130,7 @@ class images_processor:
         background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
         tot_pixels = mask.shape[0] * mask.shape[1] # Total pixels of the image
 
-        # DEBUG console visualization
+        # NOTE: console visualization - debug
         print(f"\nWorking on {os.path.basename(image_path).split('.')[0]} image")
         print(f"> Rumore nel background: {np.std(background_pixels)}")
         print(f"> Numero di oggetti (incluso il background): {len(np.unique(mask))}")
@@ -198,11 +199,12 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
-        self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path to load the different '*.json' files
+        #self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path to load the different '*.json' files
+        self.images_folder = None
         self.task = task # Folder for the ground truth mask signals loading
 
-        os.makedirs('visualization_results', exist_ok=True) # Set up a folder that will contains the final plots
-        self.visualization_folder = 'visualization_results' # Path starting from the './' (current folder - root folder of the project)
+        os.makedirs(VISUALIZATION_FOLDER, exist_ok=True) # Set up a folder that will contains the final plots
+        self.visualization_folder = VISUALIZATION_FOLDER # Path starting from the './' (current folder - root folder of the project)
 
         self.log.info(f"Obj. to plot the computed signals instantiated: working on '{self.images_folder}'")
 
@@ -280,7 +282,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
 
     @staticmethod
-    def dataset_signals_comparison(log, split_folder='training_data', target_folder='./visualization_results'):
+    def dataset_signals_comparison(log, split_folder='training_data', target_folder=VISUALIZATION_FOLDER):
         """ Read all the 'aggregated_signals' from the different datasets folders and plots the comparison graph.
 
         Args:
