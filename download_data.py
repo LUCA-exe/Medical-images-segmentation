@@ -28,7 +28,7 @@ def main():
     log.info(f"args: {args}") # Print overall args 
     log.debug(f"env: {env}")
 
-    logging.info(f"--- Downloading data and software ---")
+    log.info(f"--- Downloading data and software ---")
     download_datasets(log, args) # Call the 'util' function.
     check_evaluation_software(log, args.evaluation_software_path)
 

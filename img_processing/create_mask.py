@@ -1,7 +1,7 @@
 """create_mask.py
 
-This is a 'util' file to create segmentation masks from the 'annotation.json' (computed trough VIA) and the following 'man_trackT.tif'.
-(It is separate from the general repository, just a script that you can call from a notebook cell).
+This is a 'util' script to create segmentation masks from the 'annotation.json' (computed trough VIA) and the following 'man_trackT.tif'.
+(It is separate from the general repository, just a script that you can call from a notebook cell - Its level of log is the console).
 """
 
 from copy import deepcopy
@@ -22,7 +22,7 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
     
     # Clean and set up the debugging folder
     try:
-        shutil.rmtree(DEBUG_PATH)
+        shutil.rmtree(DEBUG_PATH, ignore_errors=True)
     except Exception as e:
         print(f'Failed to delete directory: {e}')
     os.makedirs(DEBUG_PATH ,exist_ok=True) # Set up the debugging folder
@@ -126,6 +126,7 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
                 diff_x = right_upper_corner[0] - left_upper_corner[0]
                 diff_y = right_upper_corner[1] - right_lower_corner[1]
                 area = (diff_x) * (diff_y)
+                print(f".. .. Element {idx + 1} has area {area} .. ..")
 
                 if area > pixels_limit: # Adjust the marker dimension in case the marker should be too big compared to the EVs
 
@@ -144,7 +145,7 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
                     right_lower_corner[1] += diff_y
                 
                 square_marker = np.asarray([left_upper_corner, right_upper_corner, right_lower_corner, left_lower_corner]) # Order is important to construct the figure
-                _ = cv2.drawContours(track, [square_marker], -1, idx+1, -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask
+                _ = cv2.drawContours(track, [square_marker], -1, idx+1, -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask.
                 
             d_markers.append(track)
             d_masks.append(mask)

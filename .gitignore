@@ -5,6 +5,7 @@ __MACOSX/
 tmp/
 net_utils/evaluation_software/
 training_data/
+!training_data/Fluo*
 models/all/
 test_data/*
 !test_data/Fluo*
