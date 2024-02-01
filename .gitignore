@@ -3,7 +3,7 @@ __pycache__/
 __MACOSX/
 tmp/
 net_utils/evaluation_software/
-!training_data/Fluo*
+training_data/
 models/all/
 test_data/*
 !test_data/Fluo*
