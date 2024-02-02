@@ -22,7 +22,7 @@ VISUALIZATION_FOLDER = "./results"
 
 class images_processor:
 
-    def __init__(self, env, args, dataset, task='SEG'):
+    def __init__(self, env, args, dataset, split_signals=False, task='SEG'):
         """Class to create an obj. that gather images signals from segmentation masks"""
 
         self.log = env['logger'] # Extract the needed env. variables - log
@@ -31,6 +31,12 @@ class images_processor:
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
         self.considered_images = args.max_images # Set a limit to the number of masks to use
+        self.split_signals = split_signals
+
+        if self.split_signals: # In case of 'True', set the name of the '*.json' signals file
+            self.names = ['EVs', 'Cells']
+        else:
+            self.names = [''] # In case of a single 'signals' file for GT folder.
 
         os.makedirs(TEMPORARY_FOLDER, exist_ok=True) # Set up a './tmp' folder for debugging images processing
         self.debug_folder = TEMPORARY_FOLDER
@@ -69,39 +75,43 @@ class images_processor:
         self.log.debug(f"Folders with the masks: {masks_folders}")
         
         total_stats = [] # List of dicts containing all the computed signals - It is not a 'dict' cause we can lose the 'name' of the image for the final aggregation.
+        if len(self.names) > 1:
+            self.log.info(f"Computing the characteristics of multiple cells in the images per folder")
 
-        for folder in masks_folders: # Main loop: for every folder gather the data
+        for folder in masks_folders: # Main loop: for every folder gather the data.
 
-            current_images_path = os.path.join(self.images_folder, folder.split('_')[0]) # Fetch the original images from this folder
-            current_path = os.path.join(self.images_folder, folder, self.task) # Compose the masks folder
+            # NOTE: Added the split of signals based on cells dimension - if requested by the '--split_signals' arg.
+            for name in self.names:
+                
+                current_images_path = os.path.join(self.images_folder, folder.split('_')[0]) # Fetch the original images from this folder
+                current_path = os.path.join(self.images_folder, folder, self.task) # Compose the masks folder
 
-            files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks
-            files_name.sort()
-            self.log.debug(f"Currently working in '{current_path}': files are {files_name}")
+                files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks
+                files_name.sort()
+                self.log.debug(f"Currently working in '{current_path}': files are {files_name}")
 
-            create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
-            stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
+                create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
+                stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
 
-            if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks for current folders
-            
-            for file_name in files_name:
-                current_mask_path = os.path.join(current_path, file_name)
-                image_name = fetch_image_path(current_mask_path, current_images_path) # For evey mask path, fetch the proper image path (images masks less than total of the images)
-                current_image_path = os.path.join(current_images_path, image_name)
+                if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks for current folders
+                
+                for file_name in files_name:
+                    current_mask_path = os.path.join(current_path, file_name)
+                    image_name = fetch_image_path(current_mask_path, current_images_path) # For evey mask path, fetch the proper image path (images masks less than total of the images)
+                    current_image_path = os.path.join(current_images_path, image_name)
 
-                # Ready to compute the signals for the coupled mask - image
-                self.log.debug(f".. working on {image_name} - {file_name} ..")
-                stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels) # Save the signals for every original image name
+                    # Ready to compute the signals for the coupled mask - image
+                    self.log.debug(f".. working on {image_name} - {file_name} ..")
+                    stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels) # Save the signals for every original image name
 
-                total_stats.append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset (copy, not the reference)
+                    total_stats.append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset (copy, not the reference)
 
-            # Finished to gather data from the current folder - update the existing '*.json' (on the current folder)
-            update_signals_file(self.log, current_path, stats)
+                # Finished to gather data from the current folder - update the existing '*.json' (on the current folder)
+                update_signals_file(self.log, current_path, stats)
 
-        self.log.info(f".. Aggregating images signals from all folders ..")
-        total_dict = aggregate_signals(self.log, total_stats, 'none') # Aggregate the signals of the current dataset in a single dict (format = 'metric': [list of values])
-        save_aggregated_signals(self.log, self.images_folder, total_dict) # Save the 'dict' on the root folder of the dataset.
-
+            self.log.info(f".. Aggregating images signals from all folders ..")
+            total_dict = aggregate_signals(self.log, total_stats, 'none') # Aggregate the signals of the current dataset in a single dict (format = 'metric': [list of values])
+            save_aggregated_signals(self.log, self.images_folder, total_dict, name=) # Save the 'dict' on the root folder of the dataset.
         return None
 
     # TODO: Working for gather signal both from my dataset and others (e.g. CTC/DSB 2018 datasets)
@@ -305,15 +315,17 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         for dataset in dataset_folders:
             
             json_file = [s for s in os.listdir(os.path.join(split_folder, dataset)) if s.endswith(".json")] # Search for the 'aggregated_signals.json'
-            if json_file:
-                log.info(f".. extracting {dataset} data ..")
-                dataset_list.append(dataset)
+            if json_file: # Considering at least one 'aggregated_signals.json' for dataset.
+                for file in json_file
+                    
+                    log.info(f".. extracting {dataset} data ..")
+                    dataset_list.append(dataset)
 
-                f = open(os.path.join(split_folder, dataset, json_file[0])) # Open the current 'aggregated' data.
-                signals_dict = json.load(f) # The 'aggregated_signals.json' doesn't differentiate between '01_GT' and '02_GT'.
+                    f = open(os.path.join(split_folder, dataset, json_file[0])) # Open the current 'aggregated' data.
+                    signals_dict = json.load(f) # The 'aggregated_signals.json' doesn't differentiate between '01_GT' and '02_GT'.
 
-                for metric, value in signals_dict.items(): # The 'value from the 'aggregated*.json' are lists of value
-                    datasets_dict[metric].append(value)
+                    for metric, value in signals_dict.items(): # The 'value from the 'aggregated*.json' are lists of value
+                        datasets_dict[metric].append(value)
 
             else:
                 log.info(f".. {dataset} doesn't contains any data ..")

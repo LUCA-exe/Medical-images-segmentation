@@ -31,9 +31,10 @@ def get_parser():
     
     # Parameters used for the image characteristics gathering (analyze image properties)
 
+    parser.add_argument("--split_signals", default=False, action="store_true", help='Just for my Datasets, split the charateristics between EVs and Cells')
     # TODO: Kept fixed as arguments.. maybe should be extracted from a '*.json' file with a finetuned dimension for every seen dataset..
-    parser.add_argument("--cell_dim", default = 7000, type=int, help="Min. dimension (in pixels) to consider for gathering cells stats/signals")
-    # NOTE: My dataset has an avg of 4000 EVs dim in pixels (It depends on the resolution).
+    parser.add_argument("--cell_dim", type=int, default=4000, help='Value used as a threshold between the two type of cells')
+    # NOTE: My dataset has an avg of 4000 EVs dim in pixels - It depends on the resolution.
     parser.add_argument("--max_images", default = 15, type=int, help="Max. number of images to take for the gathering of signals (for every folder ('01', '02') separately)")
     parser.add_argument('--compare_signals', default=False, action="store_true", help='Aggregate and compare signals for all the dataset with computed signals.')
     

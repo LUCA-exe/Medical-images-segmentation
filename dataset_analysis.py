@@ -9,6 +9,9 @@ from img_processing.main_img import * # Import gather and visualizator of image
 from download_data import download_datasets
 
 
+# My datasets
+DATASET = ['Fluo-E2DV-train', 'Fluo-E2DV-test']
+
 def main():
     """ Main function to call in order to run all the project classes and 
         functions about images download and properties gathering.
@@ -28,7 +31,8 @@ def main():
 
     # Process single folders signals and aggregate for the current dataset chosen by args.
     for dataset in args.dataset:
-        processor = images_processor(env, args, dataset)
+        if args.split_signals and dataset in DATASET:
+            processor = images_processor(env, args, dataset, args.split_signals)
         processor.collect_signals()
 
     if args.compare_signals:
