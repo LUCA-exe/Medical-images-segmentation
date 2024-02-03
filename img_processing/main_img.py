@@ -22,7 +22,7 @@ VISUALIZATION_FOLDER = "./results"
 
 class images_processor:
 
-    def __init__(self, env, args, dataset, names=['All cells'], thresholds=[-1], task='SEG'):
+    def __init__(self, env, args, dataset, thresholds, names=['All cells'], task='SEG'):
         """Class to create an obj. that gather images signals from segmentation masks"""
 
         self.log = env['logger'] # Extract the needed env. variables - log
@@ -33,7 +33,7 @@ class images_processor:
         self.considered_images = args.max_images # Set a limit to the number of masks to use
 
         self.names = names # In case of '--split_signals' True, the names will be a list of multiple values instead of one
-        self.thresholds = thresholds # Thresholds to consider for gathering the cell statistics.
+        self.thresholds = thresholds # Thresholds to consider for gathering the cell statistics - list of list
 
         os.makedirs(TEMPORARY_FOLDER, exist_ok=True) # Set up a './tmp' folder for debugging images processing
         self.debug_folder = TEMPORARY_FOLDER
@@ -156,12 +156,13 @@ class images_processor:
         
         # Filter out the segmented object using the thresholds - keeping the backgorund in every case.
         obj_values, obj_dims = [], []
-        if threshold != -1:
-        # Work in progress.
-
-
+        for val, count in zip(raw_obj_values, raw_obj_dims):
+            
+            if val == 0 or (count >= threshold[0] and count <= threshold[1]):
+                obj_values.append(val), obj_dims.append(count)
+   
         # NOTE: console visualization - debug
-        print(f"> List format: 'pixels value' - 'number of pixel'")
+        print(f"> List format (thresholds {threshold}): 'pixels value' - 'number of pixel'")
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
             
             print(f"   {value} - {count}")
@@ -217,86 +218,10 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         self.log = env['logger'] # Extract the needed evn. variables
         self.args = args # TODO: Select just the needed args
-        #self.images_folder = os.path.join(args.train_images_path, args.dataset) # Path to load the different '*.json' files
-        self.images_folder = None
         self.task = task # Folder for the ground truth mask signals loading
 
         os.makedirs(VISUALIZATION_FOLDER, exist_ok=True) # Set up a folder that will contains the final plots
         self.visualization_folder = VISUALIZATION_FOLDER # Path starting from the './' (current folder - root folder of the project)
-
-        self.log.info(f"Obj. to plot the computed signals instantiated: working on '{self.images_folder}'")
-
-
-    # TODO: Finish th eplotting function
-    def visualize_signals(self): # Save a plot for every '*.json' that can find
-
-        # DEBUG console
-        print(f"Files in the {self.images_folder} are {os.listdir(self.images_folder)}")
-
-        files = os.listdir(self.images_folder) # List files contained in the current dataset folder
-        # Search for '.json' extension (the aggregated signals of the dataset)
-        aggr_json = [s for s in files if s.endswith(".json")]
-        
-        if aggr_json: # If the obj. is True then is not empty
-            self.log.info(f"Aggregated file {aggr_json} found!")
-            aggr_json = aggr_json[0] # Select just the value from the list to load the file
-            f = open(os.path.join(self.images_folder, aggr_json)) # Open the aggregated file
-            aggr_data = json.load(f)
-            # TODO: Select how to visualize/compare the aggr_data with the other datasets
-        else:
-            self.log.info(f"Aggregated file {aggr_json} NOT found.. searching for the specific folders signals ..")
-        
-        mask_folders = [s for s in files if s.endswith("_GT")] # Take all the mask folders to extract the single '*.json' for each one
-        for mask_folder in mask_folders:
-            
-            current_files = os.listdir(os.path.join(self.images_folder, mask_folder, self.task))
-            print(f"Current files for the '{mask_folder}' are: {current_files}")
-            
-            data_json  = [s for s in current_files if s.endswith(".json") and s.startswith('dataset')]
-            if data_json: # Check for the signal file of the current folder
-                data_json = data_json[0]
-                current_data_json = os.path.join(self.images_folder, mask_folder, self.task, data_json)
-                f = open(current_data_json) # Open the aggregated file
-                data = json.load(f) # Signals of the current folder
-                
-                data_list = [] # List of images signals of the current folder
-                for key in data.keys(): # Create a list of dict (one dict for every image)
-                    data_list.append(deepcopy(data[key]))
-                
-                data_list = aggregate_signals(self.log, data_list, 'none') # Get a dict with for every metric key the list of values for this current folder (lose the image name key)
-                self.__plot_signals(data_list, self.args.dataset + '_' + mask_folder + '_', self.visualization_folder)
-            
-        return None
-
-    # TODO: Finish the plotting function.
-    def __plot_signals(self, data, file_name, path): # Plot the dict metrics of a dataset's single folder (every metric contains a list of value)
-        """ Read the list of dict and plot a graph for every metrics contained
-
-        Args:
-            data (list): List of dict; every key contains a list of values (one for every image)
-            file_name (str): It contains the name of the file (format: 'dataset_imagesfolder')
-
-        Returns:
-            None
-        """
-        # DEBUG
-        print(f"file name : {file_name}")
-        print(f"file path : {path}")
-
-        for metric, values in data.items():
-            # DEBUG
-            print(f"Metric :{metric}   -   values: {values}")
-            current_file_path = os.path.join(path, file_name + metric)
-            print(f"saving {current_file_path}")
-            
-            # Plot the single metric
-            plt.plot(range(len(values)), values, 'r')
-            plt.xlabel("values")
-            plt.ylabel(metric)
-            plt.savefig(current_file_path)
-            plt.close()
-
-        return None
 
 
     @staticmethod
@@ -310,7 +235,6 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             None
         """
         os.makedirs(target_folder, exist_ok=True) # Set up a folder that will contains the final plots
-
         log.info(f"Comparison of different datasets signals (used the dataset folders in the split '{split_folder}')")
         
         dataset_folders = os.listdir(split_folder)
@@ -324,12 +248,12 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             
             json_file = [s for s in os.listdir(os.path.join(split_folder, dataset)) if s.endswith(".json")] # Search for the 'aggregated_signals.json'
             if json_file: # Considering at least one 'aggregated_signals.json' for dataset.
-                for file in json_file:
+                log.info(f".. extracting {dataset} data from {json_file}..")
                     
-                    log.info(f".. extracting {dataset} data ..")
-                    dataset_list.append(dataset)
+                for single_file in json_file:
+                    dataset_list.append(single_file.split('.')[0])
 
-                    f = open(os.path.join(split_folder, dataset, json_file[0])) # Open the current 'aggregated' data.
+                    f = open(os.path.join(split_folder, dataset, single_file)) # Open the current 'aggregated' data.
                     signals_dict = json.load(f) # The 'aggregated_signals.json' doesn't differentiate between '01_GT' and '02_GT'.
 
                     for metric, value in signals_dict.items(): # The 'value from the 'aggregated*.json' are lists of value
@@ -338,7 +262,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             else:
                 log.info(f".. {dataset} doesn't contains any data ..")
                         
-        log.debug(f"Total dataset considered are : {dataset_list}")
+        log.debug(f"Total data considered are {dataset_list}")
 
         log.info(f"The graphs will be saved in '{target_folder}'")
         signalsVisualizator.__box_plots(log, datasets_dict, dataset_list, target_folder)
@@ -362,7 +286,6 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
             plt.savefig(os.path.join(target_folder, f"{key}_boxplot"))
             plt.close()
-
         return None
 
     
@@ -383,41 +306,3 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
                 plt.savefig(os.path.join(target_folder, f"{key}_lineplot"))
             plt.close() # Close the picture of this metric
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

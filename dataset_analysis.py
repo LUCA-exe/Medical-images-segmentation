@@ -11,6 +11,8 @@ from download_data import download_datasets
 
 # My datasets
 DATASET = ['Fluo-E2DV-train', 'Fluo-E2DV-test']
+MAX_CELL_DIM = 4000000 # Fixed as 4 million of pixels.
+MIN_CELL_DIM = -1 # Fake 'value' used as lower bound.
 
 def main():
     """ Main function to call in order to run all the project classes and 
@@ -33,10 +35,10 @@ def main():
     for dataset in args.dataset:
         if args.split_signals and dataset in DATASET:
             print(dataset)
-            processor = images_processor(env, args, dataset, ['EVs', 'cells'], [-1, args.cell_dim])
+            processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, args.cell_dim], [args.cell_dim, MAX_CELL_DIM]], ['EVs', 'cells'])
         else:
             print("Sbagliato")
-            processor = images_processor(env, args, dataset, ['All cells'], [-1]) # 'Processing' dataset with one type of cells.
+            processor = images_processor(env, args, dataset, [MIN_CELL_DIM, MAX_CELL_DIM], ['All cells'], ) # 'Processing' dataset with one type of cells.
         processor.collect_signals()
 
     if args.compare_signals:
