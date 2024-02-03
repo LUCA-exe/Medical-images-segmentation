@@ -28,12 +28,11 @@ class images_processor:
         self.log = env['logger'] # Extract the needed env. variables - log
         self.args = args
         self.images_folder = os.path.join(args.train_images_path, dataset) # Path in which the json will be saved
-        self.task = task # Final folder for the ground truth mask
-        self.thr = args.cell_dim
-        self.considered_images = args.max_images # Set a limit to the number of masks to use
+        self.task = task # Final folder for the ground truth mask.
+        self.considered_images = args.max_images # Set a limit to the number of masks to use.
 
         self.names = names # In case of '--split_signals' True, the names will be a list of multiple values instead of one
-        self.thresholds = thresholds # Thresholds to consider for gathering the cell statistics - list of list
+        self.thresholds = thresholds # Thresholds to consider for gathering the cell statistics - list of list.
 
         os.makedirs(TEMPORARY_FOLDER, exist_ok=True) # Set up a './tmp' folder for debugging images processing
         self.debug_folder = TEMPORARY_FOLDER
@@ -164,19 +163,16 @@ class images_processor:
         # NOTE: console visualization - debug
         print(f"> List format (thresholds {threshold}): 'pixels value' - 'number of pixel'")
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
+            print(f"   {value} - {count}")# The current obj. is a cell or background (background will occupy the FIRST position in the lists)
+            current_mask = mask == value
+            current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
             
-            print(f"   {value} - {count}")
-            if count > self.thr: # The current obj. is a cell or background (background will occupy the FIRST position in the lists)
-                current_mask = mask == value
-                current_pixels = image[current_mask] # Take from the original image the pixels value corresponding to the current object mask
-                
-                # WARNING:  BUG on some dataset in the pixels value
-                current_pixels[current_pixels > 255] = 255 # Cap the value of the pixels to the actual RGB limit channel values.
-                
-                cells_pixel.extend(current_pixels)
-                mean_cells.append(np.mean(current_pixels))
-                std_cells.append(np.std(current_pixels))
-                dim_cells.append(len(current_pixels)/tot_pixels) # Get a ratio (this way it depends less on the resolution of the images)
+            # WARNING:  BUG on some dataset in the pixels value
+            current_pixels[current_pixels > 255] = 255 # Cap the value of the pixels to the actual RGB limit channel values.
+            cells_pixel.extend(current_pixels)
+            mean_cells.append(np.mean(current_pixels))
+            std_cells.append(np.std(current_pixels))
+            dim_cells.append(len(current_pixels)/tot_pixels) # Get a ratio (this way it depends less on the resolution of the images)
 
         # To compute the image backround homogeinity
         print(f"> Background pixels shape: {background_pixels.shape}") # DEBUG console visualization
@@ -195,19 +191,14 @@ class images_processor:
         image_name = os.path.basename(image_path).split('.')[0]
         visualize_image(image, os.path.join(self.debug_folder, image_name))
         
-        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells values pixels.
+        signals_dict['cc'] = np.mean(mean_cells[1:]) # Cell color: mean of the cells values pixels (intensity).
         signals_dict['cv'] = np.mean(std_cells[1:]) # Cell variations: mean of the cells internal hetereogenity.
-        #signals_dict['ch'] = np.std(cells_pixel) # Cell hetereogenity: measure of the hetereogenity of the signals among the cells in the frame.
-        signals_dict['ch'] = np.std(mean_cells[1:]) # Cell hetereogenity: measure of the hetereogenity of the signals among the cells in the frame.
-        signals_dict['cdr'] = np.mean(dim_cells[1:]) # Cell dimensions ratio: avg. of the number of pixels of the cells (in percentage over the total image)
-        signals_dict['cdvr'] = np.std(dim_cells[1:]) # Cell dimensions variations ratio: std. of the number of pixels of the cells (in percentage over the total image)
+        signals_dict['ch'] = np.std(cells_pixel) # Cell hetereogenity: measure of the hetereogenity of the cells.
+        signals_dict['cdr'] = np.mean(dim_cells[1:]) # Cell dimensions ratio: avg. of the number of pixels of the cells (in percentage over the total image).
+        signals_dict['cdvr'] = np.std(dim_cells[1:]) # Cell dimensions variations ratio: std. of the number of pixels of the cells (in percentage over the total image).
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
-        signals_dict['bn'] = std_cells[0] # Background noise - computed during the stats over the segmented obj.
-
-        # TODO: Contrast ratio of the segmented EVs and Cells - for now just cells in order to compute the metric for the other dataset
-        signals_dict['ccd'] = abs(np.mean(mean_cells[1:]) - mean_cells[0])/255 # Cells Contrast Difference: Ratio in avg. pixel values between beackground and segmented cells over the maximum pixel value
-        signals_dict['bh'] = abs(max(background_patches) - min(background_patches)) # Background homogeinity: Measure the homogeinity of the different avg. pixels values of the background patches 
-        
+        signals_dict['ccd'] = abs(signals_dict['cc'] - mean_cells[0])/255 # Cells Contrast Difference: Ratio in avg. pixel values between beackground and segmented cells over the maximum pixel value.
+        signals_dict['bh'] = np.std(background_patches) # Background homogeinity: Measure the homogeinity of the different patches considering the std. of the average pixel values. 
         return signals_dict
 
 
