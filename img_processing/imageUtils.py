@@ -132,7 +132,7 @@ def create_signals_file(log, file_path, name='dataset_signals', ext='.json'): # 
         return None
     
     empty_dict = defaultdict(dict) # Just record all the images name to prepare to be filled later
-    images_name = ['t' + s.split('seg')[-1] for s in os.listdir(file_path) if s.startswith("man")] # Load already the name of the images given the semented mask
+    images_name = ['t' + s.split('seg')[-1] for s in os.listdir(file_path) if s.startswith("man")] # Load already the name of the images given the semented masks.
     log.info(f"The signals file {name + ext} will be created in '{file_path}' for the images: {images_name}")
     
     [empty_dict[name] for name in images_name] # Fill the inital dict without signals
@@ -175,7 +175,7 @@ def update_signals_file(log, file_path, data, name='dataset_signals', ext='.json
     return None
 
 # WARNING: The data will be saved in a file, if the '*.json' already exist It will be overwrited.
-def save_aggregated_signals(log, file_path, data, name='aggreagated_signals', ext='.json'):
+def save_aggregated_signals(log, file_path, data, name='aggregated_signals', ext='.json'):
     """ Save the aggregated signals dict of a dataset in a '*.json'
 
     Args:

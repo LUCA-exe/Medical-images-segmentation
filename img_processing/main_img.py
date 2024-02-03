@@ -22,7 +22,7 @@ VISUALIZATION_FOLDER = "./results"
 
 class images_processor:
 
-    def __init__(self, env, args, dataset, split_signals=False, task='SEG'):
+    def __init__(self, env, args, dataset, names=['All cells'], thresholds=[-1], task='SEG'):
         """Class to create an obj. that gather images signals from segmentation masks"""
 
         self.log = env['logger'] # Extract the needed env. variables - log
@@ -31,12 +31,9 @@ class images_processor:
         self.task = task # Final folder for the ground truth mask
         self.thr = args.cell_dim
         self.considered_images = args.max_images # Set a limit to the number of masks to use
-        self.split_signals = split_signals
 
-        if self.split_signals: # In case of 'True', set the name of the '*.json' signals file
-            self.names = ['EVs', 'Cells']
-        else:
-            self.names = [''] # In case of a single 'signals' file for GT folder.
+        self.names = names # In case of '--split_signals' True, the names will be a list of multiple values instead of one
+        self.thresholds = thresholds # Thresholds to consider for gathering the cell statistics.
 
         os.makedirs(TEMPORARY_FOLDER, exist_ok=True) # Set up a './tmp' folder for debugging images processing
         self.debug_folder = TEMPORARY_FOLDER
@@ -69,30 +66,33 @@ class images_processor:
              
         # Start collecting the folders path for the current dataset
         folders = os.listdir(self.images_folder)
-        self.log.info(f"Folders inside the dataset: {folders}")
+        dataset_name = self.images_folder.split('/')[-1]
+        self.log.info(f"Folders inside the dataset ({dataset_name}): {folders}")
 
         masks_folders = [s for s in folders if s.endswith("GT")]
         self.log.debug(f"Folders with the masks: {masks_folders}")
         
-        total_stats = [] # List of dicts containing all the computed signals - It is not a 'dict' cause we can lose the 'name' of the image for the final aggregation.
+        total_stats = defaultdict(list) # List of dict values containing all the computed signals - It is  a dict with number keys equal to the 'self.names'.
+        
         if len(self.names) > 1:
-            self.log.info(f"Computing the characteristics of multiple cells in the images per folder")
+            self.log.debug(f"Cells thresholds considered for {self.names}:  {self.thresholds}")
 
         for folder in masks_folders: # Main loop: for every folder gather the data.
 
-            # NOTE: Added the split of signals based on cells dimension - if requested by the '--split_signals' arg.
-            for name in self.names:
+            for threshold, name in zip(self.thresholds, self.names):
                 
-                current_images_path = os.path.join(self.images_folder, folder.split('_')[0]) # Fetch the original images from this folder
-                current_path = os.path.join(self.images_folder, folder, self.task) # Compose the masks folder
+                current_images_path = os.path.join(self.images_folder, folder.split('_')[0]) # Fetch the original images from this folder.
+                current_path = os.path.join(self.images_folder, folder, self.task) # Compose the masks folder.
 
-                files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks
+                files_name = [s for s in os.listdir(current_path) if s.startswith("man")] # Get the file names of the masks.
                 files_name.sort()
                 self.log.debug(f"Currently working in '{current_path}': files are {files_name}")
 
-                create_signals_file(self.log, current_path) # Prepare the '*.json' signals file to store the data
+                # Componing the current file name
+                signals_file_name = dataset_name + ' ' + name
+                create_signals_file(self.log, current_path, name = signals_file_name) # Prepare the '*.json' signals file to store the data
+                
                 stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
-
                 if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks for current folders
                 
                 for file_name in files_name:
@@ -102,43 +102,47 @@ class images_processor:
 
                     # Ready to compute the signals for the coupled mask - image
                     self.log.debug(f".. working on {image_name} - {file_name} ..")
-                    stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels) # Save the signals for every original image name
+                    stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels, threshold) # Save the signals for every original image name
 
-                    total_stats.append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset (copy, not the reference)
+                    total_stats[name].append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset (copy, not the reference)
 
                 # Finished to gather data from the current folder - update the existing '*.json' (on the current folder)
-                update_signals_file(self.log, current_path, stats)
+                update_signals_file(self.log, current_path, stats, name = signals_file_name)
 
-            self.log.info(f".. Aggregating images signals from all folders ..")
-            total_dict = aggregate_signals(self.log, total_stats, 'none') # Aggregate the signals of the current dataset in a single dict (format = 'metric': [list of values])
-            save_aggregated_signals(self.log, self.images_folder, total_dict, name=) # Save the 'dict' on the root folder of the dataset.
+        for name in self.names:
+            self.log.info(f".. Aggregating images signals from all folders (name: {name})..")
+            total_dict = aggregate_signals(self.log, total_stats[name], 'none') # Aggregate the signals of the current dataset in a single dict (format = 'metric': [list of values])
+            save_aggregated_signals(self.log, self.images_folder, total_dict, name = dataset_name + ' ' + name) # Save the 'dict' on the root folder of the dataset.
         return None
 
     # TODO: Working for gather signal both from my dataset and others (e.g. CTC/DSB 2018 datasets)
-    def __compute_signals(self, image_path, mask_path, perc_pixels):
+    def __compute_signals(self, image_path, mask_path, perc_pixels, threshold):
         """ Load the image and mask from the given paths and compute the signals
 
         Args:
             image_path (str): Path to load the '*.tif' image
             mask_path (str): Path to load the '*.tif' mask
+            perc_pixels (float): Percentage of the total backrounds to analyze singularly
+            threshold (int): Number of pixels to filter out the cells.
 
         Returns:
             (dict): {'signals_1': (float), 'signals_2': (float)}
         """
 
         image = tiff.imread(image_path)
+        
         if (len(image.shape) > 2):
-            image = to_single_channel(image) # Convert the image if needed
+            image = to_single_channel(image) # Convert the image if needed.
             self.log.debug(f".. image '{os.path.basename(image_path)}' converted to one channel keeping all objects ..")
 
         mask = tiff.imread(mask_path)
-        signals_dict = {} # Init. the dict for the signals
+        signals_dict = {} # Init. the dict for the signals.
 
-        boolean_mask = mask != 0 # Create a boolean matrix for the segmented objects
+        boolean_mask = mask != 0 # Create a boolean matrix for the segmented objects.
 
-        obj_pixels = len(mask[boolean_mask]) # Pixels belonging to segmented objects considered
-        background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects
-        tot_pixels = mask.shape[0] * mask.shape[1] # Total pixels of the image
+        obj_pixels = len(mask[boolean_mask]) # Pixels belonging to segmented objects considered.
+        background_pixels = image[~boolean_mask] # Take the pixel not belonging to the segmented objects.
+        tot_pixels = mask.shape[0] * mask.shape[1] # Total pixels of the image.
 
         # NOTE: console visualization - debug
         print(f"\nWorking on {os.path.basename(image_path).split('.')[0]} image")
@@ -146,13 +150,17 @@ class images_processor:
         print(f"> Numero di oggetti (incluso il background): {len(np.unique(mask))}")
         print(f"> Valori degli oggetti (incluso background): {np.unique(mask)}")
 
-        # TODO: Make this adjusted to the current dataset.. my images have different number of pixels
-        # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image resolution)
+        # TODO: Make this adjusted to the current dataset.. my images have different number of pixels.
         mean_cells, std_cells, dim_cells, dim_cells_variations, cells_pixel = [], [], [], [], [] # Mean, std and number of pixels of the segmented cells (both total and )
-        obj_values = np.unique(mask) # Store the pixel value for each object
-        obj_dims = [np.count_nonzero(mask==value) for value in obj_values] # Numbers of pixels occupied for every objects (in order of total pixels)
+        raw_obj_values, raw_obj_dims = np.unique(mask, return_counts = True) # Store the pixel value and the number of occurrence for each object
         
-        # DEBUG console visualization
+        # Filter out the segmented object using the thresholds - keeping the backgorund in every case.
+        obj_values, obj_dims = [], []
+        if threshold != -1:
+        # Work in progress.
+
+
+        # NOTE: console visualization - debug
         print(f"> List format: 'pixels value' - 'number of pixel'")
         for value, count in zip(obj_values, obj_dims): # For now less than 7000 pixels is an EVs for sure (keeping into account that it depends on the image quality)
             
@@ -316,7 +324,7 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
             
             json_file = [s for s in os.listdir(os.path.join(split_folder, dataset)) if s.endswith(".json")] # Search for the 'aggregated_signals.json'
             if json_file: # Considering at least one 'aggregated_signals.json' for dataset.
-                for file in json_file
+                for file in json_file:
                     
                     log.info(f".. extracting {dataset} data ..")
                     dataset_list.append(dataset)
