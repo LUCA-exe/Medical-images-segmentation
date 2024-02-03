@@ -34,11 +34,11 @@ def main():
     # Process single folders signals and aggregate for the current dataset chosen by args.
     for dataset in args.dataset:
         if args.split_signals and dataset in DATASET:
-            print(dataset)
+            print(f"*** Dataset {dataset} entered in the split signals")
             processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, args.cell_dim], [args.cell_dim, MAX_CELL_DIM]], ['EVs', 'cells'])
         else:
-            print("Sbagliato")
-            processor = images_processor(env, args, dataset, [MIN_CELL_DIM, MAX_CELL_DIM], ['All cells'], ) # 'Processing' dataset with one type of cells.
+            print(f"*** Dataset {dataset} entered in the all cells")
+            processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, MAX_CELL_DIM]], ['All cells']) # 'Processing' dataset with one type of cells.
         processor.collect_signals()
 
     if args.compare_signals:

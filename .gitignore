@@ -2,6 +2,7 @@ logs/
 __pycache__/
 __MACOSX/
 tmp/
+results/
 net_utils/evaluation_software/
 training_data/
 models/all/
