@@ -46,7 +46,7 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
 
 
 # Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
-def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=7000, reducing_ratio= 0.2): 
+def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=7000, reducing_ratio=0.2): 
     # 'pixel_limit' needed for the adusting of the marker dimension (smaller marker in case of cells)
     # 'reducing_ratio' Needed to reduce the initial marker dimension
 
@@ -70,7 +70,7 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
 
     d_names, d_images, d_drawed_images, d_masks, d_markers = [], [], [], [], []  
 
-    for name in all_file_names: # Loop over the original filenames - order of the '.json' keys mantained
+    for name in all_file_names: # Loop over the original filenames - order of the '.json' keys mantained.
 
         image_name = data[name]['filename'] # Extract the current 'real' images filename 
         d_names.append(image_name.split('.')[0])
@@ -80,7 +80,6 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
 
         if image_name in images_names: # Change the extension of the image (from '.jpg' to '.tif')
             img = np.asarray(PIL.Image.open(os.path.join(images_folder, image_name)))
-
             d_images.append(deepcopy(img))
         else:
             print(">> Exception! Pass to another the image ..")
@@ -88,14 +87,24 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
 
         if data[name]['regions'] != {}: # If there are annotaions
             try:
-                shapes_x, shapes_y = [], []
+                shapes_x, shapes_y, id_obj = [], [], [] # In order to take into account EVs that compare/disappear it is added the 'id_obj' attribute.
                 for segm_obj in data[name]['regions']: # Loop over the 'dict' (one for each segmented object)
+                    id_obj.append(segm_obj['region_attributes']['name'])
                     shapes_x.append(segm_obj['shape_attributes']['all_points_x'])
                     shapes_y.append(segm_obj['shape_attributes']['all_points_y'])
 
             except :
                 print(f"Possible different type of the dict keys ('*.json' file saved in the wrong format)")
                 continue # TODO: Raise exception
+
+            # Check to have all the segmented object with the 'name' filled
+            if 'not_defined' in id_obj:
+                raise ValueError(f"The list contains unexpected values: check that all the segmented object have a name assigned!")
+
+            if len(set(id_obj)) < len(id_obj):
+                raise ValueError(f"The list contains unexpected values: check that all the segmented object have a different 'name' assigned!")
+            else:
+                id_obj = [int(obj) for obj in id_obj]
 
             # Add the multiple stacked obj. on the same image
             multiple_ab = []
@@ -110,7 +119,7 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
             
             print(f".. segmenting {len(multiple_ab)} elements ..")
             for idx, obj in enumerate(multiple_ab): # Add one image at the time to manage different color
-                _ = cv2.drawContours(mask, [obj], -1, idx+1, -1) # cv2.drawContours modify inplace AND return an image - Creation of the mask
+                _ = cv2.drawContours(mask, [obj], -1, id_obj[idx], -1) # cv2.drawContours modify inplace AND return an image - Creation of the mask
                 
                 right_upper_limits = np.squeeze(obj.max(axis=0))
                 left_lower_limits = np.squeeze(obj.min(axis=0))
@@ -126,7 +135,7 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
                 diff_x = right_upper_corner[0] - left_upper_corner[0]
                 diff_y = right_upper_corner[1] - right_lower_corner[1]
                 area = (diff_x) * (diff_y)
-                print(f".. .. Element {idx + 1} has area {area} .. ..")
+                print(f".. .. Element {id_obj[idx]} has area {area} .. ..")
 
                 if area > pixels_limit: # Adjust the marker dimension in case the marker should be too big compared to the EVs
 
@@ -145,7 +154,8 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
                     right_lower_corner[1] += diff_y
                 
                 square_marker = np.asarray([left_upper_corner, right_upper_corner, right_lower_corner, left_lower_corner]) # Order is important to construct the figure
-                _ = cv2.drawContours(track, [square_marker], -1, idx+1, -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask.
+                # NOTE: Id (color) propagated over time for the same obj -can't be assigned to different obj.
+                _ = cv2.drawContours(track, [square_marker], -1, id_obj[idx], -1) # Creation of smaller objects corresponding to the current segmented cell - creation of the tracking mask.
                 
             d_markers.append(track)
             d_masks.append(mask)

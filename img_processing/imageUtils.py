@@ -229,7 +229,7 @@ def aggregate_signals(log, signals_list, method='mean'):
 
 
 def debug_segmentation_masks(seg_masks_path):
-    # Function to print seg_masks characteristics on console (just helps for creating the 'man_track.txt' in the 'TRA' folder)
+    # Function to print seg_masks characteristics on console (just helps for creating the 'man_track.txt' in the 'TRA' folder) - can be used as additional debug for the id of the segmented object.
 
     print(f"*** Printing masks properties on '{seg_masks_path}' ***")
     masks_ids = [mask for mask in os.listdir(seg_masks_path) if mask.endswith('.tif')]
