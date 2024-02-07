@@ -32,10 +32,11 @@ def main():
     log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline} metrics {args.eval_metric} <<<")
 
     # Load paths
+    args.dataset = args.dataset[0] # TODO: To fix!!!
     path_data = join(args.train_images_path, args.dataset)
     path_models = args.models_folder # Eval all models found here.
     path_best_models = args.save_model # Save best model files/metrics here
-    path_ctc_metric = args.evaluation_software
+    path_ctc_metric = args.evaluation_software_path
 
     if not exists(path_data):
         log.info(f"Warning: the '{path_data}' provided is not existent! Interrupting the program...")
@@ -120,7 +121,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     if args.eval_metric == 'software':
                         seg_measure, det_measure = ctc_metrics(path_data=path_data,
                                                                 path_results=path_seg_results,
-                                                                path_software=args.evaluation_software,
+                                                                path_software=args.evaluation_software_path,
                                                                 subset=train_set,
                                                                 mode=args.mode)
                         
