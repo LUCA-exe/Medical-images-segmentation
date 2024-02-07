@@ -40,6 +40,8 @@ def main():
     # Load paths
     path_data = Path(args.train_images_path)
     path_models = Path(args.models_folder) # Train all models found here.
+    # TODO: Make modular - for now just take the first dataset available indicated by the parameter
+    args.dataset = args.dataset[0] # TODO: To fix.
     cell_type = Path(args.dataset)
 
     # TODO: Move this into 'utils' file (called both in 'val' and 'train')
