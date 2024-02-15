@@ -61,7 +61,7 @@ def border_label_2d(label, intensity_factor = 1):
     kernel = np.ones(shape=(3, 3), dtype=np.uint8)
 
     # Pre-allocation
-    boundary = np.zeros(shape=label.shape, dtype=np.bool)
+    boundary = np.zeros(shape=label.shape, dtype=bool)
 
     nucleus_ids = get_nucleus_ids(label)
 
@@ -94,8 +94,8 @@ def distance_label_2d(label, cell_radius, neighbor_radius, disk_radius):
     """
 
     # Preallocation
-    label_dist = np.zeros(shape=label.shape, dtype=np.float)
-    label_dist_neighbor = np.zeros(shape=label.shape, dtype=np.float)
+    label_dist = np.zeros(shape=label.shape, dtype=np.float64)
+    label_dist_neighbor = np.zeros(shape=label.shape, dtype=np.float64)
 
     # Get Borders in-between touching cells
     label_border = (border_label_2d(label) == 2)

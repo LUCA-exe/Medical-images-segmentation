@@ -14,6 +14,7 @@ import json
 import requests
 import zipfile
 import tifffile as tiff
+from dotenv import load_dotenv
 
 from img_processing.imageUtils import *
 
@@ -22,14 +23,14 @@ LOGS_PATH = "logs" # TODO: Const as the path is fixed. Move this in a 'ENV' dict
 def create_logging():
   """ Function to set up the 'INFO' and 'DEBUG' log file
   """ 
-  os.makedirs(LOGS_PATH, exist_ok=True)
+  os.makedirs(os.getenv('LOGS_PATH', None), exist_ok=True)
 
   # Get the current date and time
   current_datetime = datetime.now()
 
   # Extract the date and  hour, and minute components for the sub-folder
   current_date = current_datetime.strftime("%Y-%m-%d") 
-  day_log_path = os.path.join(LOGS_PATH, current_date) # Folder for the day's logs
+  day_log_path = os.path.join(os.getenv('LOGS_PATH', None), current_date) # Folder for the day's logs
   os.makedirs(day_log_path, exist_ok=True)
 
   current_time = current_datetime.strftime("%H-%M-%S") 
@@ -75,18 +76,18 @@ def set_device():
         num_gpus = 1
     else:
         num_gpus = 0
-
     return device, num_gpus
 
 
 # NOTE: Updating to be used by all modules in this project
-def set_environment_paths(debug_folder_path='./tmp'):
+def set_environment_paths():
 
-    # Set-up and load the folders paths on the environment project
-    os.makedirs(debug_folder_path, exist_ok=True)
-    os.environ["DEBUG_FOLDER"] = debug_folder_path
+    # Load the paths on the environment
+    load_dotenv()
+
+    # Set-up folders
+    os.makedirs(os.getenv('TEMPORARY_PATH', None), exist_ok=True)
     return None
-
 
 
 # NOTE: Utils functions for the data_download.py (main script to download the data)
@@ -103,6 +104,7 @@ GT_FOLDERS = ['SEG', 'TRA']
 TRAINDATA_URL = 'http://data.celltrackingchallenge.net/training-datasets/'
 TESTDATA_URL = 'http://data.celltrackingchallenge.net/test-datasets/'
 SOFTWARE_URL = 'http://public.celltrackingchallenge.net/software/EvaluationSoftware.zip'
+
 
 # Check if eval. software is already downloaded: if not download it.
 def check_evaluation_software(log, software_path):
@@ -127,7 +129,8 @@ def check_evaluation_software(log, software_path):
     return None # Evaluation folder correctly set up
 
 
-def __download_data(log, url, target): # Download the datasets chosen with a specific chunk size
+# Download from the provided url with a specific chunk size
+def __download_data(log, url, target): 
 
     local_filename = os.path.join(target, url.split('/')[-1])
     

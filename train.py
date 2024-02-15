@@ -22,8 +22,9 @@ from training.cell_segmentation_dataset import CellSegDataset
 def main():
     """ Main function to set up paths, datasets and training pipelines
     """
-    log = create_logging() # Set up 'logger' object 
-
+    set_environment_paths() # Read .env file and set up the temporary folders.
+    log = create_logging() # Set up 'logger' object and set up the current run folders.
+    
     args = get_parser() # Set up dict arguments
     args = get_processed_args(args)
 
@@ -34,12 +35,13 @@ def main():
     log.debug(f"Env varibles: {env}")
     device, num_gpus = set_device() # Set device: cpu or single-gpu usage
     log.info(f"System detected {device} device and {num_gpus} GPUs available.")
-    set_environment_paths()
+
     log.info(f">>>   Training: pre-processing {args.pre_processing_pipeline} model {args.model_pipeline} <<<")
 
     # Load paths
     path_data = Path(args.train_images_path)
     path_models = Path(args.models_folder) # Train all models found here.
+    
     # TODO: Make modular - for now just take the first dataset available indicated by the parameter
     args.dataset = args.dataset[0] # TODO: To fix.
     cell_type = Path(args.dataset)
