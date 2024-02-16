@@ -821,7 +821,7 @@ class TUNet(nn.Module):
         x2 = self.decoder2Conv[-1](x2)
         
         # Concatenation - resulting tensor should be detached.
-        x3 = torch.cat([x1, x2], dim=0).detach()
+        x3 = torch.cat([x1, x2], dim=1).detach()
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)
         return x1, x2, x3
