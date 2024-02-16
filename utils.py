@@ -288,6 +288,7 @@ class TrainArgs(object):
         """ kit-ge training params implemented for now.
         """
         if model_pipeline == 'kit-ge':
+            self.arch = 'DU'
             self.act_fun = act_fun
             self.batch_size = batch_size
             self.filters = filters
@@ -299,6 +300,23 @@ class TrainArgs(object):
             self.pre_train = pre_train
             self.retrain = retrain
             self.split = split
+
+        elif model_pipeline == 'dual-unet': # NOTE: Params for the work "Dual U-Net for the segmentation of Overlapping Glioma Nuclei"
+            self.arch = 'TU'
+            self.act_fun = act_fun
+            self.batch_size = batch_size
+            self.filters = filters
+            self.iterations = iterations
+            self.loss = loss
+            self.norm_method = norm_method
+            self.optimizer = optimizer
+            self.pool_method = pool_method
+            self.pre_train = pre_train
+            self.retrain = retrain
+            self.split = split
+        else:
+            raise Exception('Model architecture "{}" is not known'.format(model_pipeline))
+
 
     # Override default class function
     def __str__(self):

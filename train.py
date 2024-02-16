@@ -42,7 +42,7 @@ def main():
     path_data = Path(args.train_images_path)
     path_models = Path(args.models_folder) # Train all models found here.
     
-    # TODO: Make modular - for now just take the first dataset available indicated by the parameter
+    # TODO: Make modular - for now just take the first dataset available indicated by the parameter.
     args.dataset = args.dataset[0] # TODO: To fix.
     cell_type = Path(args.dataset)
 
@@ -79,13 +79,13 @@ def main():
                             pool_method = args.pool_method,
                             pre_train = args.pre_train,
                             retrain = args.retrain,
-                            split = args.split)
+                            split = args.split) # WARNING: What is split for?
 
     # Training parameters used for all the iterations/crop options given                         
     log.info(f"Training parameters {train_args}")
 
     # Parsing the configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
-    train_configs = {'architecture': ("DU", train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters),
+    train_configs = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters),
                     'batch_size': train_args.batch_size,
                     'batch_size_auto': 2,
                     'label_type': "distance",
@@ -94,7 +94,7 @@ def main():
                     'optimizer': train_args.optimizer
                     }
 
-    # Building the architecture that will be used for every 
+    # Building the architecture that will be used for every training dataset
     net = unets.build_unet(log, unet_type=train_configs['architecture'][0],
                         act_fun=train_configs['architecture'][2],
                         pool_method=train_configs['architecture'][1],
@@ -117,7 +117,7 @@ def main():
 
             log.debug(f"-- Run name: {run_name} - Iteration: {i} --")
             
-            # Update the current configurations - there will be other updates, the core parameters will remain the same (e.g. architecture)
+            # Update the current configurations - there will be other updates but the core parameters will remain the same (e.g. architecture)
             train_configs['run_name'] = run_name
 
             if args.pre_train and args.retrain:
@@ -184,7 +184,7 @@ def main():
             # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
             print(f"Number of epochs without improvement allowed {2 * train_configs['max_epochs'] // 20 + 5}")
 
-            # Train model
+            # Training with the built model
             best_loss = train(log=log, net=net, datasets=datasets, configs=train_configs, device=device, path_models=path_models)
 
              # Fine-tune with cosine annealing for Ranger models
@@ -209,11 +209,6 @@ def main():
             write_train_info(configs=train_configs, path=path_models)
 
     log.info(">>> Training script ended correctly <<<")
-
-
-# Implementing 'kit-ge' training method - consider to make unique for every chosen pipeline/make modular later.
-def kit_ge_model_pipeline(log, models, path_models, train_sets, path_data, device, scale_factor, args):
-    pass
 
 
 if __name__ == "__main__":
