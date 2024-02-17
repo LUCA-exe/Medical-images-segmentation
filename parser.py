@@ -106,12 +106,15 @@ def get_processed_args(args):
     if not isinstance(args.th_cell, list):
         args.th_cell = [args.th_cell]
 
-    if not isinstance(args.crop_size, list):
+    if not isinstance(args.crop_size, list): # It support multiple crop_size options.
         args.crop_size = [args.crop_size]
 
     if not isinstance(args.dataset, list):
         args.dataset = [args.dataset]
 
+    # Check args consistency - both True is not supported.
+    if args.pre_train and args.retrain:
+        raise Exception('Use either the pre-train option --pre_train or the retrain option --retrain')
     return args
 
 

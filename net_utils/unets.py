@@ -4,7 +4,6 @@ This script builds the u-net for train/inference time.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch import tanh
 
 

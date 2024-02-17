@@ -8,6 +8,7 @@
 
 import torch
 import os
+from os.path import join, exists
 import logging
 from datetime import datetime
 import json
@@ -236,6 +237,15 @@ def download_datasets(log, args): # Main function to download the chosen dataset
 
     log.info(f"Program terminated")
     return None
+
+
+# Util function to check for existing path
+def check_path(log, path):
+
+    if not exists(path):
+        log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
+        raise ValueError("The '{path_data}' provided is not existent")
+    return True
 
 
 # TODO: this class offer a customized EvaluationParser for every implemented pipeline.
