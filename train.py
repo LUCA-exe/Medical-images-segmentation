@@ -152,12 +152,8 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
             datasets = {x: CellSegDataset(root_dir=path_data / dataset_name, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
 
-            # Get number of training epochs depending on dataset size (just roughly to decrease training time):
-            model_config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']))
-            # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
-            print(f"Number of epochs without improvement allowed {2 * model_config['max_epochs'] // 20 + 5}")
             # Train loop with the chosen architecture.
-            best_loss = train(log=log, net=net, datasets=datasets, configs=model_config, device=device, path_models=path_models)
+            best_loss = train(log=log, net=net, datasets=datasets, config=model_config, device=device, path_models=path_models)
 
              # Fine-tune with cosine annealing for Ranger models - taken the current best model just trained.
             if model_config['optimizer'] == 'ranger':
@@ -166,7 +162,7 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
                 # Get best weights as starting point
                 net = get_weights(net=net, weights=str(path_models / '{}.pth'.format(run_name)), num_gpus=num_gpus, device=device)
                 # Train further
-                _ = train(net=net, datasets=datasets, configs=model_config, device=device, path_models=path_models, best_loss=best_loss)
+                _ = train(net=net, datasets=datasets, config=model_config, device=device, path_models=path_models, best_loss=best_loss)
 
             # Write information to json-file
             write_train_info(configs=model_config, path=path_models)
@@ -204,7 +200,6 @@ def set_up_training():
     net = create_model_architecture(log, args.pre_train, model_config, device, num_gpus)
     set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
     log.info(">>> Training script ended correctly <<<")
-    
     return
 
 

@@ -1,26 +1,25 @@
 import torch.nn as nn
 
 
-def get_loss(loss_function):
-    """ Get loss function(s) for the training process.
+def get_loss(config):
+    """ Get loss function(s) for the training process based on the current architecture.
 
     :param loss_function: Loss function to use.
         :type loss_function: str
     :return: Loss function / dict of loss functions.
     """
 
-    # NOTE: Can be applied different loss functions for the double output 
+    # NOTE: To module to different architectures.
 
-    if loss_function == 'l1':
+    if config['loss'] == 'l1':
         border_criterion = nn.L1Loss()
         cell_criterion = nn.L1Loss()
-    elif loss_function == 'l2':
+    elif config['loss']  == 'l2':
         border_criterion = nn.MSELoss()
         cell_criterion = nn.MSELoss()
-    elif loss_function == 'smooth_l1':
+    elif config['loss']  == 'smooth_l1':
         border_criterion = nn.SmoothL1Loss()
         cell_criterion = nn.SmoothL1Loss()
 
     criterion = {'border': border_criterion, 'cell': cell_criterion}
-
     return criterion

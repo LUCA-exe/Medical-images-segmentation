@@ -4,12 +4,76 @@ import random
 import time
 import torch
 import torch.optim as optim
-
 from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 
 from training.ranger2020 import Ranger
 from training.losses import get_loss
+from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss
+
+
+def set_up_optimizer_and_scheduler(config, net, best_loss):
+    """ Set up the optimizer and scheduler configurations adn return them to the main function.
+
+    :param n_samples: number of training samples.
+        :type n_samples: int
+    :return: maximum amount of training epochs
+    """
+
+    if config['optimizer'] == 'adam':
+        optimizer = optim.Adam(net.parameters(),
+                               lr=8e-4,
+                               betas=(0.9, 0.999),
+                               eps=1e-08,
+                               weight_decay=0,
+                               amsgrad=True)
+
+        scheduler = ReduceLROnPlateau(optimizer,
+                                      mode='min',
+                                      factor=0.25,
+                                      patience=config['max_epochs'] // 20,
+                                      verbose=True,
+                                      min_lr=3e-6) 
+        break_condition = 2 * config['max_epochs'] // 20 + 5
+
+    elif config['optimizer'] == 'ranger':
+
+        lr = 6e-3
+        if best_loss < 1e3:  # probably second run
+
+            second_run = True
+
+            optimizer = Ranger(net.parameters(),
+                               lr=0.09 * lr,
+                               alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
+                               betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
+                               # Gradient centralization on or off, applied to conv layers only or conv + fc layers
+                               use_gc=True, gc_conv_only=False, gc_loc=True)
+
+            scheduler = CosineAnnealingLR(optimizer,
+                                          T_max=config['max_epochs'] // 10,
+                                          eta_min=3e-5,
+                                          last_epoch=-1,
+                                          verbose=True)
+            break_condition = config['max_epochs'] // 10 + 1
+            max_epochs = config['max_epochs'] // 10
+        else:
+            optimizer = Ranger(net.parameters(),
+                               lr=lr,
+                               alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
+                               betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
+                               # Gradient centralization on or off, applied to conv layers only or conv + fc layers
+                               use_gc=True, gc_conv_only=False, gc_loc=True)
+            scheduler = ReduceLROnPlateau(optimizer,
+                                          mode='min',
+                                          factor=0.25,
+                                          patience=config['max_epochs'] // 10,
+                                          verbose=True,
+                                          min_lr=0.075*lr)
+            break_condition = 2 * config['max_epochs'] // 10 + 5
+    else:
+        raise Exception('Optimizer not known')
+    return optimizer, scheduler, break_condition
 
 
 def get_max_epochs(n_samples):
@@ -57,8 +121,7 @@ def get_weights(net, weights, device, num_gpus):
     return net
 
 
-# TODO: Passing the log object along the functions is the best way?
-def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
+def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     """ Train the model.
 
     :param net: Model/Network to train.
@@ -77,30 +140,25 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
     :return: None
     """
 
-    print('-' * 20)
-    print('Train {0} on {1} images, validate on {2} images'.format(configs['run_name'],
-                                                                   len(datasets['train']),
-                                                                   len(datasets['val'])))
-    
-    # Added info on the log file (preferred debug for now)
-    log.debug('Train {0} on {1} images, validate on {2} images'.format(configs['run_name'],
-                                                                   len(datasets['train']),
-                                                                   len(datasets['val'])))
+    # Get number of training epochs depending on dataset size (just roughly to decrease training time):
+    config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']))
+    # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
+    print(f"Number of epochs without improvement allowed {2 * config['max_epochs'] // 20 + 5}")
 
+    print('-' * 20)
+    print('Train {0} on {1} images, validate on {2} images'.format(config['run_name'],
+                                                                   len(datasets['train']),
+                                                                   len(datasets['val'])))
+    # Added info on the log file (preferred debug for now)
+    log.debug('Train {0} on {1} images, validate on {2} images'.format(config['run_name'],
+                                                                   len(datasets['train']),
+                                                                   len(datasets['val'])))
     # Data loader for training and validation set
     apply_shuffling = {'train': True, 'val': False}
-    if device.type == "cpu":
-        num_workers = 0
-    else:
-        try:
-            num_workers = cpu_count() // 2
-        except AttributeError:
-            num_workers = 4
-    if num_workers <= 2:  # Probably Google Colab --> use 0
-        num_workers = 0
+    num_workers = get_num_workers(device)
     num_workers = np.minimum(num_workers, 16)
     dataloader = {x: torch.utils.data.DataLoader(datasets[x],
-                                                 batch_size=configs['batch_size'],
+                                                 batch_size=config['batch_size'],
                                                  shuffle=apply_shuffling,
                                                  pin_memory=True,
                                                  worker_init_fn=seed_worker,
@@ -108,64 +166,11 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
                   for x in ['train', 'val']}
 
     # Loss function and optimizer
-    criterion = get_loss(configs['loss'])
+    criterion = get_loss(config)
 
-    second_run = False
-    max_epochs = configs['max_epochs']
-
-    # Optimizer
-    if configs['optimizer'] == 'adam':
-        optimizer = optim.Adam(net.parameters(),
-                               lr=8e-4,
-                               betas=(0.9, 0.999),
-                               eps=1e-08,
-                               weight_decay=0,
-                               amsgrad=True)
-        scheduler = ReduceLROnPlateau(optimizer,
-                                      mode='min',
-                                      factor=0.25,
-                                      patience=configs['max_epochs'] // 20,
-                                      verbose=True,
-                                      min_lr=3e-6) 
-        break_condition = 2 * configs['max_epochs'] // 20 + 5
-
-    elif configs['optimizer'] == 'ranger':
-
-        lr = 6e-3
-        if best_loss < 1e3:  # probably second run
-
-            second_run = True
-
-            optimizer = Ranger(net.parameters(),
-                               lr=0.09 * lr,
-                               alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
-                               betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
-                               # Gradient centralization on or off, applied to conv layers only or conv + fc layers
-                               use_gc=True, gc_conv_only=False, gc_loc=True)
-
-            scheduler = CosineAnnealingLR(optimizer,
-                                          T_max=configs['max_epochs'] // 10,
-                                          eta_min=3e-5,
-                                          last_epoch=-1,
-                                          verbose=True)
-            break_condition = configs['max_epochs'] // 10 + 1
-            max_epochs = configs['max_epochs'] // 10
-        else:
-            optimizer = Ranger(net.parameters(),
-                               lr=lr,
-                               alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
-                               betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
-                               # Gradient centralization on or off, applied to conv layers only or conv + fc layers
-                               use_gc=True, gc_conv_only=False, gc_loc=True)
-            scheduler = ReduceLROnPlateau(optimizer,
-                                          mode='min',
-                                          factor=0.25,
-                                          patience=configs['max_epochs'] // 10,
-                                          verbose=True,
-                                          min_lr=0.075*lr)
-            break_condition = 2 * configs['max_epochs'] // 10 + 5
-    else:
-        raise Exception('Optimizer not known')
+    second_run = False # WARNING: Fixed arg - to change
+    max_epochs = config['max_epochs']
+    optimizer, scheduler, break_condition = set_up_optimizer_and_scheduler(config, net, best_loss)
 
     # Auxiliary variables for training process
     epochs_wo_improvement, train_loss, val_loss,  = 0, [], []
@@ -177,7 +182,6 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
         print('-' * 10)
         print('Epoch {}/{}'.format(epoch + 1, max_epochs))
         print('-' * 10)
-
         start = time.time()
 
         # Each epoch has a training and validation phase
@@ -188,7 +192,6 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
                 net.eval()  # Set model to evaluation mode
 
             running_loss = 0.0
-
             # Iterate over data
             for samples in dataloader[phase]:
 
@@ -211,7 +214,6 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-
                 # Statistics
                 running_loss += loss.item() * img_batch.size(0)
 
@@ -227,20 +229,14 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
                 if epoch_loss < best_loss:
                     print('Validation loss improved from {:.5f} to {:.5f}. Save model.'.format(best_loss, epoch_loss))
                     best_loss = epoch_loss
-
-                    # The state dict of data parallel (multi GPU) models need to get saved in a way that allows to
-                    # load them also on single GPU or CPU
-                    if configs['num_gpus'] > 1:
-                        torch.save(net.module.state_dict(), str(path_models / (configs['run_name'] + '.pth')))
-                    else:
-                        torch.save(net.state_dict(), str(path_models / (configs['run_name'] + '.pth')))
+                    save_current_model_state(config, net, path_models)
                     epochs_wo_improvement = 0
 
                 else:
                     print('Validation loss did not improve.')
                     epochs_wo_improvement += 1
 
-                if configs['optimizer'] == 'ranger' and second_run:
+                if config['optimizer'] == 'ranger' and second_run:
                     scheduler.step()
 
                 else:
@@ -260,22 +256,11 @@ def train(log, net, datasets, configs, device, path_models, best_loss=1e4):
     print('-' * 20)
 
     # Save loss
-    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), train_loss, val_loss]))
-    if second_run:
-        np.savetxt(fname=str(path_models / (configs['run_name'] + '_2nd_loss.txt')), X=stats,
-                   fmt=['%3i', '%2.5f', '%2.5f'],
-                   header='Epoch, training loss, validation loss', delimiter=',')
-        configs['training_time_run_2'], configs['trained_epochs_run2'] = time_elapsed, epoch + 1
-    else:
-        np.savetxt(fname=str(path_models / (configs['run_name'] + '_loss.txt')), X=stats,
-                   fmt=['%3i', '%2.5f', '%2.5f'],
-                   header='Epoch, training loss, validation loss', delimiter=',')
-        configs['training_time'], configs['trained_epochs'] = time_elapsed, epoch + 1
+    save_training_loss(train_loss, val_loss, second_run, path_models, config, time_elapsed, epoch)
 
     # Clear memory
     del net
     gc.collect()
-
     return best_loss
 
 

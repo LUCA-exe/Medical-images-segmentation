@@ -8,6 +8,62 @@ import os
 from pathlib import Path
 import tifffile as tiff
 import matplotlib.pyplot as plt
+from multiprocessing import cpu_count
+import torch
+
+
+def save_training_loss(train_loss, val_loss, second_run, path_models, config, tot_time, tot_epochs):
+    # Get the training loss and save it in a formatted '*.txt' file.
+
+    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), train_loss, val_loss]))
+    try:
+        if second_run:
+            np.savetxt(fname=str(path_models / (config['run_name'] + '_2nd_loss.txt')), X=stats,
+                    fmt=['%3i', '%2.5f', '%2.5f'],
+                    header='Epoch, training loss, validation loss', delimiter=',')
+            config['training_time_run_2'], config['trained_epochs_run2'] = tot_time, tot_epochs + 1
+
+        else:
+            np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), X=stats,
+                    fmt=['%3i', '%2.5f', '%2.5f'],
+                    header='Epoch, training loss, validation loss', delimiter=',')
+            config['training_time'], config['trained_epochs'] = tot_time, tot_epochs + 1
+        
+        print(f"Training losses saved corretly and current configuration parameters updated")
+    except Exception as e:
+        raise Exception(f"Unexpected error: {e}")
+    return None
+
+
+def save_current_model_state(config, net, path_models):
+    # The state dict of data parallel (multi GPU) models need to get saved in a way that allows to
+    # load them also on single GPU or CPU
+
+    try:
+        if config['num_gpus'] > 1:
+            torch.save(net.module.state_dict(), str(path_models / (config['run_name'] + '.pth')))
+        else:
+            torch.save(net.state_dict(), str(path_models / (config['run_name'] + '.pth')))
+        print(f".. current model state correctly saved !")
+    except Exception as e:
+        raise Exception(f"Unexpected error: {e}")
+    return None
+    
+
+def get_num_workers(device):
+    # Called from training.py in train(...) to get the num workers for the dataloader 
+
+    if device.type == "cpu":
+        num_workers = 0
+    else:
+        try:
+            num_workers = cpu_count() // 2
+        except AttributeError:
+            num_workers = 4
+    if num_workers <= 2:  # Probably Google Colab --> use 0
+        num_workers = 0
+    return num_workers
+
 
 def get_det_score(path):
     """  Get DET metric score.
