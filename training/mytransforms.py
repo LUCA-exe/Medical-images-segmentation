@@ -513,5 +513,5 @@ class ToTensor(object):
         # loss function (l1loss/l2loss) needs float tensor with shape [batch, channels, height, width]
         cell_label = torch.from_numpy(sample['cell_label']).to(torch.float)
         border_label = torch.from_numpy(sample['border_label']).to(torch.float)
-        mask_label = torch.from_numpy(sample['mask_label']).to(torch.int)
+        mask_label = torch.from_numpy(sample['mask_label']).to(torch.float)
         return img, border_label, cell_label, mask_label

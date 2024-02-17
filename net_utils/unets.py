@@ -61,8 +61,7 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
 
     # Move model to used device (GPU or CPU)
     model = model.to(device)
-
-    log.debug(model) # Added net architecture
+    log.debug(model)
     return model
 
 
@@ -773,8 +772,9 @@ class TUNet(nn.Module):
                                           ch_out=64,
                                           act_fun=act_fun,
                                           normalization=normalization))
-        # Last layers - segmentation mask.
+        # Last convolutonal layers nad activation function. 
         self.fusionConv.append(nn.Conv2d(64, 1, kernel_size=1, stride=1, padding=0))
+        self.fusionConv.append(nn.Sigmoid()) # Output - segmentation mask.
 
     def forward(self, x):
         """
@@ -823,4 +823,5 @@ class TUNet(nn.Module):
         x3 = torch.cat([x1, x2], dim=1).detach()
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)
+        x3 = self.fusionConv[2](x3)
         return x1, x2, x3
