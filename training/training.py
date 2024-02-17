@@ -177,7 +177,8 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     since = time.time()
 
     # Training process
-    for epoch in range(max_epochs):
+    #for epoch in range(max_epochs):
+    for epoch in range(2): # DEBUG!!!!!!!!!!!!!!!!!!!!!!! REMEMBER TO CHANGE
 
         print('-' * 10)
         print('Epoch {}/{}'.format(epoch + 1, max_epochs))
@@ -191,7 +192,11 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             else:
                 net.eval()  # Set model to evaluation mode
 
+            # keep track of running losses
             running_loss = 0.0
+            running_loss_border, running_loss_cell, running_loss_mask = 0.0, 0.0, 0.0
+            loss_labels = ["Total loss", "Border loss", "Cell loss", "Mask loss"]
+
             # Iterate over data
             for samples in dataloader[phase]:
 
@@ -224,18 +229,32 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-                # Statistics
+
+                # Statistics - both general and single losses.
                 running_loss += loss.item() * img_batch.size(0)
 
+                if config['architecture'][0] == 'DU':
+                    running_loss_border += loss_border.item() * img_batch.size(0)
+                    running_loss_cell += loss_cell.item() * img_batch.size(0)
+
+                if config['architecture'][0] == 'TU':
+                    running_loss_border += loss_border.item() * img_batch.size(0)
+                    running_loss_cell += loss_cell.item() * img_batch.size(0)
+                    running_loss_mask += loss_mask.item() * img_batch.size(0)
+
             epoch_loss = running_loss / len(datasets[phase])
+            epoch_loss_border =  running_loss_border / len(datasets[phase])
+            epoch_loss_cell =  running_loss_cell / len(datasets[phase])
+            epoch_loss_mask =  running_loss_mask / len(datasets[phase])
 
-            if phase == 'train':
-                train_loss.append(epoch_loss)
-                print('Training loss: {:.5f}'.format(epoch_loss))
+            if phase == 'train': 
+                train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask])
+                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
             else:
-                val_loss.append(epoch_loss)
-                print('Validation loss: {:.5f}'.format(epoch_loss))
+                val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask])
+                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
 
+                # NOTE: The update control just the total loss decrement, not the single ones.
                 if epoch_loss < best_loss:
                     print('Validation loss improved from {:.5f} to {:.5f}. Save model.'.format(best_loss, epoch_loss))
                     best_loss = epoch_loss
@@ -266,8 +285,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     print('-' * 20)
 
     # Save loss
-    save_training_loss(train_loss, val_loss, second_run, path_models, config, time_elapsed, epoch)
-
+    save_training_loss(loss_labels, train_loss, val_loss, second_run, path_models, config, time_elapsed, epoch)
     # Clear memory
     del net
     gc.collect()
