@@ -118,7 +118,6 @@ def write_train_info(configs, path):
 
     with open(path / (configs['run_name'] + '.json'), 'w', encoding='utf-8') as outfile:
         json.dump(configs, outfile, ensure_ascii=False, indent=2)
-
     return None
 
 
