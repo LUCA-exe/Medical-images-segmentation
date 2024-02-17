@@ -196,20 +196,30 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             for samples in dataloader[phase]:
 
                 # Get img_batch and label_batch and put them on GPU if available
-                img_batch, border_label_batch, cell_label_batch = samples
+                img_batch, border_label_batch, cell_label_batch, mask_label_batch = samples # Unpack always all 'labels'
                 img_batch = img_batch.to(device)
-                cell_label_batch, border_label_batch = cell_label_batch.to(device), border_label_batch.to(device)
+                cell_label_batch, border_label_batch, mask_label_batch = cell_label_batch.to(device), border_label_batch.to(device), mask_label_batch.to(device)
 
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
                 # Forward pass (track history if only in train)
                 with torch.set_grad_enabled(phase == 'train'):
-                    border_pred_batch, cell_pred_batch = net(img_batch)
-                    loss_border = criterion['border'](border_pred_batch, border_label_batch)
-                    loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
-                    loss = loss_border + loss_cell
+                    
+                    # NOTE: Depending on the architecture, you can have different number of outputs
+                    if config['architecture'] == 'DU':
+                        border_pred_batch, cell_pred_batch = net(img_batch)
+                        loss_border = criterion['border'](border_pred_batch, border_label_batch)
+                        loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
+                        loss = loss_border + loss_cell
 
+                    if config['architecture'] == 'TU':
+                        border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
+                        loss_border = criterion['border'](border_pred_batch, border_label_batch)
+                        loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
+                        loss_mask = criterion['mask'](mask_pred_batch, mask_label_batch)
+                        loss = loss_border + loss_cell + loss_mask
+                        
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
                         loss.backward()

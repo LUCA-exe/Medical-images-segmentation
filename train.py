@@ -66,7 +66,7 @@ def parse_training_args(log, args, num_gpus):
     model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters),
                     'batch_size': train_args.batch_size,
                     'batch_size_auto': 2,
-                    'label_type': "distance",
+                    'label_type': "distance", # NOTE: Fixed param.
                     'loss': train_args.loss,
                     'num_gpus': num_gpus,
                     'optimizer': train_args.optimizer

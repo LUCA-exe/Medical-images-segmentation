@@ -65,7 +65,6 @@ class Blur(object):
 
             sigma = 1.75 * random.random() + 1.0
             sample['image'] = scipy.ndimage.gaussian_filter(sample['image'], sigma, order=0)
-        
         return sample
 
 
@@ -129,7 +128,6 @@ class Contrast(object):
                 img = img.astype(dtype)
 
             sample['image'] = img
-
         return sample
 
 
@@ -214,45 +212,50 @@ class Flip(object):
                 sample['image'] = np.flip(img, axis=1).copy()
                 if len(sample) == 3:
                     sample['label'] = np.flip(sample['label'], axis=1).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     sample['border_label'] = np.flip(sample['border_label'], axis=1).copy()
                     sample['cell_label'] = np.flip(sample['cell_label'], axis=1).copy()
+                    sample['mask_label'] = np.flip(sample['mask_label'], axis=1).copy()
 
             elif h == 2:  # Flip up-down
 
                 sample['image'] = np.flip(img, axis=0).copy()
                 if len(sample) == 3:
                     sample['label'] = np.flip(sample['label'], axis=0).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     sample['border_label'] = np.flip(sample['border_label'], axis=0).copy()
                     sample['cell_label'] = np.flip(sample['cell_label'], axis=0).copy()
+                    sample['mask_label'] = np.flip(sample['mask_label'], axis=0).copy()
 
             elif h == 3:  # Rotate 90°
 
                 sample['image'] = np.rot90(img, axes=(0, 1)).copy()
                 if len(sample) == 3:
                     sample['label'] = np.rot90(sample['label'], axes=(0, 1)).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     sample['border_label'] = np.rot90(sample['border_label'], axes=(0, 1)).copy()
                     sample['cell_label'] = np.rot90(sample['cell_label'], axes=(0, 1)).copy()
+                    sample['mask_label'] = np.rot90(sample['mask_label'], axes=(0, 1)).copy()
 
             elif h == 4:  # Rotate 180°
 
                 sample['image'] = np.rot90(img, k=2, axes=(0, 1)).copy()
                 if len(sample) == 3:
                     sample['label'] = np.rot90(sample['label'], k=2, axes=(0, 1)).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     sample['border_label'] = np.rot90(sample['border_label'], k=2, axes=(0, 1)).copy()
                     sample['cell_label'] = np.rot90(sample['cell_label'], k=2, axes=(0, 1)).copy()
+                    sample['mask_label'] = np.rot90(sample['mask_label'], k=2, axes=(0, 1)).copy()
 
             elif h == 5:  # Rotate 270°
 
                 sample['image'] = np.rot90(img, k=3, axes=(0, 1)).copy()
                 if len(sample) == 3:
                     sample['label'] = np.rot90(sample['label'], k=3, axes=(0, 1)).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     sample['border_label'] = np.rot90(sample['border_label'], k=3, axes=(0, 1)).copy()
                     sample['cell_label'] = np.rot90(sample['cell_label'], k=3, axes=(0, 1)).copy()
+                    sample['mask_label'] = np.rot90(sample['mask_label'], k=3, axes=(0, 1)).copy()
 
             elif h == 6:  # Flip left-right + rotate 90°
 
@@ -262,11 +265,13 @@ class Flip(object):
                 if len(sample) == 3:
                     label_img = np.flip(sample['label'], axis=1).copy()
                     sample['label'] = np.rot90(label_img, k=1, axes=(0, 1)).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     border_label = np.flip(sample['border_label'], axis=1).copy()
                     cell_label = np.flip(sample['cell_label'], axis=1).copy()
+                    mask_label = np.flip(sample['mask_label'], axis=1).copy()
                     sample['border_label'] = np.rot90(border_label, k=1, axes=(0, 1)).copy()
                     sample['cell_label'] = np.rot90(cell_label, k=1, axes=(0, 1)).copy()
+                    sample['mask_label'] = np.rot90(mask_label, k=1, axes=(0, 1)).copy()
 
             elif h == 7:  # Flip up-down + rotate 90°
 
@@ -276,12 +281,13 @@ class Flip(object):
                 if len(sample) == 3:
                     label_img = np.flip(sample['label'], axis=0).copy()
                     sample['label'] = np.rot90(label_img, k=1, axes=(0, 1)).copy()
-                elif len(sample) == 4:
+                elif len(sample) >= 4:
                     border_label = np.flip(sample['border_label'], axis=0).copy()
                     cell_label = np.flip(sample['cell_label'], axis=0).copy()
+                    mask_label = np.flip(sample['mask_label'], axis=0).copy()
                     sample['border_label'] = np.rot90(border_label, k=1, axes=(0, 1)).copy()
                     sample['cell_label'] = np.rot90(cell_label, k=1, axes=(0, 1)).copy()
-
+                    sample['mask_label'] = np.rot90(mask_label, k=1, axes=(0, 1)).copy()
         return sample
 
 
@@ -386,7 +392,7 @@ class Rotate(object):
                 else:
                     sample['label'] = seq1.augment_image(sample['label'])
 
-            elif len(sample) == 4:
+            elif len(sample) >= 4:
 
                 if sample['border_label'].dtype == np.uint8:
                     sample['border_label'] = seq2.augment_image(sample['border_label'])
@@ -397,6 +403,12 @@ class Rotate(object):
                     sample['cell_label'] = seq2.augment_image(sample['cell_label'])
                 else:
                     sample['cell_label'] = seq1.augment_image(sample['cell_label'])
+
+                # NOTE: Mask should be 'np.uint8' or 'np.uint16'
+                if sample['mask_label'].dtype == np.uint8:
+                    sample['mask_label'] = seq2.augment_image(sample['mask_label'])
+                else:
+                    sample['mask_label'] = seq1.augment_image(sample['mask_label'])
             else:
                 raise Exception('Unsupported sample format.')
          
@@ -437,7 +449,7 @@ class Scaling(object):
                     sample['label'] = seq2.augment_image(sample['label'])
                 else:
                     sample['label'] = seq1.augment_image(sample['label']).copy()
-            elif len(sample) == 4:
+            elif len(sample) >= 4:
                 if sample['border_label'].dtype == np.uint8:
                     sample['border_label'] = seq2.augment_image(sample['border_label'])
                 else:
@@ -447,9 +459,14 @@ class Scaling(object):
                     sample['cell_label'] = seq2.augment_image(sample['cell_label'])
                 else:
                     sample['cell_label'] = seq1.augment_image(sample['cell_label'])
+
+                # NOTE: Mask should be 'np.uint8' or 'np.uint16'
+                if sample['mask_label'].dtype == np.uint8:
+                    sample['mask_label'] = seq2.augment_image(sample['mask_label'])
+                else:
+                    sample['mask_label'] = seq1.augment_image(sample['mask_label'])
             else:
                 raise Exception('Unsupported sample format.')
-
         return sample
 
   
@@ -496,5 +513,5 @@ class ToTensor(object):
         # loss function (l1loss/l2loss) needs float tensor with shape [batch, channels, height, width]
         cell_label = torch.from_numpy(sample['cell_label']).to(torch.float)
         border_label = torch.from_numpy(sample['border_label']).to(torch.float)
-
-        return img, border_label, cell_label
+        mask_label = torch.from_numpy(sample['mask_label']).to(torch.int)
+        return img, border_label, cell_label, mask_label

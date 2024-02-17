@@ -9,8 +9,6 @@ def get_loss(config):
     :return: Loss function / dict of loss functions.
     """
 
-    # NOTE: To module to different architectures.
-
     if config['loss'] == 'l1':
         border_criterion = nn.L1Loss()
         cell_criterion = nn.L1Loss()
@@ -20,6 +18,12 @@ def get_loss(config):
     elif config['loss']  == 'smooth_l1':
         border_criterion = nn.SmoothL1Loss()
         cell_criterion = nn.SmoothL1Loss()
-
-    criterion = {'border': border_criterion, 'cell': cell_criterion}
+    
+    # NOTE: Binary cross entropy for the segmentation mask should be fixed.
+    if config['architecture'][0] == 'DU':
+        criterion = {'border': border_criterion, 'cell': cell_criterion}
+        
+    elif config['architecture'][0] == 'TU':
+        mask_criterion = nn.CrossEntropyLoss()
+        criterion = {'border': border_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
     return criterion
