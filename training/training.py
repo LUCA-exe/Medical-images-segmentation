@@ -177,8 +177,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     since = time.time()
 
     # Training process
-    #for epoch in range(max_epochs):
-    for epoch in range(2): # DEBUG!!!!!!!!!!!!!!!!!!!!!!! REMEMBER TO CHANGE
+    for epoch in range(max_epochs):
 
         print('-' * 10)
         print('Epoch {}/{}'.format(epoch + 1, max_epochs))
