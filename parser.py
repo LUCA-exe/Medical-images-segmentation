@@ -27,7 +27,7 @@ def get_parser():
     # Specific folder to save the evaluation software - should be treated as const
     parser.add_argument("--evaluation_software_path", default="./net_utils/evaluation_software/", type=str, help="Path to access for loading the evaluation software of Cell Tracking Challenge")
     # TODO: Expand the dataset options from other challenges/websites - what dataset to download (from CTC website)
-    parser.add_argument("--download_dataset", default = "all", type=str, help="Name of the dataset to download (else 'all')")
+    parser.add_argument("--dataset_to_download", default = "all", type=str, help="Name of the dataset to download (else 'all')")
     
     # Parameters used for the image characteristics gathering (analyze image properties)
 

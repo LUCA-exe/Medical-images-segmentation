@@ -17,6 +17,7 @@ SOFTWARE_DET_FILE = "DET_log.txt"
 def main():
     """ Main function to set up paths, load model and evaluate the inferred images.
     """
+    set_environment_paths() # Save folders/folder paths in the env.
     log = create_logging() # Set up 'logger' object 
 
     args = get_parser() # Set up dict arguments
@@ -28,7 +29,7 @@ def main():
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
     device, num_gpus = set_device() # Set device: cpu or single-gpu usage
-    set_environment_paths() # Save folders/folder paths in the env.
+    
     log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline} metrics {args.eval_metric} <<<")
 
     # Load paths
@@ -38,9 +39,7 @@ def main():
     path_best_models = args.save_model # Save best model files/metrics here
     path_ctc_metric = args.evaluation_software_path
 
-    if not exists(path_data):
-        log.info(f"Warning: the '{path_data}' provided is not existent! Interrupting the program...")
-        raise ValueError("The '{path_data}' provided is not existent")
+    check_path(log, path_data)
 
     if args.eval_metric == 'software': # Check wich set of metrics you want to use
         if not os.path.isdir(path_ctc_metric): # Check if evaluation software is available

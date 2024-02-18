@@ -31,7 +31,6 @@ def main():
     log.info(f"--- Downloading data and software ---")
     download_datasets(log, args) # Call the 'util' function.
     check_evaluation_software(log, args.evaluation_software_path)
-
     log.info("Downloads ended correctly :)")
 
 if __name__ == "__main__":

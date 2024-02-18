@@ -19,7 +19,13 @@ from dotenv import load_dotenv
 
 from img_processing.imageUtils import *
 
-LOGS_PATH = "logs" # TODO: Const as the path is fixed. Move this in a 'ENV' dict 
+#LOGS_PATH = "logs" # TODO: Const as the path is fixed. Move this in a 'ENV' dict 
+# TODO: Move this to a 'config file' inside the repository.
+# TODO: If my dataset will become public, manage the download from this script as additional option.
+DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
+            "PhC-C2DH-U373", "PhC-C2DL-PSC", "Fluo-N2DH-SIM+"]
+# Folders expected in the annotated time lapses (e.g. '01')
+GT_FOLDERS = ['SEG', 'TRA']
 
 def create_logging():
   """ Function to set up the 'INFO' and 'DEBUG' log file
@@ -89,22 +95,6 @@ def set_environment_paths():
     # Set-up folders
     os.makedirs(os.getenv('TEMPORARY_PATH', None), exist_ok=True)
     return None
-
-
-# NOTE: Utils functions for the data_download.py (main script to download the data)
-
-# TODO: Move this to a 'config file' inside the repository.
-# TODO: If my dataset will become public, manage the download from this script as additional option.
-DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
-            "PhC-C2DH-U373", "PhC-C2DL-PSC", "Fluo-N2DH-SIM+"]
-# Folders expected in the annotated time lapses (e.g. '01')
-GT_FOLDERS = ['SEG', 'TRA']
-
-
-# NOTE: For now download just the train/test Datasets from CTC - move this to the '.env. file
-TRAINDATA_URL = 'http://data.celltrackingchallenge.net/training-datasets/'
-TESTDATA_URL = 'http://data.celltrackingchallenge.net/test-datasets/'
-SOFTWARE_URL = 'http://public.celltrackingchallenge.net/software/EvaluationSoftware.zip'
 
 
 # Check if eval. software is already downloaded: if not download it.
@@ -194,8 +184,7 @@ def __check_dataset(log, dataset_path, url): # Check if It is alredy available, 
 
 
 def download_datasets(log, args): # Main function to download the chosen datasets and set up their utilization
-    """ Function to download the images in the path passed by arguments.
-        Dataset folder structure is fixed.
+    """ Function to download the images in the path passed by arguments - dataset folder structure is fixed.
 
     Args:
         args (dict): Arguments usefull for the download and creation of the images folder
@@ -211,7 +200,7 @@ def download_datasets(log, args): # Main function to download the chosen dataset
     os.makedirs(args.train_images_path, exist_ok=True)
     os.makedirs(args.test_images_path, exist_ok=True)
 
-    if args.download_dataset == 'all': # TODO: Provide other options
+    if args.dataset_to_download == 'all': # TODO: Provide other options
 
         log.info(f"All datasets will be downloaded")
         for dataset in DATASETS:
@@ -244,7 +233,7 @@ def check_path(log, path):
 
     if not exists(path):
         log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
-        raise ValueError("The '{path_data}' provided is not existent")
+        raise ValueError("The '{path}' provided is not existent")
     return True
 
 
