@@ -17,6 +17,7 @@ from parser import get_parser, get_processed_args
 def main():
     """ Function to call the download data utils.
     """
+    set_environment_paths()
     log = create_logging() # Set up 'logger' object 
 
     args = get_parser() # Set up dict arguments
@@ -30,7 +31,7 @@ def main():
 
     log.info(f"--- Downloading data and software ---")
     download_datasets(log, args) # Call the 'util' function.
-    check_evaluation_software(log, args.evaluation_software_path)
+    check_and_download_evaluation_software(log, args.evaluation_software_path)
     log.info("Downloads ended correctly :)")
 
 if __name__ == "__main__":

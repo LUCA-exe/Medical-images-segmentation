@@ -19,13 +19,15 @@ from dotenv import load_dotenv
 
 from img_processing.imageUtils import *
 
-#LOGS_PATH = "logs" # TODO: Const as the path is fixed. Move this in a 'ENV' dict 
+
 # TODO: Move this to a 'config file' inside the repository.
 # TODO: If my dataset will become public, manage the download from this script as additional option.
 DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
             "PhC-C2DH-U373", "PhC-C2DL-PSC", "Fluo-N2DH-SIM+"]
-# Folders expected in the annotated time lapses (e.g. '01')
-GT_FOLDERS = ['SEG', 'TRA']
+
+GT_FOLDERS = ['SEG', 'TRA'] # Folders expected in the annotated time lapses (e.g. '01_GT')
+TRAINING_FOLDER = "training_data"
+
 
 def create_logging():
   """ Function to set up the 'INFO' and 'DEBUG' log file
@@ -97,34 +99,32 @@ def set_environment_paths():
     return None
 
 
-# Check if eval. software is already downloaded: if not download it.
-def check_evaluation_software(log, software_path):
+def check_and_download_evaluation_software(log, software_path):
+    # Check if eval. software is already downloaded: if not download it.
     
     # Check if the evaluation folder is already contained
     files = [name for name in os.listdir(software_path) if not name.startswith(".")]
     
     # Download evaluation software if it is not already donwloaded (there is just one file in the '*/evaluation software' folder)
     if len(files) <= 1:
+        software_url = os.getenv("CTC_SOFTWARE_URL", None)
+        software_name = os.getenv("CTC_SOFTWARE_NAME", None).split(".")[0]
         log.info(f"Downloading evaluation software to '{software_path}' ..")
-        __download_data(log=None, url=SOFTWARE_URL, target=software_path)
+        __download_data(log=None, url=software_url, target=software_path)
+        unzip_donwloaded_file(log, os.path.join(software_path, software_name), target = software_path)
+
     else:
         log.info(f"Evaluation software already set-up in '{software_path}'")
         return False # Eval software already set up.
 
-    # Unzip evaluation software
-    log.info('Unzip evaluation software ..')
-    with zipfile.ZipFile(os.path.join(software_path, SOFTWARE_URL.split('/')[-1]), 'r') as z:
-        z.extractall(software_path)
-    
     log.info(f"Evaluation software correctly set up")
     return None # Evaluation folder correctly set up
 
 
-# Download from the provided url with a specific chunk size
 def __download_data(log, url, target): 
+    # Download from the provided url with a specific chunk size
 
     local_filename = os.path.join(target, url.split('/')[-1])
-    
     # TODO: Try a couple of times if raise status give error. 
     with requests.get(url, stream=True) as r:
 
@@ -140,10 +140,38 @@ def __download_data(log, url, target):
     return local_filename
 
 
-def __check_dataset(log, dataset_path, url): # Check if It is alredy available, if not download it (function used both for test/train splits)
-    
-    dataset = dataset_path.split('/')[-1] # Extract the name
+def unzip_donwloaded_file(log, path, target = 'none'):
+    # Unzip the file and remove the original zipped version.
 
+    log.info(f"Unzipping {path + '.zip'} ..")
+    with zipfile.ZipFile(path + '.zip', 'r') as z: # Extract zipped dataset
+        if target == 'none':
+            z.extractall(path.split('/')[0])
+        else:
+            z.extractall(target)
+        
+    os.remove(path + '.zip') # Remove orginal zip
+    log.info(f"The file {path + '.zip'} correctly removed")
+    return True
+
+
+def check_downloaded_images(log, images_path):
+    # As default will be used '01' ('01_GT/SEG' and '01_GT/TRA') with the respective first files - first check.
+
+    # Read first images
+    images = os.listdir(images_path)
+    images.sort()
+    images = [img for img in images if img.endswith('.tif')] # Avoid additional file not '*.tif', as the 'man_track.txt'.
+    image = tiff.imread(os.path.join(images_path, images[0]))
+    log_image_characteristics(log, image, images[0].split('.')[0]) # Log characteristics of images
+    
+    return None
+
+
+def __check_and_download_dataset(log, dataset_path, url): 
+    # Check if It is alredy available, if not download it (function used both for test/train splits).
+    
+    dataset = dataset_path.split('/')[-1] # Extract the name.
     if not os.path.isdir(dataset_path): # Check if It's already present
 
         log.info(f"Downloading {dataset_path.split('/')[0].split('_')[0]} {dataset} dataset ..")
@@ -151,35 +179,24 @@ def __check_dataset(log, dataset_path, url): # Check if It is alredy available, 
 
             dataset_url = os.path.join(url, dataset + '.zip') # Set up the url for the download 
             __download_data(log, dataset_url, dataset_path.split('/')[0]) # Donwload the data on the target folder
-
+            unzip_donwloaded_file(log, dataset_path)
         except:
+
             log.info(f"Failed the download of the {dataset_path.split('/')[0].split('_')[0]} split of {dataset}")
         
-        # Continue the operations
-        log.info(f"Unzipping {dataset_path + '.zip'} ..")
-        with zipfile.ZipFile(dataset_path + '.zip', 'r') as z: # Extract zipped dataset
-            z.extractall(dataset_path.split('/')[0])
-        os.remove(dataset_path + '.zip') # Remove orginal zip
-        
-        # As default will be used '01' ('01_GT/SEG' and '01_GT/TRA') with the respective first files
-        images = os.listdir(os.path.join(dataset_path, '01'))
-        images.sort()
-        image = tiff.imread(os.path.join(dataset_path, '01', images[0]))
-        log_image_characteristics(log, image, 'image') # Log characteristics of images
-
-        if dataset_path.split('/')[0] == 'training_data': # TODO: should be passed directly from args
+        check_downloaded_images(log, os.path.join(dataset_path, '01')) # Original time-lapses images.
+        if dataset_path.split('/')[-2] == TRAINING_FOLDER: # TODO: should be passed directly from args
             
             for folder in GT_FOLDERS:# Analyze both first mask in SEG and TRA.
-                masks = os.listdir(os.path.join(dataset_path, '01_GT', folder))
-                if folder == 'TRA': # Avoid the requested '.txt' file.
-                    masks = [mask for mask in masks if mask.endswith('.tif')]
-                masks.sort()
-                mask = tiff.imread(os.path.join(dataset_path, '01_GT', folder, masks[0]))
-                log_image_characteristics(log, mask, 'mask')
-        
+                current_folder_path = os.path.join(dataset_path, '01_GT', folder)
+                
+                if os.path.exists(current_folder_path):
+                    check_downloaded_images(log, current_folder_path)
+                else:
+                    log.info("Path {current_folder_path} does not exist ..")
+                            
     else:
         log.info(f"'{dataset_path}' exists already!")
-
     return None
 
 
@@ -199,6 +216,9 @@ def download_datasets(log, args): # Main function to download the chosen dataset
     # Set up the split folders
     os.makedirs(args.train_images_path, exist_ok=True)
     os.makedirs(args.test_images_path, exist_ok=True)
+    # Get url from the .env loaded paths.
+    train_data_url = os.getenv("CTC_TRAINDATA_URL", None)
+    test_data_url = os.getenv("CTC_TESTDATA_URL", None)
 
     if args.dataset_to_download == 'all': # TODO: Provide other options
 
@@ -207,29 +227,28 @@ def download_datasets(log, args): # Main function to download the chosen dataset
             current_train_path = os.path.join(args.train_images_path, dataset)
             current_test_path = os.path.join(args.test_images_path, dataset)
 
-            __check_dataset(log, current_train_path, TRAINDATA_URL)
-            __check_dataset(log, current_test_path, TESTDATA_URL)
+            __check_and_download_dataset(log, current_train_path, train_data_url)
+            __check_and_download_dataset(log, current_test_path, test_data_url)
 
     else: # Download single dataset if it is present in the list
 
-        if args.download_dataset in DATASETS:
-            log.info(f"Dataset that will be downloaded: {args.download_dataset}")
-            current_train_path = os.path.join(args.train_images_path, args.download_dataset)
-            current_test_path = os.path.join(args.test_images_path, args.download_dataset)
+        if args.dataset_to_download in DATASETS:
+            log.info(f"Dataset that will be downloaded: {args.dataset_to_download}")
+            current_train_path = os.path.join(args.train_images_path, args.dataset_to_download)
+            current_test_path = os.path.join(args.test_images_path, args.dataset_to_download)
 
-            __check_dataset(log, current_train_path, TRAINDATA_URL)
-            __check_dataset(log, current_test_path, TESTDATA_URL)
+            __check_and_download_dataset(log, current_train_path,  train_data_url)
+            __check_and_download_dataset(log, current_test_path, test_data_url)
             log.info(f"Data downloads completed!")
         
         else:
             log.info(f"Dataset {args.download_dataset} not found in the available list!")
-
     log.info(f"Program terminated")
     return None
 
 
-# Util function to check for existing path
 def check_path(log, path):
+    # Util function to check for existing path - it will raise an Error.
 
     if not exists(path):
         log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")

@@ -61,7 +61,7 @@ def visualize_raw_res(image, mask, file_path):
 
 # Util function - called even from the 'utils.py' in the root folder
 def log_image_characteristics(log, image_obj, name_obj):
-    """ Log shape and max/min values of the images when downloading a new dataset (first check at the data)
+    """ Log shape and max/min values of the images when downloading a new dataset (first check at the data).
 
     Args:
         image_obj (np.ndarray): Tensor of the image
