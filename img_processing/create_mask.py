@@ -99,9 +99,11 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
 
             # Check to have all the segmented object with the 'name' filled
             if 'not_defined' in id_obj:
+                print(f"Bug on id list: {id_obj}")
                 raise ValueError(f"The list contains unexpected values: check that all the segmented object have a name assigned!")
 
             if len(set(id_obj)) < len(id_obj):
+                print(f"Bug on id list: {id_obj}")
                 raise ValueError(f"The list contains unexpected values: check that all the segmented object have a different 'name' assigned!")
             else:
                 id_obj = [int(obj) for obj in id_obj]
