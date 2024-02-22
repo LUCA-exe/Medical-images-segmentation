@@ -10,7 +10,7 @@ from os.path import join, exists
 from collections import defaultdict
 from utils import create_logging, set_device, set_environment_paths, TrainArgs, check_path
 from parser import get_parser, get_processed_args
-from net_utils.utils import unique_path, write_train_info
+from net_utils.utils import unique_path, write_train_info, show_training_dataset_samples
 from net_utils import unets
 from training.create_training_sets import create_ctc_training_sets, get_file
 from training.training import train, train_auto, get_max_epochs, get_weights
@@ -101,6 +101,7 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
         log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
         for i in range(args.iterations): # Train multiple models - how can it distinguished by multiple iterations?
+        
             run_name = unique_path(path_models, model_name + '_{:02d}.pth').stem
             log.debug(f"-- Run name: {run_name} - Iteration: {i} --")
             # Update the current model configurations - there will be other updates but the core parameters will remain the same (e.g. architecture)
@@ -152,6 +153,8 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
             datasets = {x: CellSegDataset(root_dir=path_data / dataset_name, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
 
+            # Assert that the datasets has been created correctly.
+            show_training_dataset_samples(log, datasets["train"])
             # Train loop with the chosen architecture.
             best_loss = train(log=log, net=net, datasets=datasets, config=model_config, device=device, path_models=path_models)
 

@@ -50,6 +50,7 @@ def save_current_model_state(config, net, path_models):
         else:
             torch.save(net.state_dict(), str(path_models / (config['run_name'] + '.pth')))
         print(f".. current model state correctly saved !")
+        
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
     return None
@@ -346,7 +347,7 @@ def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):
 
     # Check if the file already exists
     if os.path.exists(file_path):
-        log.info("The file {file_name }already exists in {dataset_path}: It will be subscribed.")
+        log.info("The file {file_name} already exists in {dataset_path}: It will be subscribed.")
 
     # Save the dict in input in a 'results.json' file in the dataset folder
     with open(os.path.join(dataset_path, name + ext), "w") as outfile:
@@ -361,7 +362,7 @@ def aggregate_metrics():
     pass
 
 
-# Moved from the 'create_training_sets.py' module - function used by 'training' methods
+# Moved from the 'create_training_sets.py' module - function used by 'training' methods.
 def write_file(file, path):
     with open(path, 'w', encoding='UTF-8') as f:
         json.dump(file, f, ensure_ascii=False, indent=2)
@@ -425,6 +426,28 @@ def save_image(img, path, title, use_cmap = False):
     plt.savefig(image_path, bbox_inches='tight', pad_inches=0.1)
     plt.close()  # Close the plot to free up resources
     return None
+
+
+def show_training_dataset_samples(log, dataset, samples = 10):
+    # Visual debug for the images used in the training set.
+    log.debug(f"Visually inspect the first {samples} samples of images from the training Dataset")
+    folder = os.getenv("TEMPORARY_PATH")
+    for idx in range(samples):
+
+        image_list = dataset[idx]
+
+        for pos, image in enumerate(image_list): # Plot all images except the last one: the mask tensor.
+
+            curr_title = "Sample " + str(idx) + f" image {str(pos)}"
+            save_image(np.squeeze(image), folder, curr_title)
+
+    log.debug(f"Images correctly saved in {folder}!")
+    return True
+
+
+
+
+
 
 
 

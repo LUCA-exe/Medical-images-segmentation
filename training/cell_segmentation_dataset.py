@@ -52,6 +52,7 @@ class CellSegDataset(Dataset):
                   'border_label': dist_neighbor_label,
                   'mask_label': mask_label,
                   'id': img_id.stem}
+                  
         # Apply tranformation for the training.
         sample = self.transform(sample)
         return sample

@@ -121,6 +121,17 @@ def get_weights(net, weights, device, num_gpus):
     return net
 
 
+def update_running_losses(running_losses_list, losses_list, batch_size):
+    # In input a list of losses computed during a mini_batch images, for every item of the list just update the values and returns it.
+
+    updated_losses = [loss * batch_size for loss in losses_list]
+    updated_running_losses = []
+    for runn_loss, loss in zip(running_losses_list, updated_losses): # Update every running loss by the corrispondent current mini_batch loss.
+
+        updated_running_losses.append(runn_loss + loss)
+    return updated_running_losses
+
+
 def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     """ Train the model.
 
@@ -149,7 +160,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     print('Train {0} on {1} images, validate on {2} images'.format(config['run_name'],
                                                                    len(datasets['train']),
                                                                    len(datasets['val'])))
-    # Added info on the log file (preferred debug for now)
+    # Added info on the log file (preferred debug for now).
     log.debug('Train {0} on {1} images, validate on {2} images'.format(config['run_name'],
                                                                    len(datasets['train']),
                                                                    len(datasets['val'])))
@@ -230,30 +241,31 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         optimizer.step()
 
                 # Statistics - both general and single losses.
-                running_loss += loss.item() * img_batch.size(0)
+                running_loss += loss.item() * img_batch.size(0) # NOTE: loss.item() as default contains  already the average of the mini_batch loss.
 
                 if config['architecture'][0] == 'DU':
-                    running_loss_border += loss_border.item() * img_batch.size(0)
-                    running_loss_cell += loss_cell.item() * img_batch.size(0)
+                    running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], [loss_border.item(), loss_cell.item()], img_batch.size(0))
 
                 if config['architecture'][0] == 'TU':
-                    running_loss_border += loss_border.item() * img_batch.size(0)
-                    running_loss_cell += loss_cell.item() * img_batch.size(0)
-                    running_loss_mask += loss_mask.item() * img_batch.size(0)
+                    running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], [loss_border.item(), loss_cell.item(), loss_mask.item()], img_batch.size(0))
 
+            # Compute average epoch losses
             epoch_loss = running_loss / len(datasets[phase])
             epoch_loss_border =  running_loss_border / len(datasets[phase])
             epoch_loss_cell =  running_loss_cell / len(datasets[phase])
             epoch_loss_mask =  running_loss_mask / len(datasets[phase])
 
             if phase == 'train': 
+
                 train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask])
                 print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
             else:
+
                 val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask])
-                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
+                print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
 
                 # NOTE: The update control just the total loss decrement, not the single ones.
+
                 if epoch_loss < best_loss:
                     print('Validation loss improved from {:.5f} to {:.5f}. Save model.'.format(best_loss, epoch_loss))
                     best_loss = epoch_loss
@@ -390,7 +402,6 @@ def train_auto(net, dataset, configs, device, path_models):
     # Clear memory
     del net
     gc.collect()
-
     return None
 
 
