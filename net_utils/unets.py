@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import tanh
 
 
-def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_gpus, ch_in=1, ch_out=1, filters=(64, 1024), attach_fusion_layers = False):
+def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_gpus, ch_in=1, ch_out=1, filters=(64, 1024), detach_fusion_layers = False):
     """ Build U-net architecture.
 
     :param unet_type: 'U' (U-net) or 'DU' (U-net with two decoder paths and two outputs).
@@ -50,7 +50,7 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
                       ch_out=ch_out,
                       pool_method=pool_method,
                       filters=filters,
-                      attach_fusion_layers = attach_fusion_layers,
+                      detach_fusion_layers = detach_fusion_layers,
                       act_fun=act_fun,
                       normalization=normalization)
     else:
@@ -685,7 +685,7 @@ class AutoUNet(nn.Module):
 class TUNet(nn.Module):
     """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
 
-    def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), attach_fusion_layers = False):
+    def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), detach_fusion_layers = False):
         """
 
         :param ch_in: Number of channels of the input image.
@@ -707,7 +707,7 @@ class TUNet(nn.Module):
         self.ch_in = ch_in
         self.filters = filters
         self.pool_method = pool_method
-        self.attach_fusion_layers = attach_fusion_layers
+        self.detach_fusion_layers = detach_fusion_layers
 
         # Encoder
         self.encoderConv = nn.ModuleList()
@@ -822,10 +822,10 @@ class TUNet(nn.Module):
         x2 = self.decoder2Conv[-1](x2)
         
         # Concatenation.
-        if self.attach_fusion_layers: # Check if the 'detach' is requested.
-            x3 = torch.cat([x1, x2], dim=1)
-        else:
+        if self.detach_fusion_layers: # Check if the 'detach' is requested.
             x3 = torch.cat([x1, x2], dim=1).detach()
+        else:
+            x3 = torch.cat([x1, x2], dim=1)
 
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)

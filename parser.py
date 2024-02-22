@@ -56,7 +56,7 @@ def get_parser():
     parser.add_argument('--act_fun', '-af', default='relu', type=str, help='Activation function')
     parser.add_argument('--filters', '-f', nargs=2, type=int, default=[64, 1024], help='Filters for U-net')
     # NOTE: This arg. is parsed just if the model pipeline is the "dual-unet".
-    parser.add_argument('--attach_fusion_layers', '-dfl', default=False, action="store_true", help='If it is allowed the back-propagation from the fusion layers')
+    parser.add_argument('--detach_fusion_layers', '-dfl', default=False, action="store_true", help='If it is allowed the back-propagation from the fusion layers')
     parser.add_argument('--iterations', '-i', default=1, type=int, help='Number of models to train')
     parser.add_argument('--loss', '-l', default='smooth_l1', type=str, help='Loss function')
     parser.add_argument('--norm_method', '-nm', default='bn', type=str, help='Normalization method')

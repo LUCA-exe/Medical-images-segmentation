@@ -301,7 +301,7 @@ class TrainArgs(object):
     """ Class with training creation parameters.
     """
 
-    def __init__(self, model_pipeline, act_fun, batch_size, filters, attach_fusion_layers, iterations,
+    def __init__(self, model_pipeline, act_fun, batch_size, filters, detach_fusion_layers, iterations,
     loss, norm_method, optimizer, pool_method, pre_train, retrain, split):
         """ kit-ge training params implemented for now.
         """
@@ -310,7 +310,7 @@ class TrainArgs(object):
             self.act_fun = act_fun
             self.batch_size = batch_size
             self.filters = filters
-            self.attach_fusion_layers = attach_fusion_layers # NOTE: In this configuration of architecture will not be used this parameter.
+            self.detach_fusion_layers = detach_fusion_layers # NOTE: In this configuration of architecture will not be used this parameter.
             self.iterations = iterations
             self.loss = loss
             self.norm_method = norm_method
@@ -325,7 +325,7 @@ class TrainArgs(object):
             self.act_fun = act_fun
             self.batch_size = batch_size
             self.filters = filters
-            self.attach_fusion_layers = attach_fusion_layers
+            self.detach_fusion_layers = detach_fusion_layers
             self.iterations = iterations
             self.loss = loss
             self.norm_method = norm_method

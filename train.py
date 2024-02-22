@@ -50,7 +50,7 @@ def parse_training_args(log, args, num_gpus):
                             act_fun = args.act_fun,
                             batch_size = args.batch_size, 
                             filters = args.filters,
-                            attach_fusion_layers = args.attach_fusion_layers,
+                            detach_fusion_layers = args.detach_fusion_layers,
                             iterations = args.iterations,
                             loss = args.loss,
                             norm_method = args.norm_method,
@@ -64,7 +64,7 @@ def parse_training_args(log, args, num_gpus):
     log.info(f"Training parameters {train_args}")
 
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
-    model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters, train_args.attach_fusion_layers),
+    model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters, train_args.detach_fusion_layers),
                     'batch_size': train_args.batch_size,
                     'batch_size_auto': 2,
                     'label_type': "distance", # NOTE: Fixed param.
@@ -93,7 +93,7 @@ def create_model_architecture(log, pre_train, model_config, device, num_gpus):
                                 ch_in=1,
                                 ch_out=1,
                                 filters=model_config['architecture'][4],
-                                attach_fusion_layers=model_config['architecture'][5])
+                                detach_fusion_layers=model_config['architecture'][5])
     return net
 
 def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):
@@ -103,7 +103,8 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
         model_name = '{}_{}_{}_{}_{}_{}'.format(trainset_name, args.mode, args.split, crop_size, args.pre_processing_pipeline, args.model_pipeline)
         log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
-        for i in range(args.iterations): # Train multiple models - how can it distinguished by multiple iterations?
+        # Train multiple models - It helps to distinguish between model apparently equal (but with internal architecture different)
+        for i in range(args.iterations): 
         
             run_name = unique_path(path_models, model_name + '_{:02d}.pth').stem
             log.debug(f"-- Run name: {run_name} - Iteration: {i} --")
