@@ -100,7 +100,7 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
     # Loop to iterate over the different trained/re-trained architectures.
 
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
-        model_name = '{}_{}_{}_{}_model_{}'.format(trainset_name, args.mode, args.split, crop_size, args.model_pipeline)
+        model_name = '{}_{}_{}_{}_{}_{}'.format(trainset_name, args.mode, args.split, crop_size, args.pre_processing_pipeline, args.model_pipeline)
         log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
         for i in range(args.iterations): # Train multiple models - how can it distinguished by multiple iterations?
