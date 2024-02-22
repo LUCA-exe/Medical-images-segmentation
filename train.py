@@ -10,7 +10,7 @@ from os.path import join, exists
 from collections import defaultdict
 from utils import create_logging, set_device, set_environment_paths, TrainArgs, check_path
 from parser import get_parser, get_processed_args
-from net_utils.utils import unique_path, write_train_info, show_training_dataset_samples
+from net_utils.utils import unique_path, write_train_info
 from net_utils import unets
 from training.create_training_sets import create_ctc_training_sets, get_file
 from training.training import train, train_auto, get_max_epochs, get_weights
@@ -50,6 +50,7 @@ def parse_training_args(log, args, num_gpus):
                             act_fun = args.act_fun,
                             batch_size = args.batch_size, 
                             filters = args.filters,
+                            attach_fusion_layers = args.attach_fusion_layers,
                             iterations = args.iterations,
                             loss = args.loss,
                             norm_method = args.norm_method,
@@ -63,7 +64,7 @@ def parse_training_args(log, args, num_gpus):
     log.info(f"Training parameters {train_args}")
 
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
-    model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters),
+    model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters, train_args.attach_fusion_layers),
                     'batch_size': train_args.batch_size,
                     'batch_size_auto': 2,
                     'label_type': "distance", # NOTE: Fixed param.
@@ -71,6 +72,7 @@ def parse_training_args(log, args, num_gpus):
                     'num_gpus': num_gpus,
                     'optimizer': train_args.optimizer
                     }
+    log.info(f"Model configuration {model_config}")
     return train_args, model_config
 
 
@@ -90,14 +92,15 @@ def create_model_architecture(log, pre_train, model_config, device, num_gpus):
                                 num_gpus=num_gpus,
                                 ch_in=1,
                                 ch_out=1,
-                                filters=model_config['architecture'][4])
+                                filters=model_config['architecture'][4],
+                                attach_fusion_layers=model_config['architecture'][5])
     return net
 
 def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):
     # Loop to iterate over the different trained/re-trained architectures.
 
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
-        model_name = '{}_{}_{}_{}_model'.format(trainset_name, args.mode, args.split, crop_size)
+        model_name = '{}_{}_{}_{}_model_{}'.format(trainset_name, args.mode, args.split, crop_size, args.model_pipeline)
         log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
         for i in range(args.iterations): # Train multiple models - how can it distinguished by multiple iterations?
@@ -153,8 +156,6 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
             datasets = {x: CellSegDataset(root_dir=path_data / dataset_name, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
 
-            # Assert that the datasets has been created correctly.
-            show_training_dataset_samples(log, datasets["train"])
             # Train loop with the chosen architecture.
             best_loss = train(log=log, net=net, datasets=datasets, config=model_config, device=device, path_models=path_models)
 

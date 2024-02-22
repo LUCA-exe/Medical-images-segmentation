@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 
 from training.ranger2020 import Ranger
 from training.losses import get_loss
-from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss
+from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples
 
 
 def set_up_optimizer_and_scheduler(config, net, best_loss):
@@ -150,6 +150,8 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
     :return: None
     """
+    # Assert that the datasets has been created correctly before the loop over the images.
+    show_training_dataset_samples(log, datasets["train"])
 
     # Get number of training epochs depending on dataset size (just roughly to decrease training time):
     config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']))
@@ -176,11 +178,13 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                                                  num_workers=num_workers)
                   for x in ['train', 'val']}
 
-    # Loss function and optimizer
+    # Set-up the Loss function.
     criterion = get_loss(config)
+    log.info(f"Loss that will be used are: {criterion}")
 
-    second_run = False # WARNING: Fixed arg - to change
+    second_run = False # WARNING: Fixed arg - to change.
     max_epochs = config['max_epochs']
+    # Set-up the optimizer.
     optimizer, scheduler, break_condition = set_up_optimizer_and_scheduler(config, net, best_loss)
 
     # Auxiliary variables for training process
