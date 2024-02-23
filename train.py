@@ -80,11 +80,11 @@ def create_model_architecture(log, pre_train, model_config, device, num_gpus):
     # Given the parsed training arguments, create the U-Net architecture
     
     if pre_train:
-        unet_type = 'AutoU'
+        unet_type = 'AutoU' # Get CNN (U-Net without skip connections)
     else:
         unet_type = model_config['architecture'][0]
 
-    net = unets.build_unet(log, unet_type=unet_type, # Get CNN (U-Net without skip connections)
+    net = unets.build_unet(log, unet_type=unet_type, 
                                 act_fun=model_config['architecture'][2],
                                 pool_method=model_config['architecture'][1],
                                 normalization=model_config['architecture'][3],
@@ -128,7 +128,8 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
                     raise Exception('Pre-training only for GTs and for single cell type!')
 
                 # Get CNN (U-Net without skip connections)
-                net_auto = create_model_architecture(args.pre_train, model_config, device, num_gpus)
+                net_auto = create_model_architecture(log, args.pre_train, model_config, device, num_gpus)
+
                 # Load training and validation set
                 data_transforms_auto = augmentors(label_type='auto', min_value=0, max_value=65535)
                 datasets = AutoEncoderDataset(data_dir=path_data / args.cell_type[0],
@@ -163,7 +164,7 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
              # Fine-tune with cosine annealing for Ranger models - taken the current best model just trained.
             if model_config['optimizer'] == 'ranger':
                 # NOTE: No-update on training configurations.
-                net = create_model_architecture(args.pre_train, model_config, device, num_gpus)
+                net = create_model_architecture(log, args.pre_train, model_config, device, num_gpus)
                 # Get best weights as starting point
                 net = get_weights(net=net, weights=str(path_models / '{}.pth'.format(run_name)), num_gpus=num_gpus, device=device)
                 # Train further

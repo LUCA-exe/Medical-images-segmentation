@@ -28,7 +28,7 @@ def main():
 
     log.info(f"Args: {args}") # Print overall args 
     log.debug(f"Env varibles: {env}")
-    device, num_gpus = set_device() # Set device: cpu or single-gpu usage
+    device, num_gpus = set_device() # Set device: cpu or single-gpu usage.
     
     log.info(f">>>   Evaluation: model {args.model_pipeline} post-processing {args.post_processing_pipeline} metrics {args.eval_metric} <<<")
 
@@ -108,13 +108,13 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     log.debug(eval_args)
 
                     # Inference on the chosen train set
-                    args_used = inference_2d(log=log, model=model_path,
+                    args_used = inference_2d(log=log, model_path=model_path,
                                 data_path=os.path.join(path_data, train_set),
                                 result_path=path_seg_results,
                                 device=device,
+                                num_gpus = num_gpus,
                                 batchsize=args.batch_size,
                                 args=eval_args,
-                                num_gpus=num_gpus,
                                 model_pipeline=args.model_pipeline,
                                 post_processing_pipeline=args.post_processing_pipeline) 
 
@@ -130,7 +130,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     else:
                         raise NotImplementedError(f"Other metrics not implemented yet ..")
 
-                    # Kept the internal structure as simple as possble for custom aggregation later (both for visualization/tranform in '*.csv' file)
+                    # NOTE: Every post-processing pipeline have internal specific args - custom aggregation later (both for visualization/tranform in '*.csv' file).
                     result_dict['results'][curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
                     curr_experiment += 1
                    

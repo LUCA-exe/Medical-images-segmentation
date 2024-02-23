@@ -60,7 +60,7 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
     if num_gpus > 1:
         model = nn.DataParallel(model)
 
-    # Move model to used device (GPU or CPU)
+    # Move model to used device (GPU or CPU).
     model = model.to(device)
     log.debug(model)
     return model

@@ -76,13 +76,17 @@ def create_logging():
   return logger
 
 
-# For now the repository is implemented for single-gpu usage.
+# NOTE: For now the repository is implemented for single-gpu usage.
 def set_device():
     # Set device for using CPU or GPU
+
+    #num_gpus = torch.cuda.device_count() - not implemented multi-gpu.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if str(device) == 'cuda':
+
         torch.backends.cudnn.benchmark = True
         num_gpus = 1
+        
     else:
         num_gpus = 0
     return device, num_gpus

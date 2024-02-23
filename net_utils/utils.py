@@ -40,6 +40,22 @@ def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_model
     return None
 
 
+def save_inference_final_images(result_path, file_id, prediction_instance):
+    # Save final inferred image.
+
+    tiff.imwrite(str(result_path / ('mask' + file_id)), prediction_instance)
+    return None
+
+
+def save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border):
+    # Called if "args.save_raw_pred" is true: save the raw outputs of the model during inference time.
+    
+    tiff.imwrite(str(result_path / ('cell' + file_id)), prediction_cell_batch[h, ..., 0].astype(np.float32))
+    tiff.imwrite(str(result_path / ('raw_border' + file_id)), prediction_border_batch[h, ..., 0].astype(np.float32))
+    tiff.imwrite(str(result_path / ('border' + file_id)), border.astype(np.float32))
+    return None
+
+
 def save_current_model_state(config, net, path_models):
     # The state dict of data parallel (multi GPU) models need to get saved in a way that allows to
     # load them also on single GPU or CPU
@@ -71,12 +87,11 @@ def get_num_workers(device):
     return num_workers
 
 
-def get_num_gpus_and_set_weights(net, model, device):
+def load_weights(net, model, device, num_gpus):
     # Get number of GPUs to use and load weights
 
     try:
         model_path = str(model)  # Ensure valid file path
-        num_gpus = torch.cuda.device_count()
 
         if num_gpus > 1:
             net.module.load_state_dict(torch.load(model_path, map_location=device))
@@ -89,7 +104,7 @@ def get_num_gpus_and_set_weights(net, model, device):
     except Exception as e:
 
         print(f"Unexpected error while loading model: {e}")
-    return num_gpus
+    return None
 
 
 def get_det_score(path):

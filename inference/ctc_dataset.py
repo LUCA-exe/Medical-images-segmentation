@@ -36,7 +36,7 @@ class CTCDataSet(Dataset):
 
         img = tiff.imread(str(img_id))
 
-        if len(img.shape) > 2: # Preferred choice
+        if len(img.shape) > 2: # Preferred choice for my 2D dataset.
             img = np.sum(img, axis=2) # Keep all object
             #img = img[1024:, 1024:] # NOTE: Temporary fix
 

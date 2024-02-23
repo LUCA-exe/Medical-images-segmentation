@@ -14,22 +14,13 @@ from skimage.transform import resize
 
 from inference.ctc_dataset import CTCDataSet, pre_processing_transforms
 from inference.postprocessing import *
-from net_utils.unets import build_unet, get_num_gpus_and_set_weights, get_num_workers
+from net_utils.unets import build_unet
+from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images
 
 
-def load_and_get_architecture(log, model_name, model_pipeline, device):
-
-    # Load model json file to get architecture + filters
-    with open('.' + model_name.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
-        model_settings = json.load(f) # Load model structure
-
-    # Build model
-    log.info(f"Bulding model '{model_name}' ..")
-
-    # Fetch number of gpus and load the weights on device.
-    num_gpus = get_num_gpus_and_set_weights(net, model_name, device)
-
+def create_architecture(log, model_pipeline, model_settings, device, num_gpus):
     # TODO: Check which model to build (implement different pipelines/options to build the model)
+    
     if model_pipeline == 'kit-ge':
         net = build_unet(log, unet_type=model_settings['architecture'][0],
                         act_fun=model_settings['architecture'][2],
@@ -39,17 +30,34 @@ def load_and_get_architecture(log, model_name, model_pipeline, device):
                         num_gpus=num_gpus,
                         ch_in=1,
                         ch_out=1,
-                        filters=model_settings['architecture'][4])
+                        filters=model_settings['architecture'][4],
+                        detach_fusion_layers=model_settings['architecture'][5])
+    return net
 
+
+def load_and_get_architecture(log, model_path, model_pipeline, device, num_gpus):
+    # Load architecture from the "*.json" and prepare it for the evaluation phase.
+
+    # Load model json file to get architecture + filters
+    with open('.' + model_path.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
+        model_settings = json.load(f) # Load model structure
+
+    # Build model
+    log.info(f"Bulding model '{model_path}' ..")
+    # Create the architecture given the json configuration file.
+    net = create_architecture(log, model_pipeline, model_settings, device, num_gpus)
+    # Load the weights.
+    load_weights(net, model_path, device, num_gpus)
+    
     # Prepare model for evaluation
     net.eval()
     torch.set_grad_enabled(False) # NOTE: This command affect the autograd context-manager just the single thread.
     log.info(f"Model correctly set for evaluation phase")
-    return net # UPDATE THE ARCHITECTURE!!!
+    return net, model_settings
 
 
 # For now use this simple 'dataloader' loop for evaluation of different pipelines.
-def inference_2d(log, model, data_path, result_path, device, batchsize, args, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
+def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batchsize, args, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -68,8 +76,7 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, mo
         :type num_gpus: int
     :return: None
     """
-    log.info(f"Loading model '{model}' information ..")
-    result_path = Path(result_path) # Cast from str to Path type
+    result_path = Path(result_path) # Cast from str to Path type.
 
     '''# Load model json file to get architecture + filters
     with open('.' + model.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
@@ -102,6 +109,7 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, mo
     # Prepare model for evaluation
     net.eval()
     torch.set_grad_enabled(False)'''
+    net, model_settings = load_and_get_architecture(log, model_path, model_pipeline, device, num_gpus)
 
     # Get images to predict
     log.info(f"Creating inference dataset ..")
@@ -143,7 +151,7 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, mo
 
         log.debug(f".. predicted batch {idx} ..")
 
-        # Get rid of pads
+        # Get rid of pads.
         prediction_cell_batch = prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
         prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
@@ -184,12 +192,15 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, mo
             prediction_instance = foi_correction(mask=prediction_instance, cell_type=args.cell_type)
 
             # Save images in the 'results' folder
-            tiff.imwrite(str(result_path / ('mask' + file_id)), prediction_instance)
+            save_inference_final_images(result_path, file_id, prediction_instance)
+            '''tiff.imwrite(str(result_path / ('mask' + file_id)), prediction_instance)
             if save_raw_pred:
                 tiff.imwrite(str(result_path / ('cell' + file_id)), prediction_cell_batch[h, ..., 0].astype(np.float32))
                 tiff.imwrite(str(result_path / ('raw_border' + file_id)), prediction_border_batch[h, ..., 0].astype(np.float32))
-                tiff.imwrite(str(result_path / ('border' + file_id)), border.astype(np.float32))
+                tiff.imwrite(str(result_path / ('border' + file_id)), border.astype(np.float32))'''
+            if save_raw_pred: save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border)
 
+    # TODO: Move into "post_processing.py" module.
     if args.artifact_correction:
         # Artifact correction based on the assumption that the cells are dense and artifacts far away
         roi = np.zeros_like(prediction_instance) > 0
