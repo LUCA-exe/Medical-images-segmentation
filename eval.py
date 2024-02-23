@@ -71,7 +71,7 @@ def main():
 # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
 def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
 
-    result_dict = get_evaluation_dict(args, path_data)
+    result_dict = {}
     curr_experiment = 0 # Simple counter of the args. combination
 
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
@@ -126,7 +126,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                         raise NotImplementedError(f"Other metrics not implemented yet ..")
 
                     # NOTE: Every post-processing pipeline have internal specific args - custom aggregation later (both for visualization/tranform in '*.csv' file).
-                    result_dict['results'][curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
+                    result_dict[curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
                     curr_experiment += 1
                    
     # Save the metrics - It will update the file if there is already an "*.json" with the same name.

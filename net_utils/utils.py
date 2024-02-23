@@ -377,16 +377,6 @@ def zero_pad_model_input(img, pad_val=0):
     return img, [pads[0], pads[1]]
 
 
-def get_evaluation_dict(args, path_data):
-    # Get the dictionary containing the information for the current evaluation run.
-
-    result_dict = { 'model': args.model_pipeline,
-                'post_processing': args.post_processing_pipeline, # NOTE: It is possible to add more fixed args in the dict
-                'data': path_data,
-                'results': {}} # NOTE: This field will contains specific post-processing args for the current pipeline.
-    return result_dict
-
-
 def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):
     # Save/Update the final metrics dict after the post_processing pipeline.
 
@@ -557,16 +547,3 @@ def show_training_dataset_samples(log, dataset, samples = 10):
 
     log.debug(f"Images correctly saved in {folder}!")
     return True
-
-
-
-
-
-
-
-
-
-
-
-
-
