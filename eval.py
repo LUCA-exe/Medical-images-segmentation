@@ -5,11 +5,11 @@ This is the evaluation main function that call inference and the metrics computa
 import os
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths, EvalArgs
+from utils import create_logging, set_device, set_environment_paths, EvalArgs, check_path
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
-from net_utils.utils import save_metrics
+from net_utils.utils import save_metrics, get_evaluation_dict
 
 # CONSTS
 SOFTWARE_DET_FILE = "DET_log.txt"
@@ -34,14 +34,15 @@ def main():
 
     # Load paths
     args.dataset = args.dataset[0] # TODO: To fix!!!
+
     path_data = join(args.train_images_path, args.dataset)
     path_models = args.models_folder # Eval all models found here.
-    path_best_models = args.save_model # Save best model files/metrics here
+    path_best_models = args.save_model # Save best model files/metrics here.
     path_ctc_metric = args.evaluation_software_path
 
     check_path(log, path_data)
 
-    if args.eval_metric == 'software': # Check wich set of metrics you want to use
+    if args.eval_metric == 'software': # Check wich set of metrics you want to use.
         if not os.path.isdir(path_ctc_metric): # Check if evaluation software is available
             raise Exception('No evaluation software found. Run the script download_data.py')
 
@@ -52,7 +53,7 @@ def main():
     log.debug(f"Dataset folder to evaluate: {path_data}")
     log.debug(f"Folder used to fetch models: {path_models}")
     log.debug(f"Folder used to save models performances/files: {path_data}") # Saving the results on the folder of the evaluated dataset
-    if path_ctc_metric != 'none': # In case of 'none' (str) use custom metrics on the script
+    if path_ctc_metric != 'none': # In case of 'none' (str) use custom metrics on the script.
         log.debug(f"Evaluation software folder: {path_ctc_metric}")
 
     scores = [] # Temporary list to keep the evaluation results
@@ -64,7 +65,6 @@ def main():
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
-    
     log.info(">>> Evaluation script ended correctly <<<")
 
 
@@ -72,10 +72,11 @@ def main():
 def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
 
     # Prepare dict for the results of this specific post-processing loop.
-    results = {'model':args.model_pipeline, 
-               'post_processing': args.post_processing_pipeline, # NOTE: It is possible to add more fixed args in the dict
-               'data': path_data,
-               'results': {}} # This key will contains every metrics for every significative combination of 'eval_args'
+    '''result_dict = { 'model':args.model_pipeline, 
+                    'post_processing': args.post_processing_pipeline, # NOTE: It is possible to add more fixed args in the dict
+                    'data': path_data,
+                    'results': {}} # This key will contains every metrics for every significative combination of 'eval_args'''
+    result_dict = get_evaluation_dict(args, path_data)
     curr_experiment = 0 # Simple counter of the args. combination
 
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
@@ -130,11 +131,11 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                         raise NotImplementedError(f"Other metrics not implemented yet ..")
 
                     # Kept the internal structure as simple as possble for custom aggregation later (both for visualization/tranform in '*.csv' file)
-                    results['results'][curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
+                    result_dict['results'][curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
                     curr_experiment += 1
                    
-    # Save the metrics
-    save_metrics(log, results, path_data, name = 'eval_results')
+    # Save the metrics - It will update the file if there is already an "*.json" with the same name.
+    save_metrics(log, result_dict, path_data, name = 'eval_results')
     return None
 
 

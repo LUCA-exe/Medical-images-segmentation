@@ -71,6 +71,27 @@ def get_num_workers(device):
     return num_workers
 
 
+def get_num_gpus_and_set_weights(net, model, device):
+    # Get number of GPUs to use and load weights
+
+    try:
+        model_path = str(model)  # Ensure valid file path
+        num_gpus = torch.cuda.device_count()
+
+        if num_gpus > 1:
+            net.module.load_state_dict(torch.load(model_path, map_location=device))
+        else:
+            net.load_state_dict(torch.load(model_path, map_location=device))
+
+    except FileNotFoundError as e:
+
+        print(f"Error: Model file '{model_path}' not found.")
+    except Exception as e:
+
+        print(f"Unexpected error while loading model: {e}")
+    return num_gpus
+
+
 def get_det_score(path):
     """  Get DET metric score.
 
@@ -338,6 +359,17 @@ def zero_pad_model_input(img, pad_val=0):
         img = np.pad(img, ((pads[0], 0), (pads[1], 0)), mode='constant', constant_values=pad_val)
 
     return img, [pads[0], pads[1]]
+
+
+def get_evaluation_dict(args, path_data):
+    # Get the dictionary containing the information for the current evaluation run.
+
+    result_dict = { 'model': args.model_pipeline,
+                'post_processing': args.post_processing_pipeline, # NOTE: It is possible to add more fixed args in the dict
+                'data': path_data,
+                'results': {}} # NOTE: This field will contains specific post-processing args for the current pipeline.
+    return result_dict
+
 
 # Custom saving/loading metrics functions
 def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):

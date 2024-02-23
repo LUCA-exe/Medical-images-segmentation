@@ -14,11 +14,42 @@ from skimage.transform import resize
 
 from inference.ctc_dataset import CTCDataSet, pre_processing_transforms
 from inference.postprocessing import *
-from net_utils.unets import build_unet
+from net_utils.unets import build_unet, get_num_gpus_and_set_weights, get_num_workers
+
+
+def load_and_get_architecture(log, model_name, model_pipeline, device):
+
+    # Load model json file to get architecture + filters
+    with open('.' + model_name.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
+        model_settings = json.load(f) # Load model structure
+
+    # Build model
+    log.info(f"Bulding model '{model_name}' ..")
+
+    # Fetch number of gpus and load the weights on device.
+    num_gpus = get_num_gpus_and_set_weights(net, model_name, device)
+
+    # TODO: Check which model to build (implement different pipelines/options to build the model)
+    if model_pipeline == 'kit-ge':
+        net = build_unet(log, unet_type=model_settings['architecture'][0],
+                        act_fun=model_settings['architecture'][2],
+                        pool_method=model_settings['architecture'][1],
+                        normalization=model_settings['architecture'][3],
+                        device=device,
+                        num_gpus=num_gpus,
+                        ch_in=1,
+                        ch_out=1,
+                        filters=model_settings['architecture'][4])
+
+    # Prepare model for evaluation
+    net.eval()
+    torch.set_grad_enabled(False) # NOTE: This command affect the autograd context-manager just the single thread.
+    log.info(f"Model correctly set for evaluation phase")
+    return net # UPDATE THE ARCHITECTURE!!!
 
 
 # For now use this simple 'dataloader' loop for evaluation of different pipelines.
-def inference_2d(log, model, data_path, result_path, device, batchsize, args, num_gpus=None, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
+def inference_2d(log, model, data_path, result_path, device, batchsize, args, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -40,7 +71,7 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, nu
     log.info(f"Loading model '{model}' information ..")
     result_path = Path(result_path) # Cast from str to Path type
 
-    # Load model json file to get architecture + filters
+    '''# Load model json file to get architecture + filters
     with open('.' + model.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
         model_settings = json.load(f) # Load model structure
 
@@ -57,20 +88,20 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, nu
                         num_gpus=num_gpus,
                         ch_in=1,
                         ch_out=1,
-                        filters=model_settings['architecture'][4])
+                        filters=model_settings['architecture'][4])'''
 
-    # Get number of GPUs to use and load weights
+    '''# Get number of GPUs to use and load weights
     if not num_gpus:
         num_gpus = torch.cuda.device_count()
     if num_gpus > 1:
         net.module.load_state_dict(torch.load(str(model), map_location=device))
     else:
-        net.load_state_dict(torch.load(str(model), map_location=device))
+        net.load_state_dict(torch.load(str(model), map_location=device))'''
     
-    log.info(f"Model correctly set")
+    '''log.info(f"Model correctly set")
     # Prepare model for evaluation
     net.eval()
-    torch.set_grad_enabled(False)
+    torch.set_grad_enabled(False)'''
 
     # Get images to predict
     log.info(f"Creating inference dataset ..")
@@ -79,7 +110,7 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, nu
     
     log.info(f"Inference dataset correctly set")
     
-    if device.type == "cpu":
+    '''if device.type == "cpu":
         num_workers = 0
     else:
         try:
@@ -87,7 +118,9 @@ def inference_2d(log, model, data_path, result_path, device, batchsize, args, nu
         except AttributeError:
             num_workers = 4
     if num_workers <= 2:  # Probably Google Colab --> use 0
-        num_workers = 0
+        num_workers = 0'''
+
+    num_workers = get_num_workers(device)
     num_workers = np.minimum(num_workers, 16)
     log.debug(f"Number of workers set for the dataloader: {num_workers}")
 
