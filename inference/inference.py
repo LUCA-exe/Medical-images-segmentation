@@ -77,56 +77,12 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     :return: None
     """
     result_path = Path(result_path) # Cast from str to Path type.
-
-    '''# Load model json file to get architecture + filters
-    with open('.' + model.split('.')[1] + '.json') as f: # Fetch model info from saved '*.json'
-        model_settings = json.load(f) # Load model structure
-
-    # Build model
-    log.info(f"Bulding model '{model}' ..")
-
-    # TODO: Check which model to build (implement different pipelines/options to build the model)
-    if model_pipeline == 'kit-ge':
-        net = build_unet(log, unet_type=model_settings['architecture'][0],
-                        act_fun=model_settings['architecture'][2],
-                        pool_method=model_settings['architecture'][1],
-                        normalization=model_settings['architecture'][3],
-                        device=device,
-                        num_gpus=num_gpus,
-                        ch_in=1,
-                        ch_out=1,
-                        filters=model_settings['architecture'][4])'''
-
-    '''# Get number of GPUs to use and load weights
-    if not num_gpus:
-        num_gpus = torch.cuda.device_count()
-    if num_gpus > 1:
-        net.module.load_state_dict(torch.load(str(model), map_location=device))
-    else:
-        net.load_state_dict(torch.load(str(model), map_location=device))'''
-    
-    '''log.info(f"Model correctly set")
-    # Prepare model for evaluation
-    net.eval()
-    torch.set_grad_enabled(False)'''
     net, model_settings = load_and_get_architecture(log, model_path, model_pipeline, device, num_gpus)
 
     # Get images to predict
-    log.info(f"Creating inference dataset ..")
     ctc_dataset = CTCDataSet(data_dir=data_path,
                              transform=pre_processing_transforms(apply_clahe=args.apply_clahe, scale_factor=args.scale))
-    
     log.info(f"Inference dataset correctly set")
-    
-    '''if device.type == "cpu":
-        num_workers = 0
-    else:
-        try:
-            num_workers = cpu_count() // 2
-        except AttributeError:
-            num_workers = 4
-    if num_workers <= 2:  # Probably Google Colab --> use 0
-        num_workers = 0'''
 
     num_workers = get_num_workers(device)
     num_workers = np.minimum(num_workers, 16)
@@ -193,11 +149,6 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
             # Save images in the 'results' folder
             save_inference_final_images(result_path, file_id, prediction_instance)
-            '''tiff.imwrite(str(result_path / ('mask' + file_id)), prediction_instance)
-            if save_raw_pred:
-                tiff.imwrite(str(result_path / ('cell' + file_id)), prediction_cell_batch[h, ..., 0].astype(np.float32))
-                tiff.imwrite(str(result_path / ('raw_border' + file_id)), prediction_border_batch[h, ..., 0].astype(np.float32))
-                tiff.imwrite(str(result_path / ('border' + file_id)), border.astype(np.float32))'''
             if save_raw_pred: save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border)
 
     # TODO: Move into "post_processing.py" module.

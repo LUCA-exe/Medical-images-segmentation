@@ -71,11 +71,6 @@ def main():
 # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
 def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
 
-    # Prepare dict for the results of this specific post-processing loop.
-    '''result_dict = { 'model':args.model_pipeline, 
-                    'post_processing': args.post_processing_pipeline, # NOTE: It is possible to add more fixed args in the dict
-                    'data': path_data,
-                    'results': {}} # This key will contains every metrics for every significative combination of 'eval_args'''
     result_dict = get_evaluation_dict(args, path_data)
     curr_experiment = 0 # Simple counter of the args. combination
 
@@ -135,7 +130,8 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     curr_experiment += 1
                    
     # Save the metrics - It will update the file if there is already an "*.json" with the same name.
-    save_metrics(log, result_dict, path_data, name = 'eval_results')
+    result_file_name = f"{args.model_pipeline}_{args.post_processing_pipeline}_{path_data.split('/')[-1]}_eval_results"
+    save_metrics(log, result_dict, path_data, name = result_file_name)
     return None
 
 

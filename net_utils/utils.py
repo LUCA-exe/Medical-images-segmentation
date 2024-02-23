@@ -392,7 +392,7 @@ def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):
     file_name = name + ext
     file_path = os.path.join(dataset_path, file_name)
 
-    # Check if the file already exists
+    # Check if the file already exists - TODO: Implement update of existing result file.
     if os.path.exists(file_path):
         log.info("The file {file_name} already exists in {dataset_path}: It will be subscribed.")
 
