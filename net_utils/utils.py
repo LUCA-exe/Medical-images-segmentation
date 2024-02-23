@@ -10,6 +10,7 @@ import tifffile as tiff
 import matplotlib.pyplot as plt
 from multiprocessing import cpu_count
 import torch
+import pandas as pd
 
 
 def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_models, config, tot_time, tot_epochs):
@@ -386,27 +387,93 @@ def get_evaluation_dict(args, path_data):
     return result_dict
 
 
-# Custom saving/loading metrics functions
 def save_metrics(log, metrics, dataset_path, name = 'results', ext = '.json'):
-    
+    # Save/Update the final metrics dict after the post_processing pipeline.
+
     file_name = name + ext
     file_path = os.path.join(dataset_path, file_name)
 
     # Check if the file already exists - TODO: Implement update of existing result file.
     if os.path.exists(file_path):
-        log.info("The file {file_name} already exists in {dataset_path}: It will be subscribed.")
 
-    # Save the dict in input in a 'results.json' file in the dataset folder
-    with open(os.path.join(dataset_path, name + ext), "w") as outfile:
-        json.dump(metrics, fp=outfile, indent = 4, sort_keys=True)
+        log.info("The file {file_name} already exists in {dataset_path}: It will be updated.")
+        update_evaluation_metrics(file_path, metrics)
+    else:
 
+        # Save the dict in input in a '*.json' file in the dataset folder.
+        '''with open(file_path, "w") as outfile:
+            json.dump(metrics, fp=outfile, indent = 4, sort_keys=True)'''
+        save_dict_to_json(metrics, file_path)
     log.info(f"File '{name + ext}' in '{dataset_path}' saved correctly!")
     return None
 
 
-# TODO: Implement as aggregation of results for visualization purpose.
-def aggregate_metrics():
-    pass
+def update_evaluation_metrics(file_path, new_data_dict):
+    # In case of same "*.json" file containing results, update it.
+
+    old_data = read_json_file(file_path) # Read existing results.
+    old_df = pd.DataFrame.from_dict(old_data, orient="index") # tranform the dict data into a dataframe.
+    new_df = pd.DataFrame.from_dict(new_data_dict, orient="index")
+
+    # Merge the two dict 
+    merged_df = pd.concat([old_df, new_df], ignore_index=True).drop_duplicates() # Check for duplicates results - drop during the assignement.
+    merged_df.index = merged_df.index.astype("object") # Cast the index to object type before tranforming into a dict
+    final_dict = merged_df.to_dict('index')
+    save_dict_to_json(final_dict, file_path)
+    return None
+
+
+def read_json_file(file_path):
+    """
+    Reads a JSON file and returns the contents as a dictionary.
+
+    Args:
+        filepath (str): The path to the JSON file.
+
+    Returns:
+        dict: The contents of the JSON file as a dictionary.
+
+    Raises:
+        ValueError: If the file cannot be opened or if the JSON is invalid.
+    """
+
+    try:
+        with open(file_path, 'r') as f:
+
+            data = json.load(f)
+    except FileNotFoundError:
+
+        raise ValueError(f"File not found: {file_path}")
+    except json.JSONDecodeError as e:
+
+        raise ValueError(f"Invalid JSON format: {e}")
+    return data
+
+
+def save_dict_to_json(data, filepath, *, indent=4, ensure_ascii=True):
+    """
+    Saves a dictionary to a JSON file.
+
+    Args:
+        data (dict): The dictionary to save.
+        filepath (str): The path to the JSON file.
+        indent (int, optional): The indentation level for human-readable output.
+        ensure_ascii (bool, optional): Whether to ensure ASCII encoding (default: True).
+
+    Raises:
+        TypeError: If the data is not a dictionary.
+        IOError: If there is an error writing to the file.
+    """
+
+    if not isinstance(data, dict):
+        raise TypeError("Data must be a dictionary.")
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=indent, ensure_ascii=ensure_ascii)
+
+    except IOError as e:
+        raise IOError(f"Error writing to file: {e}")
+    return None
 
 
 # Moved from the 'create_training_sets.py' module - function used by 'training' methods.
