@@ -133,7 +133,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
             # TODO: Implement different post-processing options.
             if post_processing_pipeline == 'kit-ge':
-                prediction_instance, border = distance_postprocessing(border_prediction=prediction_border_batch[h],
+                prediction_instance, border = border_cell_distance_post_processing(border_prediction=prediction_border_batch[h],
                                                                     cell_prediction=prediction_cell_batch[h],
                                                                     args=args)
 

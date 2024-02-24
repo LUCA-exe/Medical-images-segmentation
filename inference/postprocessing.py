@@ -43,8 +43,76 @@ def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..
     return mask
 
 
-def distance_postprocessing(border_prediction, cell_prediction, args):
-    """ Post-processing for distance label (cell + neighbor) prediction.
+def remove_smaller_areas(seeds, area_threshold):
+    """
+    Removes connected components in a 2D array with areas smaller than a given threshold.
+
+    Args:
+        seeds (np.ndarray): A 2D NumPy array of connected components (labeled).
+        area_threshold (int): The minimum area allowed for a component to remain.
+
+    Returns:
+        np.ndarray: The modified 3D array with smaller components removed.
+
+    Raises:
+        ValueError: If seeds is empty or area_threshold is negative.
+    """
+
+    if not seeds.size:
+        raise ValueError("seeds cannot be empty")
+
+    if area_threshold < 0:
+        raise ValueError("area_threshold must be a non-negative integer")
+
+    # Extract properties of each component
+    props = measure.regionprops(seeds)
+
+    # Filter and remove components based on area
+    filtered_seeds = seeds.copy()
+    for prop in props:
+        if prop.area <= area_threshold:
+            filtered_seeds[filtered_seeds == prop.label] = 0
+
+    # Re-label the remaining components
+    return measure.label(filtered_seeds, background=0)
+
+
+def get_minimum_area_to_remove(connected_components, percentage=0.1):
+  """
+  Calculates the minimum area allowed in an array of connected components,
+  based on a percentage of the average area, and removes smaller components.
+
+  Args:
+    connected_components: A NumPy array of connected components.
+    percentage: A percentage of the average area to use as the minimum threshold
+               (default: 0.1).
+
+  Returns:
+    The minimum area allowed in the array.
+
+  Raises:
+    ValueError: If connected_components is empty.
+  """
+
+  if not connected_components.size:
+    raise ValueError("connected_components cannot be empty")
+
+  # Calculate areas of all components
+  areas = np.array([prop.area for prop in measure.regionprops(connected_components)])
+
+  # Calculate minimum area based on percentage of average area
+  if np.any(areas):
+    min_area = percentage * np.mean(areas)
+  else:
+    min_area = 0
+
+  # Set a minimum threshold
+  min_area = np.maximum(min_area, 4)
+  return min_area
+
+
+def border_cell_distance_post_processing(border_prediction, cell_prediction, args):
+    """ Post-processing for distance label (cell + neighbor distances) prediction.
 
     :param border_prediction: Neighbor distance prediction.
         :type border_prediction:
@@ -59,18 +127,8 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
 
     # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring) - Fixed parameters
     sigma_cell = 0.5
-
-    apply_splitting = False # TODO: Move into the eval args parsers
-    # Debug
-    save_image(cell_prediction, "./tmp", "Pre gaussian filtering")
     cell_prediction = gaussian_filter(cell_prediction, sigma=sigma_cell)
-    # Debug
-    save_image(cell_prediction, "./tmp", "Post gaussian filtering")
-    # Debug
-    save_image(border_prediction, "./tmp", "Pre border clip")
     border_prediction = np.clip(border_prediction, 0, 1)
-    # Debug
-    save_image(border_prediction, "./tmp", "Post border clip")
 
     th_seed = args.th_seed
     th_cell = args.th_cell
@@ -78,42 +136,21 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
 
     # Get mask for watershed - straight up eliminations of low intensity pixel.
     mask = cell_prediction > th_cell
-    # Debug
-    save_image(mask, "./tmp", "Post th_cell")
-
+    
     # Get seeds for marker-based watershed
     borders = np.tan(border_prediction ** 2)
-    # Debug
-    save_image(borders, "./tmp", "Post tan border")
-    # Empirical threhsolds
+
+    # Empirical threhsolds of border pixel values
     borders[borders < 0.05] = 0
     borders = np.clip(borders, 0, 1)
-    # Debug
-    save_image(borders, "./tmp", "Second border clip")
+    
+    # Try to clean/thin the cell_prediction
     cell_prediction_cleaned = (cell_prediction - borders)
-    # Debug
-    save_image(cell_prediction_cleaned, "./tmp", "Cell_pred - processed borders")
     seeds = cell_prediction_cleaned > th_seed
-    # Debug
-    save_image(cell_prediction_cleaned, "./tmp", "Cell_pred post th_seed")
     seeds = measure.label(seeds, background=0)
 
-    # Remove very small seeds
-    props = measure.regionprops(seeds)
-    areas = []
-    for i in range(len(props)):
-        areas.append(props[i].area)
-    if len(areas) > 0:
-        min_area = 0.10 * np.mean(np.array(areas))
-    else:
-        min_area = 0
-    min_area = np.maximum(min_area, 4)
-
-    for i in range(len(props)):
-        # if props[i].area <= 4 or (input_3D and props[i].area <= 8):
-        if props[i].area <= min_area:
-            seeds[seeds == props[i].label] = 0
-    seeds = measure.label(seeds, background=0)
+    min_area = get_minimum_area_to_remove(seeds)
+    seeds = remove_smaller_areas(seeds, min_area)
 
     # Avoid empty predictions (there needs to be at least one cell)
     while np.max(seeds) == 0 and th_seed > 0.05:
@@ -126,8 +163,6 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
                 seeds[seeds == props[i].label] = 0
         seeds = measure.label(seeds, background=0)
 
-    # Debug
-    save_image(seeds, "./tmp", "Seed final results for watershed after removing smaller cells")
     # Marker-based watershed
     prediction_instance = watershed(image=-cell_prediction, markers=seeds, mask=mask, watershed_line=False)
 
@@ -147,28 +182,6 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
                 if len(merge_ids) == 2:
                     prediction_instance[prediction_instance == merge_ids[1]] = merge_ids[0]
         prediction_instance = measure.label(prediction_instance)
-
-    # Iterative splitting of cells detected as (probably) merged
-    if apply_splitting:
-        props = measure.regionprops(prediction_instance)
-        volumes, nucleus_ids = [], []
-        for i in range(len(props)):
-            volumes.append(props[i].area)
-            nucleus_ids.append(props[i].label)
-        volumes = np.array(volumes)
-        for i, nucleus_id in enumerate(nucleus_ids):
-            if volumes[i] > np.mean(volumes) + 2/5 * np.mean(volumes):
-                nucleus_bin = (prediction_instance == nucleus_id)
-                cell_prediction_nucleus = cell_prediction * nucleus_bin
-                for th in [0.50, 0.60, 0.75]:
-                    new_seeds = measure.label(cell_prediction_nucleus > th)
-                    if np.max(new_seeds) > 1:
-                        new_cells = watershed(image=-cell_prediction_nucleus, markers=new_seeds, mask=nucleus_bin,
-                                              watershed_line=False)
-                        new_ids = get_nucleus_ids(new_cells)
-                        for new_id in new_ids:
-                            prediction_instance[new_cells == new_id] = np.max(prediction_instance) + 1
-                        break
 
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
