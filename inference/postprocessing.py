@@ -6,8 +6,7 @@ from skimage import measure
 from skimage.feature import peak_local_max, canny
 from skimage.morphology import binary_closing
 
-from net_utils.utils import get_nucleus_ids
-from utils import save_image
+from net_utils.utils import get_nucleus_ids, save_image
 
 
 def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..

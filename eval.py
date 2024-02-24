@@ -9,7 +9,7 @@ from utils import create_logging, set_device, set_environment_paths, EvalArgs, c
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
-from net_utils.utils import save_metrics, get_evaluation_dict
+from net_utils.utils import save_metrics
 
 # CONSTS
 SOFTWARE_DET_FILE = "DET_log.txt"
