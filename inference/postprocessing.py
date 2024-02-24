@@ -7,6 +7,7 @@ from skimage.feature import peak_local_max, canny
 from skimage.morphology import binary_closing
 
 from net_utils.utils import get_nucleus_ids
+from utils import save_image
 
 
 def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..
@@ -61,23 +62,41 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
     sigma_cell = 0.5
 
     apply_splitting = False # TODO: Move into the eval args parsers
+    # Debug
+    save_image(cell_prediction, "./tmp", "Pre gaussian filtering")
     cell_prediction = gaussian_filter(cell_prediction, sigma=sigma_cell)
+    # Debug
+    save_image(cell_prediction, "./tmp", "Post gaussian filtering")
+    # Debug
+    save_image(border_prediction, "./tmp", "Pre border clip")
     border_prediction = np.clip(border_prediction, 0, 1)
+    # Debug
+    save_image(border_prediction, "./tmp", "Post border clip")
 
     th_seed = args.th_seed
     th_cell = args.th_cell
     th_local = 0.25
 
-    # Get mask for watershed
+    # Get mask for watershed - straight up eliminations of low intensity pixel.
     mask = cell_prediction > th_cell
+    # Debug
+    save_image(mask, "./tmp", "Post th_cell")
 
     # Get seeds for marker-based watershed
     borders = np.tan(border_prediction ** 2)
+    # Debug
+    save_image(borders, "./tmp", "Post tan border")
     # Empirical threhsolds
     borders[borders < 0.05] = 0
     borders = np.clip(borders, 0, 1)
+    # Debug
+    save_image(borders, "./tmp", "Second border clip")
     cell_prediction_cleaned = (cell_prediction - borders)
+    # Debug
+    save_image(cell_prediction_cleaned, "./tmp", "Cell_pred - processed borders")
     seeds = cell_prediction_cleaned > th_seed
+    # Debug
+    save_image(cell_prediction_cleaned, "./tmp", "Cell_pred post th_seed")
     seeds = measure.label(seeds, background=0)
 
     # Remove very small seeds
@@ -108,6 +127,8 @@ def distance_postprocessing(border_prediction, cell_prediction, args):
                 seeds[seeds == props[i].label] = 0
         seeds = measure.label(seeds, background=0)
 
+    # Debug
+    save_image(seeds, "./tmp", "Seed final results for watershed after removing smaller cells")
     # Marker-based watershed
     prediction_instance = watershed(image=-cell_prediction, markers=seeds, mask=mask, watershed_line=False)
 
