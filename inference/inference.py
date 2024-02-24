@@ -18,24 +18,23 @@ from net_utils.unets import build_unet
 from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images
 
 
-def create_architecture(log, model_pipeline, model_settings, device, num_gpus):
+def create_architecture(log, model_settings, device, num_gpus):
     # TODO: Check which model to build (implement different pipelines/options to build the model)
     
-    if model_pipeline == 'kit-ge':
-        net = build_unet(log, unet_type=model_settings['architecture'][0],
-                        act_fun=model_settings['architecture'][2],
-                        pool_method=model_settings['architecture'][1],
-                        normalization=model_settings['architecture'][3],
-                        device=device,
-                        num_gpus=num_gpus,
-                        ch_in=1,
-                        ch_out=1,
-                        filters=model_settings['architecture'][4],
-                        detach_fusion_layers=model_settings['architecture'][5])
+    net = build_unet(log, unet_type=model_settings['architecture'][0],
+                    act_fun=model_settings['architecture'][2],
+                    pool_method=model_settings['architecture'][1],
+                    normalization=model_settings['architecture'][3],
+                    device=device,
+                    num_gpus=num_gpus,
+                    ch_in=1,
+                    ch_out=1,
+                    filters=model_settings['architecture'][4],
+                    detach_fusion_layers=model_settings['architecture'][5])
     return net
 
 
-def load_and_get_architecture(log, model_path, model_pipeline, device, num_gpus):
+def load_and_get_architecture(log, model_path, device, num_gpus):
     # Load architecture from the "*.json" and prepare it for the evaluation phase.
 
     # Load model json file to get architecture + filters
@@ -45,7 +44,7 @@ def load_and_get_architecture(log, model_path, model_pipeline, device, num_gpus)
     # Build model
     log.info(f"Bulding model '{model_path}' ..")
     # Create the architecture given the json configuration file.
-    net = create_architecture(log, model_pipeline, model_settings, device, num_gpus)
+    net = create_architecture(log, model_settings, device, num_gpus)
     # Load the weights.
     load_weights(net, model_path, device, num_gpus)
     
@@ -77,7 +76,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     :return: None
     """
     result_path = Path(result_path) # Cast from str to Path type.
-    net, model_settings = load_and_get_architecture(log, model_path, model_pipeline, device, num_gpus)
+    net, model_settings = load_and_get_architecture(log, model_path, device, num_gpus)
 
     # Get images to predict
     ctc_dataset = CTCDataSet(data_dir=data_path,
@@ -104,6 +103,10 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
         # Prediction outputs - dependent on the chosen model pipeline. 
         if model_pipeline == 'kit-ge':
             prediction_border_batch, prediction_cell_batch = net(img_batch)
+
+        elif model_pipeline == "triple-unet":
+            prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
+            prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         log.debug(f".. predicted batch {idx} ..")
 
@@ -136,7 +139,9 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                 prediction_instance, border = border_cell_distance_post_processing(border_prediction=prediction_border_batch[h],
                                                                     cell_prediction=prediction_cell_batch[h],
                                                                     args=args)
-
+            
+            if post_processing_pipeline == 'triple-unet':
+                prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
 
             if args.scale < 1:
                 prediction_instance = resize(prediction_instance,

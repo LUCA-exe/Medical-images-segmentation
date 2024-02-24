@@ -62,6 +62,8 @@ def main():
     # NOTE: For now it is implemented evaluation for one dataset
     if args.post_processing_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
         kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
+    elif args.post_processing_pipeline == 'triple-unet':
+        triple_unet_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
@@ -128,6 +130,71 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     # NOTE: Every post-processing pipeline have internal specific args - custom aggregation later (both for visualization/tranform in '*.csv' file).
                     result_dict[curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
                     curr_experiment += 1
+                   
+    # Save the metrics - It will update the file if there is already an "*.json" with the same name.
+    result_file_name = f"{args.model_pipeline}_{args.post_processing_pipeline}_{path_data.split('/')[-1]}_eval_results"
+    save_metrics(log, result_dict, path_data, name = result_file_name)
+    return None
+
+
+# TODO: Work in progress.
+def triple_unet_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
+
+    result_dict = {}
+    curr_experiment = 0 # Simple counter of the args. combination
+
+    # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
+    for model in models: # Loop over all the models found
+        model_path = os.path.join(path_models, model) # Create model path
+        for train_set in train_sets:
+
+            log.info(f'> Evaluate {model} on {path_data}_{train_set}')
+
+            # Set up current results folder for the segmentation maps
+            path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model.split('.')[0]}")
+            log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
+            os.makedirs(path_seg_results, exist_ok=True)
+
+            # Get post-processing settings
+            eval_args = EvalArgs(args.post_processing_pipeline,
+                                    th_cell=None, 
+                                    th_seed=None,
+                                    apply_clahe=None,
+                                    scale=args.scale,
+                                    cell_type=args.dataset,
+                                    save_raw_pred=args.save_raw_pred,
+                                    artifact_correction=None,
+                                    apply_merging=args.apply_merging)
+            
+            # Debug specific args for the current run.
+            log.debug(eval_args)
+
+            # Inference on the chosen train set
+            args_used = inference_2d(log=log, model_path=model_path,
+                        data_path=os.path.join(path_data, train_set),
+                        result_path=path_seg_results,
+                        device=device,
+                        num_gpus = num_gpus,
+                        batchsize=args.batch_size,
+                        args=eval_args,
+                        model_pipeline=args.model_pipeline,
+                        post_processing_pipeline=args.post_processing_pipeline) 
+
+            if args.eval_metric == 'software':
+                seg_measure, det_measure = ctc_metrics(path_data=path_data,
+                                                        path_results=path_seg_results,
+                                                        path_software=args.evaluation_software_path,
+                                                        subset=train_set,
+                                                        mode=args.mode)
+                
+                _, so, fnv, fpv = count_det_errors(os.path.join(path_seg_results, SOFTWARE_DET_FILE))
+
+            else:
+                raise NotImplementedError(f"Other metrics not implemented yet ..")
+
+            # NOTE: Every post-processing pipeline have internal specific args - custom aggregation later (both for visualization/tranform in '*.csv' file).
+            result_dict[curr_experiment] = {'model':model, 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
+            curr_experiment += 1
                    
     # Save the metrics - It will update the file if there is already an "*.json" with the same name.
     result_file_name = f"{args.model_pipeline}_{args.post_processing_pipeline}_{path_data.split('/')[-1]}_eval_results"

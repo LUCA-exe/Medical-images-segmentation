@@ -284,15 +284,15 @@ class EvalArgs(object): # Class containings inference and post-processing parame
         :param artifact_correction: Apply artifact correction post-processing.
             :type artifact_correction: bool
         """
-        if post_processing_pipeline == 'kit-ge':
-            self.th_cell = th_cell
-            self.th_seed = th_seed
-            self.apply_clahe = apply_clahe
-            self.scale = scale
-            self.cell_type = cell_type
-            self.save_raw_pred = save_raw_pred
-            self.artifact_correction = artifact_correction
-            self.apply_merging = apply_merging
+        self.th_cell = th_cell
+        self.th_seed = th_seed
+        self.apply_clahe = apply_clahe
+        self.scale = scale
+        self.cell_type = cell_type
+        self.save_raw_pred = save_raw_pred
+        self.artifact_correction = artifact_correction
+        self.apply_merging = apply_merging
+
 
     # Override default class function to print parameters
     def __str__(self):

@@ -120,8 +120,6 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
         :type cell_prediction:
     :param args: Post-processing settings (th_cell, th_seed, n_splitting, fuse_z_seeds).
         :type args:
-    :param input_3d: True (3D data), False (2D data).
-        :type input_3d: bool
     :return: Instance segmentation mask.
     """
 
@@ -163,7 +161,7 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
                 seeds[seeds == props[i].label] = 0
         seeds = measure.label(seeds, background=0)
 
-    # Marker-based watershed
+    # Marker-based watershed - markers (seeds) should be smaller than the image cells (cells distance)
     prediction_instance = watershed(image=-cell_prediction, markers=seeds, mask=mask, watershed_line=False)
 
     if args.apply_merging and np.max(prediction_instance) < 255:
@@ -186,3 +184,15 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
+def seg_mask_post_processing(mask, args):
+    """ Assignining different IDs in the final segmentation mask prediction.
+
+    :param mask: Binary mask prediction.
+
+    :param args: Post-processing settings (th_cell, th_seed, n_splitting, fuse_z_seeds).
+        :type args:
+    :return: Instance segmentation mask.
+    """
+
+    processed_mask = measure.label(mask, background=0)
+    return np.squeeze(processed_mask.astype(np.uint16))
