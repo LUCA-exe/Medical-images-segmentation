@@ -44,7 +44,7 @@ def get_parser():
     parser.add_argument("--pre_processing_pipeline", default="kit-ge", type=str, help="Chosing what pre-processing operations/pipeline to do")
     parser.add_argument('--train_loop', '-tl', default=False, action="store_true", help='If True execute the training loop after the dataset creation')
     parser.add_argument("--model_pipeline", default="kit-ge", type=str, help="String to chose what models to build")
-    parser.add_argument("--post_processing_pipeline", default="kit-ge", type=str, help="Chosing what post-processing operations/pipeline to do")
+    parser.add_argument("--post_processing_pipeline", default="dual-unet", type=str, help="Chosing what post-processing operations/pipeline to do")
 
     # Dataset pre-processing args - for now just KIT-GE post-processing pipeline it is implemented
 

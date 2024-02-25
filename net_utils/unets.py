@@ -32,7 +32,7 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
     """
 
     # Build model
-    if unet_type == 'DU':  # U-Net with two decoder paths and two single channel outputs (e.g., cell + neighbor dist)
+    if unet_type == 'DU':  # U-Net with two decoder paths and two single channel outputs (e.g., cell + neighbor dist) | dual-unet
         model = DUNet(ch_in=ch_in,
                       ch_out=ch_out,
                       pool_method=pool_method,
@@ -45,7 +45,7 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
                          filters=filters,
                          act_fun=act_fun,
                          normalization=normalization)
-    elif unet_type == 'TU':  # U-Net with two decoder paths and one single channel outputs (e.g., cell + neighbor dist used in the fusion layers)
+    elif unet_type == 'TU':  # U-Net with two decoder paths and one single channel outputs (e.g., cell + neighbor dist used in the fusion layers) | triple-unet
         model = TUNet(ch_in=ch_in,
                       ch_out=ch_out,
                       pool_method=pool_method,

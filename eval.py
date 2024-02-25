@@ -5,7 +5,7 @@ This is the evaluation main function that call inference and the metrics computa
 import os
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths, EvalArgs, check_path
+from utils import create_logging, set_device, set_environment_paths, EvalArgs, check_path, eval_factory
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
@@ -57,11 +57,11 @@ def main():
         log.debug(f"Evaluation software folder: {path_ctc_metric}")
 
     scores = [] # Temporary list to keep the evaluation results
-    train_sets = args.subset # List of subfolder to eval: already parser from args
-    
+    train_sets = args.subset # List of subfolder to eval: already parsed from args
+
     # NOTE: For now it is implemented evaluation for one dataset
-    if args.post_processing_pipeline == 'kit-ge': # Call inference from the KIT-GE-(2) model's method
-        kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
+    if args.post_processing_pipeline == 'dual-unet': # Call inference from the KIT-GE-(2) model's method
+        du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     elif args.post_processing_pipeline == 'triple-unet':
         triple_unet_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     
@@ -71,10 +71,11 @@ def main():
 
 
 # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
-def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
+def du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
 
     result_dict = {}
     curr_experiment = 0 # Simple counter of the args. combination
+    eval_f = eval_factory()
 
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
     for model in models: # Loop over all the models found
@@ -90,7 +91,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                     log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
                     os.makedirs(path_seg_results, exist_ok=True)
 
-                    # Get post-processing settings
+                    '''# Get post-processing settings
                     eval_args = EvalArgs(args.post_processing_pipeline,
                                             th_cell=float(th_cell), 
                                             th_seed=float(th_seed),
@@ -99,10 +100,19 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                             cell_type=args.dataset,
                                             save_raw_pred=args.save_raw_pred,
                                             artifact_correction=args.artifact_correction,
-                                            apply_merging=args.apply_merging)
+                                            apply_merging=args.apply_merging)'''
+                    eval_class_args = eval_f.create_argument_class(args.post_processing_pipeline,
+                                                    float(th_cell), 
+                                                    float(th_seed),
+                                                    args.apply_clahe,
+                                                    args.scale,
+                                                    args.dataset,
+                                                    args.save_raw_pred,
+                                                    args.artifact_correction,
+                                                    args.apply_merging)
                     
                     # Debug specific args for the current run.
-                    log.debug(eval_args)
+                    log.debug(eval_class_args)
 
                     # Inference on the chosen train set
                     args_used = inference_2d(log=log, model_path=model_path,
@@ -111,9 +121,7 @@ def kit_ge_inference_loop(log, models, path_models, train_sets, path_data, devic
                                 device=device,
                                 num_gpus = num_gpus,
                                 batchsize=args.batch_size,
-                                args=eval_args,
-                                model_pipeline=args.model_pipeline,
-                                post_processing_pipeline=args.post_processing_pipeline) 
+                                args=eval_class_args) 
 
                     if args.eval_metric == 'software':
                         seg_measure, det_measure = ctc_metrics(path_data=path_data,

@@ -44,6 +44,8 @@ def load_and_get_architecture(log, model_path, device, num_gpus):
     # Build model
     log.info(f"Bulding model '{model_path}' ..")
     # Create the architecture given the json configuration file.
+    log.debug(f"Model settings: {model_settings}")
+
     net = create_architecture(log, model_settings, device, num_gpus)
     # Load the weights.
     load_weights(net, model_path, device, num_gpus)
@@ -56,7 +58,7 @@ def load_and_get_architecture(log, model_path, device, num_gpus):
 
 
 # For now use this simple 'dataloader' loop for evaluation of different pipelines.
-def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batchsize, args, model_pipeline='kit-ge', post_processing_pipeline='kit-ge'):
+def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batchsize, args):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -100,11 +102,11 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             pad_batch = [pad_batch[i][0] for i in range(len(pad_batch))]
             img_size = [img_size[i][0] for i in range(len(img_size))]
 
-        # Prediction outputs - dependent on the chosen model pipeline. 
-        if model_pipeline == 'kit-ge':
+        # Prediction outputs - dependent on the loaded model pipeline. 
+        if model_settings["architecture"][0] == 'DU':
             prediction_border_batch, prediction_cell_batch = net(img_batch)
 
-        elif model_pipeline == "triple-unet":
+        elif model_settings["architecture"][0] == "TU":
             prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
             prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
@@ -135,12 +137,12 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             file_id = ids_batch[h].split('t')[-1] + '.tif'
 
             # TODO: Implement different post-processing options.
-            if post_processing_pipeline == 'kit-ge':
+            if args.post_processing == 'dual-unet':
                 prediction_instance, border = border_cell_distance_post_processing(border_prediction=prediction_border_batch[h],
                                                                     cell_prediction=prediction_cell_batch[h],
                                                                     args=args)
             
-            if post_processing_pipeline == 'triple-unet':
+            if args.post_process == 'triple-unet':
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
 
             if args.scale < 1:

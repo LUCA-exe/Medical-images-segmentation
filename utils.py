@@ -16,6 +16,7 @@ import requests
 import zipfile
 import tifffile as tiff
 from dotenv import load_dotenv
+from abc import ABC, abstractmethod
 
 from img_processing.imageUtils import *
 
@@ -168,7 +169,6 @@ def check_downloaded_images(log, images_path):
     images = [img for img in images if img.endswith('.tif')] # Avoid additional file not '*.tif', as the 'man_track.txt'.
     image = tiff.imread(os.path.join(images_path, images[0]))
     log_image_characteristics(log, image, images[0].split('.')[0]) # Log characteristics of images
-    
     return None
 
 
@@ -260,46 +260,6 @@ def check_path(log, path):
     return True
 
 
-# TODO: this class offer a customized EvaluationParser for every implemented pipeline.
-class EvalArgs(object): # Class containings inference and post-processing parameters.
-    """ Class with post-processing parameters.
-    """
-
-    def __init__(self, post_processing_pipeline, th_cell, th_seed, apply_clahe, scale, cell_type,
-                 save_raw_pred,artifact_correction, apply_merging):
-        """
-        (kit-ge post-processing params)
-        :param th_cell: Mask / cell size threshold.
-            :type th_cell: float
-        :param th_seed: Seed / marker threshold.
-            :type th_seed: float
-        :param apply_clahe: Apply contrast limited adaptive histogram equalization (CLAHE).
-            :type apply_clahe: bool
-        :param scale: Scale factor for downsampling.
-            :type scale: float
-        :param cell_type: Cell type.
-            :type cell_type: str
-        :param save_raw_pred: Save (some) raw predictions.
-            :type save_raw_pred: bool
-        :param artifact_correction: Apply artifact correction post-processing.
-            :type artifact_correction: bool
-        """
-        self.th_cell = th_cell
-        self.th_seed = th_seed
-        self.apply_clahe = apply_clahe
-        self.scale = scale
-        self.cell_type = cell_type
-        self.save_raw_pred = save_raw_pred
-        self.artifact_correction = artifact_correction
-        self.apply_merging = apply_merging
-
-
-    # Override default class function to print parameters
-    def __str__(self):
-        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"EvalArgs({attributes})"
-
-
 # TODO: this class offer a customized TrainingParser for every implemented pipeline.
 class TrainArgs(object):
     """ Class with training creation parameters.
@@ -347,5 +307,154 @@ class TrainArgs(object):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
         return f"TrainArgs({attributes})"
 
+
+# NOTE: Work in progress
+class i_eval_factory(ABC):
+    """Interface for creating evaluation arguments classes."""
+
+    @abstractmethod
+    def create_argument_class(self, *args):
+        """
+        Creates an evaluation args. class based on the number of arguments.
+
+        Args:
+            *args: Variable-length argument list containing input arguments.
+
+        Returns:
+            EvalClass: An instance of an appropriate evaluation metric class.
+        """
+
+        raise NotImplementedError("create_eval_class() must be implemented")
+
+
+class eval_factory(i_eval_factory):
+
+    def create_argument_class(self, *args):
+
+        self._arg_len = len(args)
+        if self._arg_len == 9:
+            return eval_arg_du(*args)
+
+        elif self._arg_len == 6:
+            return eval_arg_tu(*args)
+
+        else:
+            raise ValueError("Invalid number of arguments for evaluation class.")
+
+
+class a_eval_arg_class(ABC):
+    """Abstract base class for evaluation arguments."""
+
+    def __init__(self, *args):
+        self._args = args
+
+
+    def __str__(self):
+        """
+        Abstract method to return in plain text the class attributes.
+        """
+
+
+    def get_name(self):
+        """
+        Returns the name of the argument class.
+
+        Returns:
+            str: The name of the pipeline used in the evaluation phase.
+        """
+
+        return self.__class__.__name__
+
+
+class eval_arg_du(a_eval_arg_class):
+    """Specific argument evaluation class for the KIT-GE model implementation."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        print(args) # DEBUG
+        
+        # Following the original arguments of the post processing evaluation.
+        self.post_pipeline = [0]
+        self.th_cell = args[1]
+        self.th_seed = args[2]
+        self.apply_clahe = args[3]
+        self.scale = args[4]
+        self.cell_type = args[5]
+        self.save_raw_pred = args[6]
+        self.artifact_correction = args[7]
+        self.apply_merging = args[8]
+
+
+    def get_name(self):
+        return "Evaluation argument class for the original Dual U-net of KIT-GE"
+
+
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"eval_args for Dual U-net of KIT-GE({attributes})"
+
+
+class eval_arg_tu(a_eval_arg_class):
+    """Specific argument evaluation class for my implementation of the Dual U-net."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        # Reducted number of arguments compared to the KIT-GE implementation
+        self.post_pipeline = [0] 
+        self.scale = args[1]
+        self.cell_type = args[2]
+        self.save_raw_pred = args[3]
+        self.artifact_correction = args[4]
+        self.apply_merging = args[5]
+
+
+    def get_name(self):
+        return "Evaluation argument class for my custom implementation."
+
+
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"eval_args for Tiple U-net({attributes})"
+
+
+# NOTE: Deprecated 
+class EvalArgs(object): # Class containings inference and post-processing parameters.
+    """ Class with post-processing parameters.
+    """
+
+    def __init__(self, post_processing_pipeline, th_cell, th_seed, apply_clahe, scale, cell_type,
+                 save_raw_pred,artifact_correction, apply_merging):
+        """
+        (kit-ge post-processing params)
+        :param th_cell: Mask / cell size threshold.
+            :type th_cell: float
+        :param th_seed: Seed / marker threshold.
+            :type th_seed: float
+        :param apply_clahe: Apply contrast limited adaptive histogram equalization (CLAHE).
+            :type apply_clahe: bool
+        :param scale: Scale factor for downsampling.
+            :type scale: float
+        :param cell_type: Cell type.
+            :type cell_type: str
+        :param save_raw_pred: Save (some) raw predictions.
+            :type save_raw_pred: bool
+        :param artifact_correction: Apply artifact correction post-processing.
+            :type artifact_correction: bool
+        """
+        self.th_cell = th_cell
+        self.th_seed = th_seed
+        self.apply_clahe = apply_clahe
+        self.scale = scale
+        self.cell_type = cell_type
+        self.save_raw_pred = save_raw_pred
+        self.artifact_correction = artifact_correction
+        self.apply_merging = apply_merging
+
+
+    # Override default class function to print parameters
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"EvalArgs({attributes})"
 
         
