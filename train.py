@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths, TrainArgs, check_path
+from utils import create_logging, set_device, set_environment_paths, check_path, train_factory
 from parser import get_parser, get_processed_args
 from net_utils.utils import unique_path, write_train_info
 from net_utils import unets
@@ -42,10 +42,32 @@ def set_up_training_set(log, args, path_data, cell_type):
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
 
-def parse_training_args(log, args, num_gpus):
+def get_training_args_class(log, args, train_factory):
+    # Get training args class depending on the chosen model pipeline
+
+    train_args = train_factory.create_argument_class(model_pipeline = args.model_pipeline,
+                            act_fun = args.act_fun,
+                            batch_size = args.batch_size, 
+                            filters = args.filters,
+                            detach_fusion_layers = args.detach_fusion_layers,
+                            iterations = args.iterations,
+                            loss = args.loss,
+                            norm_method = args.norm_method,
+                            optimizer = args.optimizer,
+                            pool_method = args.pool_method,
+                            pre_train = args.pre_train,
+                            retrain = args.retrain,
+                            split = args.split)
+
+    # Training parameters used for all the iterations/crop options given.                         
+    log.info(train_args)
+    return train_args
+
+
+def get_model_config(log, train_args, num_gpus):
     # Get training settings - As in 'eval.py', the args for training are split in a specific parser for readibility.
     
-    # TODO: Separate in other function -->
+    '''# TODO: Separate in other function -->
     train_args = TrainArgs(model_pipeline = args.model_pipeline,
                             act_fun = args.act_fun,
                             batch_size = args.batch_size, 
@@ -61,7 +83,7 @@ def parse_training_args(log, args, num_gpus):
                             split = args.split) # WARNING: What is split for?
 
     # Training parameters used for all the iterations/crop options given                         
-    log.info(f"Training parameters {train_args}")
+    log.info(f"Training parameters {train_args}")'''
 
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
     model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters, train_args.detach_fusion_layers),
@@ -73,7 +95,7 @@ def parse_training_args(log, args, num_gpus):
                     'optimizer': train_args.optimizer
                     }
     log.info(f"Model configuration {model_config}")
-    return train_args, model_config
+    return model_config
 
 
 def create_model_architecture(log, pre_train, model_config, device, num_gpus):
@@ -202,8 +224,16 @@ def set_up_training():
         log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
         return None # Exit the script
 
-    train_args, model_config = parse_training_args(log, args, num_gpus)
+    # INStantiate the interface class
+    train_factory = train_factory()
+    '''train_args, model_config = parse_training_args(log, args, num_gpus)'''
+
+    # Parse the training arguments and settings for the specific model pipeline
+    train_args = get_training_args_class(log, args, train_factory)
+    model_config = get_model_config(log, train_args, num_gpus)
     net = create_model_architecture(log, args.pre_train, model_config, device, num_gpus)
+
+    # Set up and execute the actual trainig
     set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
     log.info(">>> Training script ended correctly <<<")
     return

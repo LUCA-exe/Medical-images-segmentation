@@ -260,7 +260,123 @@ def check_path(log, path):
     return True
 
 
-# TODO: this class offer a customized TrainingParser for every implemented pipeline.
+# NOTE: Work in progress
+class i_train_factory(ABC):
+    """Interface for creating training arguments classes."""
+
+    @abstractmethod
+    def create_argument_class(self, *args):
+        """
+        Creates an training args. class based on the number of arguments.
+
+        Args:
+            *args: Variable-length argument list containing input arguments.
+
+        Returns:
+            EvalClass: An instance of an appropriate training argument class.
+        """
+
+        raise NotImplementedError("create_train_class() must be implemented")
+
+
+class train_factory(i_train_factory):
+
+    def create_argument_class(self, *args):
+        # First arg. is the chosen model pipeline
+
+        self._arg_len = len(args)
+        if self._arg_len == "kit-ge":
+            return train_arg_du(*args[1:])
+
+        elif self._arg_len == "triple-unet":
+            return train_arg_tu(*args[1:])
+
+        elif self._arg_len == "triple-unet":
+            return train_arg_tu(*args[1:])
+
+        else:
+            raise ValueError(f"{args[0]} is an invalid model pipeline.")
+
+
+class a_train_arg_class(ABC):
+    """Abstract base class for evaluation arguments."""
+
+    def __init__(self, *args):
+        self._args = args
+
+
+    def __str__(self):
+        """
+        Abstract method to return in plain text the class attributes.
+        """
+
+
+    def get_name(self):
+        """
+        Returns the name of the argument class.
+
+        Returns:
+            str: The name of the pipeline used in the evaluation phase.
+        """
+
+        return self.__class__.__name__
+
+
+class train_arg_du(a_train_arg_class):
+    """Specific argument training class for the KIT-GE model implementation."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        print(args) # DEBUG
+        
+        # Following the original arguments of the post processing evaluation.
+        self.post_pipeline = [0]
+        self.th_cell = args[1]
+        self.th_seed = args[2]
+        self.apply_clahe = args[3]
+        self.scale = args[4]
+        self.cell_type = args[5]
+        self.save_raw_pred = args[6]
+        self.artifact_correction = args[7]
+        self.apply_merging = args[8]
+
+
+    def get_name(self):
+        return "Training argument class for the original Dual U-net of KIT-GE"
+
+
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"train_args for Dual U-net of KIT-GE({attributes})"
+
+
+# TODO: Implement the real "Dual U-net"
+
+class train_arg_tu(a_train_arg_class):
+    """Specific argument training class for my implementation of the Dual U-net."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        # Reducted number of arguments compared to the KIT-GE implementation
+        self.post_pipeline = [0] 
+        self.scale = args[1]
+        self.cell_type = args[2]
+        self.save_raw_pred = args[3]
+        self.artifact_correction = args[4]
+        self.apply_merging = args[5]
+
+
+    def get_name(self):
+        return "Training argument class for my custom implementation."
+
+
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"train_args for Tiple U-net({attributes})"
+
+
+# DEPRECATED
 class TrainArgs(object):
     """ Class with training creation parameters.
     """
