@@ -345,12 +345,13 @@ class train_arg_du(a_train_arg_class):
         self.crop_size = args[13]
         self.mode = args[14]
         self.pre_processing_pipeline = args[15]
+        self.classification_loss = False # NOTE: In this architecture is not present the classification branch
 
 
     def get_arch_args(self):
         # Return all the architecture args as tuple
 
-        return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False
+        return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False, False
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
@@ -380,12 +381,14 @@ class train_arg_tu(a_train_arg_class):
         self.crop_size = args[13]
         self.mode = args[14]
         self.pre_processing_pipeline = args[15]
+        self.softmax_layer = args[16]
+        self.classification_loss = args[17]
 
 
     def get_arch_args(self):
         # Return all the architecture args as tuple
 
-        return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, self.detach_fusion_layers
+        return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, self.detach_fusion_layers, self.softmax_layer
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())

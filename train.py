@@ -60,7 +60,9 @@ def get_training_args_class(log, args, train_factory):
                             args.split,
                             args.crop_size,
                             args.mode,
-                            args.pre_processing_pipeline)
+                            args.pre_processing_pipeline,
+                            args.softmax_layer,
+                            args.classification_loss)
 
     # Training parameters used for all the iterations/crop options given.                         
     log.info(train_args)
@@ -94,6 +96,7 @@ def get_model_config(log, train_args, num_gpus):
                     'batch_size_auto': 2,
                     'label_type': "distance", # NOTE: Fixed param.
                     'loss': train_args.loss,
+                    'classification_loss': train_args.classification_loss,
                     'num_gpus': num_gpus,
                     'optimizer': train_args.optimizer
                     }
@@ -119,7 +122,8 @@ def create_model_architecture(log, pre_train, model_config, device, num_gpus):
                                 ch_in=1,
                                 ch_out=1,
                                 filters=model_config['architecture'][4],
-                                detach_fusion_layers=model_config['architecture'][5])
+                                detach_fusion_layers=model_config['architecture'][5],
+                                softmax_layer=model_config['architecture'][6])
     return net
 
 def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):

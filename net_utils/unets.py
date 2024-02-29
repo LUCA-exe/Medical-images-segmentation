@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import tanh
 
 
-def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_gpus, ch_in=1, ch_out=1, filters=(64, 1024), detach_fusion_layers = False):
+def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_gpus, ch_in=1, ch_out=1, filters=(64, 1024), detach_fusion_layers = False, softmax_layer = False):
     """ Build U-net architecture.
 
     :param unet_type: 'U' (U-net) or 'DU' (U-net with two decoder paths and two outputs).
@@ -52,7 +52,8 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
                       filters=filters,
                       detach_fusion_layers = detach_fusion_layers,
                       act_fun=act_fun,
-                      normalization=normalization)
+                      normalization=normalization,
+                      softmax_layer=softmax_layer)
     else:
         raise Exception('Architecture "{}" is not known'.format(unet_type))
 
@@ -687,7 +688,7 @@ class AutoUNet(nn.Module):
 class TUNet(nn.Module):
     """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
 
-    def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), detach_fusion_layers = False):
+    def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), detach_fusion_layers = False, softmax_layer = False):
         """
 
         :param ch_in: Number of channels of the input image.
@@ -710,6 +711,7 @@ class TUNet(nn.Module):
         self.filters = filters
         self.pool_method = pool_method
         self.detach_fusion_layers = detach_fusion_layers
+        self.softmax_layer = softmax_layer
 
         # Encoder
         self.encoderConv = nn.ModuleList()
@@ -780,8 +782,10 @@ class TUNet(nn.Module):
         # Last convolutonal layers and activation function - number of output channels equal to the number of classes.
         self.fusionConv.append(nn.Conv2d(64, 2, kernel_size=1, stride=1, padding=0))
 
-        # TODO: Implement the option to choose between sigmoid and softmax.
-        self.fusionConv.append(nn.Sigmoid()) # Output - segmentation mask.
+        if self.softmax_layer:
+            self.fusionConv.append(nn.Softmax(dim=1))
+        else:
+            self.fusionConv.append(nn.Sigmoid())
 
 
     def forward(self, x):
