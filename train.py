@@ -45,19 +45,22 @@ def set_up_training_set(log, args, path_data, cell_type):
 def get_training_args_class(log, args, train_factory):
     # Get training args class depending on the chosen model pipeline
 
-    train_args = train_factory.create_argument_class(model_pipeline = args.model_pipeline,
-                            act_fun = args.act_fun,
-                            batch_size = args.batch_size, 
-                            filters = args.filters,
-                            detach_fusion_layers = args.detach_fusion_layers,
-                            iterations = args.iterations,
-                            loss = args.loss,
-                            norm_method = args.norm_method,
-                            optimizer = args.optimizer,
-                            pool_method = args.pool_method,
-                            pre_train = args.pre_train,
-                            retrain = args.retrain,
-                            split = args.split)
+    train_args = train_factory.create_argument_class(args.model_pipeline,
+                            args.act_fun,
+                            args.batch_size, 
+                            args.filters,
+                            args.detach_fusion_layers,
+                            args.iterations,
+                            args.loss,
+                            args.norm_method,
+                            args.optimizer,
+                            args.pool_method,
+                            args.pre_train,
+                            args.retrain,
+                            args.split,
+                            args.crop_size,
+                            args.mode,
+                            args.pre_processing_pipeline)
 
     # Training parameters used for all the iterations/crop options given.                         
     log.info(train_args)
@@ -86,7 +89,7 @@ def get_model_config(log, train_args, num_gpus):
     log.info(f"Training parameters {train_args}")'''
 
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
-    model_config = {'architecture': (train_args.arch, train_args.pool_method, train_args.act_fun, train_args.norm_method, train_args.filters, train_args.detach_fusion_layers),
+    model_config = {'architecture': train_args.get_arch_args(),
                     'batch_size': train_args.batch_size,
                     'batch_size_auto': 2,
                     'label_type': "distance", # NOTE: Fixed param.
@@ -94,6 +97,7 @@ def get_model_config(log, train_args, num_gpus):
                     'num_gpus': num_gpus,
                     'optimizer': train_args.optimizer
                     }
+
     log.info(f"Model configuration {model_config}")
     return model_config
 
@@ -122,7 +126,7 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
     # Loop to iterate over the different trained/re-trained architectures.
 
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
-        model_name = '{}_{}_{}_{}_{}_{}'.format(trainset_name, args.mode, args.split, crop_size, args.pre_processing_pipeline, args.model_pipeline)
+        model_name = '{}_{}_{}_{}_{}_{}'.format(trainset_name, args.mode, args.split, crop_size, args.pre_processing_pipeline, args.arch)
         log.info(f"--- The '{idx + 1}' model used is {model_name} ---")
 
         # Train multiple models - It helps to distinguish between model apparently equal (but with internal architecture different)
@@ -171,7 +175,7 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
                 del net_auto
             
             # Load training and validation set - this is the train (or fine-tuning after the pre-training phase).
-            data_transforms = augmentors(label_type = model_config['label_type'], min_value=0, max_value=65535)
+            data_transforms = augmentors(label_type = model_config['label_type'], min_value=0, max_value=65535) # NOTE: min_value and max_value fixed params.
             model_config['data_transforms'] = str(data_transforms)
             dataset_name = "{}_{}_{}_{}".format(trainset_name, args.mode, args.split, crop_size)
             log.debug(f".. Reading dataset: {dataset_name} ..")
@@ -192,9 +196,9 @@ def set_up_training_loops(log, args, path_data, trainset_name, path_models, mode
                 # Train further
                 _ = train(net=net, datasets=datasets, config=model_config, device=device, path_models=path_models, best_loss=best_loss)
 
-            # Write information to json-file
+            # Write information to json-file - consider to pass even the train_args.
             write_train_info(configs=model_config, path=path_models)
-    return
+    return None
 
 
 def set_up_training():
@@ -213,9 +217,10 @@ def set_up_training():
     
     # TODO: Make modular - for now just take the first dataset available indicated by the parameter.
     args.dataset = args.dataset[0] # TODO: To fix.
-    
     cell_type = Path(args.dataset)
-    if check_path(log, path_data):
+    
+    # Double check if both the training data folder and the specific dataset exist
+    if check_path(log, path_data) and check_path(log, join(path_data, cell_type)):
         trainset_name = args.dataset # 'args.dataset' used as cell type
     set_up_training_set(log, args, path_data, cell_type)
 
@@ -224,17 +229,17 @@ def set_up_training():
         log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
         return None # Exit the script
 
-    # INStantiate the interface class
-    train_factory = train_factory()
+    # Instantiate the training factory class
+    factory = train_factory()
     '''train_args, model_config = parse_training_args(log, args, num_gpus)'''
 
     # Parse the training arguments and settings for the specific model pipeline
-    train_args = get_training_args_class(log, args, train_factory)
+    train_args = get_training_args_class(log, args, factory)
     model_config = get_model_config(log, train_args, num_gpus)
-    net = create_model_architecture(log, args.pre_train, model_config, device, num_gpus)
+    net = create_model_architecture(log, train_args.pre_train, model_config, device, num_gpus)
 
     # Set up and execute the actual trainig
-    set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
+    set_up_training_loops(log, train_args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
     log.info(">>> Training script ended correctly <<<")
     return
 

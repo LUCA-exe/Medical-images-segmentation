@@ -32,7 +32,7 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
     """
 
     # Build model
-    if unet_type == 'kit-ge':  # U-Net with two decoder paths and two single channel outputs (e.g., cell + neighbor dist) | dual-unet
+    if unet_type == 'dual-unet':  # U-Net with two decoder paths and two single channel outputs (e.g., cell + neighbor dist) | kit-ge implementation
         model = DUNet(ch_in=ch_in,
                       ch_out=ch_out,
                       pool_method=pool_method,
@@ -532,6 +532,7 @@ class DUNet(nn.Module):
         self.decoder1Conv.append(nn.Conv2d(n_featuremaps, ch_out, kernel_size=1, stride=1, padding=0))
         self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
 
+
     def forward(self, x):
         """
 
@@ -651,6 +652,7 @@ class AutoUNet(nn.Module):
 
         # Last 1x1 convolutions (2nd path has always 1 channel: binary or dist)
         self.decoderConv.append(nn.Conv2d(n_featuremaps, ch_in, kernel_size=1, stride=1, padding=0))
+
 
     def forward(self, x):
         """
@@ -777,6 +779,7 @@ class TUNet(nn.Module):
         # Last convolutonal layers nad activation function. 
         self.fusionConv.append(nn.Conv2d(64, 1, kernel_size=1, stride=1, padding=0))
         self.fusionConv.append(nn.Sigmoid()) # Output - segmentation mask.
+
 
     def forward(self, x):
         """

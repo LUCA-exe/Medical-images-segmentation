@@ -12,6 +12,25 @@ from training.losses import get_loss
 from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples
 
 
+def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion):
+    
+    if arch_name == 'dual-unet':
+        border_pred_batch, cell_pred_batch = net(img_batch)
+        loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
+        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+        loss = loss_border + loss_cell
+
+    if arch_name == 'triple-unet':
+        border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
+        loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
+        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+        loss_mask = criterion['mask'](mask_pred_batch, true_batches_list[2])
+        loss = loss_border + loss_cell + loss_mask
+
+    # TODO: Finish to implement 
+    return loss, 
+
+
 def set_up_optimizer_and_scheduler(config, net, best_loss):
     """ Set up the optimizer and scheduler configurations adn return them to the main function.
 
@@ -225,19 +244,19 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                 # Forward pass (track history if only in train)
                 with torch.set_grad_enabled(phase == 'train'):
                     
-                    # NOTE: Depending on the architecture, you can have different number of outputs
-                    if config['architecture'][0] == 'DU':
+                    '''# NOTE: Depending on the architecture, you can have different number of outputs
+                    if config['architecture'][0] == 'dual-unet':
                         border_pred_batch, cell_pred_batch = net(img_batch)
                         loss_border = criterion['border'](border_pred_batch, border_label_batch)
                         loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
                         loss = loss_border + loss_cell
 
-                    if config['architecture'][0] == 'TU':
+                    if config['architecture'][0] == 'triple-unet':
                         border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
                         loss_border = criterion['border'](border_pred_batch, border_label_batch)
                         loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
                         loss_mask = criterion['mask'](mask_pred_batch, mask_label_batch)
-                        loss = loss_border + loss_cell + loss_mask
+                        loss = loss_border + loss_cell + loss_mask'''
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
@@ -301,6 +320,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
     # Save loss
     save_training_loss(loss_labels, train_loss, val_loss, second_run, path_models, config, time_elapsed, epoch)
+
     # Clear memory
     del net
     gc.collect()

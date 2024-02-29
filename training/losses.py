@@ -20,10 +20,10 @@ def get_loss(config):
         cell_criterion = nn.SmoothL1Loss()
     
     # NOTE: Binary cross entropy for the segmentation mask should be fixed.
-    if config['architecture'][0] == 'DU':
+    if config['architecture'][0] == 'dual-unet':
         criterion = {'border': border_criterion, 'cell': cell_criterion}
         
-    elif config['architecture'][0] == 'TU':
+    elif config['architecture'][0] == 'triple-unet':
         mask_criterion = nn.BCELoss()
         criterion = {'border': border_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
     return criterion

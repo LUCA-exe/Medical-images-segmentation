@@ -257,6 +257,7 @@ def check_path(log, path):
     if not exists(path):
         log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
         raise ValueError("The '{path}' provided is not existent")
+
     return True
 
 
@@ -284,15 +285,14 @@ class train_factory(i_train_factory):
     def create_argument_class(self, *args):
         # First arg. is the chosen model pipeline
 
-        self._arg_len = len(args)
-        if self._arg_len == "kit-ge":
-            return train_arg_du(*args[1:])
+        if args[0] == "dual-unet":
+            return train_arg_du(args)
 
-        elif self._arg_len == "triple-unet":
-            return train_arg_tu(*args[1:])
+        elif args[0] == "original-dual-unet":
+            return train_arg_tu(args)
 
-        elif self._arg_len == "triple-unet":
-            return train_arg_tu(*args[1:])
+        elif args[0] == "triple-unet":
+            return train_arg_tu(args)
 
         else:
             raise ValueError(f"{args[0]} is an invalid model pipeline.")
@@ -301,22 +301,26 @@ class train_factory(i_train_factory):
 class a_train_arg_class(ABC):
     """Abstract base class for evaluation arguments."""
 
-    def __init__(self, *args):
-        self._args = args
-
-
+  
+    @abstractmethod
     def __str__(self):
         """
         Abstract method to return in plain text the class attributes.
         """
 
 
+    @abstractmethod
+    def get_arch_args(self):
+        """
+        Abstract method to return in tuple all the params regarding the architectures. 
+        """
+
     def get_name(self):
         """
         Returns the name of the argument class.
 
         Returns:
-            str: The name of the pipeline used in the evaluation phase.
+            str: The name of the pipeline used in the training phase.
         """
 
         return self.__class__.__name__
@@ -325,25 +329,29 @@ class a_train_arg_class(ABC):
 class train_arg_du(a_train_arg_class):
     """Specific argument training class for the KIT-GE model implementation."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        print(args) # DEBUG
-        
-        # Following the original arguments of the post processing evaluation.
-        self.post_pipeline = [0]
-        self.th_cell = args[1]
-        self.th_seed = args[2]
-        self.apply_clahe = args[3]
-        self.scale = args[4]
-        self.cell_type = args[5]
-        self.save_raw_pred = args[6]
-        self.artifact_correction = args[7]
-        self.apply_merging = args[8]
+    def __init__(self, args):
+
+        self.arch = args[0]
+        self.act_fun = args[1]
+        self.batch_size = args[2]
+        self.filters = args[3]
+        self.iterations = args[5]
+        self.loss = args[6]
+        self.norm_method = args[7]
+        self.optimizer = args[8]
+        self.pool_method = args[9]
+        self.pre_train = args[10]
+        self.retrain = args[11]
+        self.split = args[12]
+        self.crop_size = args[13]
+        self.mode = args[14]
+        self.pre_processing_pipeline = args[15]
 
 
-    def get_name(self):
-        return "Training argument class for the original Dual U-net of KIT-GE"
+    def get_arch_args(self):
+        # Return all the architecture args as tuple
 
+        return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())

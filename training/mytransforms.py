@@ -27,7 +27,7 @@ def augmentors(label_type, min_value, max_value):
                                               FlipAuto(p=1.0),
                                               ToTensor(label_type=label_type, min_value=min_value, max_value=max_value)])
 
-    else:
+    else: # label_type == 'distace'
         data_transforms = {'train': transforms.Compose([Flip(p=1.0),
                                                         Contrast(p=0.5),
                                                         Scaling(p=0.25),
