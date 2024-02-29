@@ -256,7 +256,7 @@ def check_path(log, path):
 
     if not exists(path):
         log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
-        raise ValueError("The '{path}' provided is not existent")
+        raise ValueError(f"The '{path}' provided is not existent")
 
     return True
 

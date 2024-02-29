@@ -25,7 +25,9 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
         loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
-        loss_mask = criterion['mask'](mask_pred_batch, true_batches_list[2])
+        # NOTE: Attention to the shape of the "target" of the cross entropy loss.
+        target = true_batches_list[2][:, 0, :, :]
+        loss_mask = criterion['mask'](mask_pred_batch, target)
         loss = loss_border + loss_cell + loss_mask
         losses_list = [loss_border.item(), loss_cell.item(), loss_mask.item()]
 
