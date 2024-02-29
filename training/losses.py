@@ -24,6 +24,6 @@ def get_loss(config):
         criterion = {'border': border_criterion, 'cell': cell_criterion}
         
     elif config['architecture'][0] == 'triple-unet':
-        mask_criterion = nn.BCELoss()
+        mask_criterion = nn.CrossEntropyLoss()
         criterion = {'border': border_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
     return criterion

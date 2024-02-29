@@ -261,7 +261,6 @@ def check_path(log, path):
     return True
 
 
-# NOTE: Work in progress
 class i_train_factory(ABC):
     """Interface for creating training arguments classes."""
 
@@ -363,25 +362,34 @@ class train_arg_du(a_train_arg_class):
 class train_arg_tu(a_train_arg_class):
     """Specific argument training class for my implementation of the Dual U-net."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, args):
 
-        # Reducted number of arguments compared to the KIT-GE implementation
-        self.post_pipeline = [0] 
-        self.scale = args[1]
-        self.cell_type = args[2]
-        self.save_raw_pred = args[3]
-        self.artifact_correction = args[4]
-        self.apply_merging = args[5]
+        self.arch = args[0]
+        self.act_fun = args[1]
+        self.batch_size = args[2]
+        self.filters = args[3]
+        self.detach_fusion_layers = args[4]
+        self.iterations = args[5]
+        self.loss = args[6]
+        self.norm_method = args[7]
+        self.optimizer = args[8]
+        self.pool_method = args[9]
+        self.pre_train = args[10]
+        self.retrain = args[11]
+        self.split = args[12]
+        self.crop_size = args[13]
+        self.mode = args[14]
+        self.pre_processing_pipeline = args[15]
 
 
-    def get_name(self):
-        return "Training argument class for my custom implementation."
+    def get_arch_args(self):
+        # Return all the architecture args as tuple
 
+        return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, self.detach_fusion_layers
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"train_args for Tiple U-net({attributes})"
+        return f"train_args for Dual U-net of KIT-GE({attributes})"
 
 
 # DEPRECATED

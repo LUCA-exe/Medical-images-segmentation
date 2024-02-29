@@ -776,8 +776,11 @@ class TUNet(nn.Module):
                                           ch_out=64,
                                           act_fun=act_fun,
                                           normalization=normalization))
-        # Last convolutonal layers nad activation function. 
-        self.fusionConv.append(nn.Conv2d(64, 1, kernel_size=1, stride=1, padding=0))
+
+        # Last convolutonal layers and activation function - number of output channels equal to the number of classes.
+        self.fusionConv.append(nn.Conv2d(64, 2, kernel_size=1, stride=1, padding=0))
+
+        # TODO: Implement the option to choose between sigmoid and softmax.
         self.fusionConv.append(nn.Sigmoid()) # Output - segmentation mask.
 
 
@@ -824,12 +827,13 @@ class TUNet(nn.Module):
             x2 = self.decoder2Conv[i](x2)
         x2 = self.decoder2Conv[-1](x2)
         
-        # Concatenation.
+        # Concatenation
         if self.detach_fusion_layers: # Check if the 'detach' is requested.
             x3 = torch.cat([x1, x2], dim=1).detach()
         else:
             x3 = torch.cat([x1, x2], dim=1)
 
+        # Final fusion layers - Convolutional layers 3
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)
         x3 = self.fusionConv[2](x3)

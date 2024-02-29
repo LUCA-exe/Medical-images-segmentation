@@ -19,6 +19,7 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
         loss = loss_border + loss_cell
+        losses_list = [loss_border.item(), loss_cell.item()]
 
     if arch_name == 'triple-unet':
         border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
@@ -26,9 +27,9 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
         loss_mask = criterion['mask'](mask_pred_batch, true_batches_list[2])
         loss = loss_border + loss_cell + loss_mask
+        losses_list = [loss_border.item(), loss_cell.item(), loss_mask.item()]
 
-    # TODO: Finish to implement 
-    return loss, 
+    return loss, losses_list
 
 
 def set_up_optimizer_and_scheduler(config, net, best_loss):
@@ -141,11 +142,11 @@ def get_weights(net, weights, device, num_gpus):
 
 
 def update_running_losses(running_losses_list, losses_list, batch_size):
-    # In input a list of losses computed during a mini_batch images, for every item of the list just update the values and returns it.
+    # In input a list of losses computed during a mini_batch images, for every item of the list just update the values and returns it
 
     updated_losses = [loss * batch_size for loss in losses_list]
     updated_running_losses = []
-    for runn_loss, loss in zip(running_losses_list, updated_losses): # Update every running loss by the corrispondent current mini_batch loss.
+    for runn_loss, loss in zip(running_losses_list, updated_losses): # Update every running loss by the corrispondent current mini_batch loss
 
         updated_running_losses.append(runn_loss + loss)
     return updated_running_losses
@@ -209,6 +210,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     # Auxiliary variables for training process
     epochs_wo_improvement, train_loss, val_loss,  = 0, [], []
     since = time.time()
+    arch_name = config['architecture'][0]
 
     # Training process
     for epoch in range(max_epochs):
@@ -257,20 +259,22 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
                         loss_mask = criterion['mask'](mask_pred_batch, mask_label_batch)
                         loss = loss_border + loss_cell + loss_mask'''
+                    # NOTE: important the orders of the true_label_batch
+                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch], arch_name, net, criterion)
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
 
-                # Statistics - both general and single losses.
+                # Statistics - both general and single losses
                 running_loss += loss.item() * img_batch.size(0) # NOTE: loss.item() as default contains  already the average of the mini_batch loss.
 
-                if config['architecture'][0] == 'DU':
-                    running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], [loss_border.item(), loss_cell.item()], img_batch.size(0))
+                if config['architecture'][0] == 'dual-unet':
+                    running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, img_batch.size(0))
 
-                if config['architecture'][0] == 'TU':
-                    running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], [loss_border.item(), loss_cell.item(), loss_mask.item()], img_batch.size(0))
+                if config['architecture'][0] == 'triple-unet':
+                    running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], losses_list, img_batch.size(0))
 
             # Compute average epoch losses
             epoch_loss = running_loss / len(datasets[phase])
