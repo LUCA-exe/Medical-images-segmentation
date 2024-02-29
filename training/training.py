@@ -6,13 +6,14 @@ import torch
 import torch.optim as optim
 from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
+import torch.nn as nn
 
 from training.ranger2020 import Ranger
-from training.losses import get_loss
+from training.losses import get_loss, get_weights_tensor
 from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples
 
 
-def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion):
+def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config):
     
     if arch_name == 'dual-unet':
         border_pred_batch, cell_pred_batch = net(img_batch)
@@ -25,9 +26,18 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
         loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+
         # NOTE: Attention to the shape of the "target" of the cross entropy loss.
         target = true_batches_list[2][:, 0, :, :]
-        loss_mask = criterion['mask'](mask_pred_batch, target)
+
+        # TODO: Implement the weighted loss more elegantly - I have to check if the weights can be passed during the "forward" function of the loss toghther with the input and target.
+        if config["classification_loss"] == "weigthed-cross-entropy":
+            class_weights = get_weights_tensor(true_batches_list[2])
+            loss_mask = criterion['mask'](mask_pred_batch, target, weight=class_weights)
+
+        else:
+            loss_mask = criterion['mask'](mask_pred_batch, target)
+
         loss = loss_border + loss_cell + loss_mask
         losses_list = [loss_border.item(), loss_cell.item(), loss_mask.item()]
 
@@ -262,7 +272,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         loss_mask = criterion['mask'](mask_pred_batch, mask_label_batch)
                         loss = loss_border + loss_cell + loss_mask'''
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch], arch_name, net, criterion)
+                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch], arch_name, net, criterion, config)
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
