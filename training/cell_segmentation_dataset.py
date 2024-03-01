@@ -51,9 +51,13 @@ class CellSegDataset(Dataset):
             np.ndarray: Mask with only cell borders remaining.
         """
         # Check the shape of the mask - should be one from the creation of the trianig set of KIT-GE pipeline.
-
+        mask = np.squeeze(copy.deepcopy(mask)) # Remove temporary the channel to apply the transformation
+        mask[mask > 0] = 1
         # Erode the mask to remove the inner part of the cells (efficiently)
-        eroded_mask = ndimage.binary_erosion(mask).astype(bool)
+        #eroded_mask = ndimage.binary_erosion(mask).astype(bool)
+
+        # NOTE: inpsect the effect of the eroded cells when theri location is at the border/split from multiple patches.
+        eroded_mask = ndimage.binary_erosion(mask, iterations=4).astype(mask.dtype)
 
         # Dilate the eroded mask to slightly enlarge the borders (handling very thin borders)
         dilated_mask = ndimage.binary_dilation(eroded_mask)
