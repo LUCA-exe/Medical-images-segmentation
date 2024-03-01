@@ -27,7 +27,7 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
 
-        if config["classification_loss"] == "weigthed-cross-entropy":
+        if config["classification_loss"] == "weighted-cross-entropy":
             target = true_batches_list[2]
         else:
             # NOTE: Attention to the shape of the "target" of the cross entropy loss.
@@ -38,7 +38,7 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         #target = true_batches_list[2][:, 0, :, :]
         #target = true_batches_list[2]
         # TODO: Implement the weighted loss more elegantly - I have to check if the weights can be passed during the "forward" function of the loss toghther with the input and target.
-        '''if config["classification_loss"] == "weigthed-cross-entropy":
+        '''if config["classification_loss"] == "weighted-cross-entropy":
             WeightedCELoss(weight_func=get_weights_tensor)
             class_weights = get_weights_tensor(true_batches_list[2])
             loss_mask = criterion['mask'](mask_pred_batch, target, weight=class_weights)
@@ -219,7 +219,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                   for x in ['train', 'val']}
 
     # Set-up the Loss function.
-    criterion = get_loss(config)
+    criterion = get_loss(config, device)
     log.info(f"Loss that will be used are: {criterion}")
 
     second_run = False # WARNING: Fixed arg - to change.

@@ -100,9 +100,10 @@ class WeightedCELoss(nn.Module):
                                             Defaults to None.
     """
 
-    def __init__(self, weight_func=None):
+    def __init__(self, weight_func=None, device = None):
         super().__init__()
         self.weight_func = weight_func
+        self.device = device
         #self.ce = nn.CrossEntropyLoss()  # Standard cross-entropy loss
 
     def forward(self, input, target):
@@ -119,7 +120,7 @@ class WeightedCELoss(nn.Module):
   
         if self.weight_func is not None:
             # Calculate class weights based on current batch
-            class_weights = self.weight_func(target)
+            class_weights = self.weight_func(target, device = self.device)
 
             # Ensure class weights have the correct shape
             '''if target.dim() > 2 and class_weights.dim() == 1:
@@ -186,7 +187,7 @@ class WeightedFocalLoss(nn.Module):
         return weighted_loss.mean()
 
 
-def get_loss(config):
+def get_loss(config, device):
     """ Get loss function(s) for the training process based on the current architecture.
 
     :param loss_function: Loss function to use.
@@ -209,8 +210,8 @@ def get_loss(config):
         
     elif config['architecture'][0] == 'triple-unet':
 
-        if config["classification_loss"] == "weigthed-cross-entropy":
-            mask_criterion = WeightedCELoss(weight_func=get_weights_tensor)
+        if config["classification_loss"] == "weighted-cross-entropy":
+            mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
         elif config["classification_loss"] == "cross-entropy":
             mask_criterion = nn.CrossEntropyLoss()
         else:
