@@ -514,7 +514,7 @@ def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_s
     return None
 
 
-# Used in train/validation phase to perform further analysis - e.g. in the 'border_label_2d' to debug visually the highlighted borders
+# Used in train/validation phase to perform further analysis - e.g. in the 'border_label_2d' to debug visually the highlighted borders.
 def save_image(img, path, title, use_cmap = False):
     
     # Ensure the folder exists

@@ -2,6 +2,9 @@ import numpy as np
 import tifffile as tiff
 from torch.utils.data import Dataset
 import scipy.ndimage as ndimage
+import copy
+
+from net_utils.utils import save_image
 
 
 class CellSegDataset(Dataset):
@@ -35,7 +38,7 @@ class CellSegDataset(Dataset):
 
     
     # TODO: Prepare the "cell borders" from the original mask - work in progress!!!
-    def __extract_cell_borders(mask, border_width=10):
+    def __extract_cell_borders(self, mask, border_width = 10, iterations = 2):
 
         """
         Extracts borders of cells from a binary segmentation mask adn return it for the ground truth batches.
@@ -50,13 +53,21 @@ class CellSegDataset(Dataset):
         # Check the shape of the mask - should be one from the creation of the trianig set of KIT-GE pipeline.
 
         # Erode the mask to remove the inner part of the cells (efficiently)
-        eroded_mask = ndimage.binary_erosion(mask, iterations=border_width).astype(bool)
+        eroded_mask = ndimage.binary_erosion(mask).astype(bool)
 
         # Dilate the eroded mask to slightly enlarge the borders (handling very thin borders)
         dilated_mask = ndimage.binary_dilation(eroded_mask)
 
         # Obtain the borders directly by difference
         cell_borders = dilated_mask ^ eroded_mask 
+
+        # DEBUG
+        save_image(img = mask, path="./tmp", title = "original mask")
+        save_image(img = eroded_mask, path="./tmp", title = "eroded_mask")
+        save_image(img = dilated_mask, path="./tmp", title = "dilated_mask")
+        save_image(img = cell_borders, path="./tmp", title = "cell_borders_mask")
+        exit(1)
+
         return cell_borders
 
 
@@ -72,13 +83,19 @@ class CellSegDataset(Dataset):
         dist_label = tiff.imread(str(dist_label_id)).astype(np.float32)
         # NOTE: Mask need further processing - kept the processing in this class.
         mask_label = tiff.imread(str(mask_label_id)).astype(np.uint8)
-        mask_label = self.__prepare_seg_mask(mask_label)
+
+        # DEBUG
+        print(type(mask_label))
+        print(mask_label.shape)
+        self.__extract_cell_borders(copy.deepcopy(mask_label))
+
+        processed_mask_label = self.__prepare_seg_mask(mask_label)
         dist_neighbor_label = tiff.imread(str(dist_neighbor_label_id)).astype(np.float32)
 
         sample = {'image': img,
                   'cell_label': dist_label,
                   'border_label': dist_neighbor_label,
-                  'mask_label': mask_label,
+                  'mask_label': processed_mask_label,
                   'id': img_id.stem}
                   
         # Apply tranformation for the training.
