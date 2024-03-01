@@ -103,7 +103,7 @@ class WeightedCELoss(nn.Module):
     def __init__(self, weight_func=None):
         super().__init__()
         self.weight_func = weight_func
-        self.ce = nn.CrossEntropyLoss()  # Standard cross-entropy loss
+        #self.ce = nn.CrossEntropyLoss()  # Standard cross-entropy loss
 
     def forward(self, input, target):
         """
@@ -116,20 +116,28 @@ class WeightedCELoss(nn.Module):
         Returns:
             torch.Tensor: Weighted cross-entropy loss.
         """
-
+  
         if self.weight_func is not None:
             # Calculate class weights based on current batch
             class_weights = self.weight_func(target)
 
             # Ensure class weights have the correct shape
-            if target.dim() > 2 and class_weights.dim() == 1:
-                class_weights = class_weights.unsqueeze(1).expand_as(target)  # Expand for consistency
+            '''if target.dim() > 2 and class_weights.dim() == 1:
+                class_weights = class_weights.unsqueeze(1).expand_as(target)  # Expand for consistency'''
 
             # Apply weights in forward pass
-            return self.ce(input, target, weight=class_weights)
+            loss = nn.CrossEntropyLoss(weight=class_weights)
+            
+            # TODO: Modify here the shape of the target if necessary - Attention to the shape of the "target" of the cross entropy loss.
+            target = target[:, 0, :, :]
+
+            #print(target.size())
+            #print(input.size())
+
+            return loss(input, target)
+
         else:
-            # Fallback to standard CE loss without weights
-            return self.ce(input, target)
+            raise ValueError(f"The provided weight function is not valid!")
 
 
 # TODO: work in progress
@@ -196,11 +204,21 @@ def get_loss(config):
         border_criterion = nn.SmoothL1Loss()
         cell_criterion = nn.SmoothL1Loss()
     
-    # NOTE: Cross entropy for the segmentation mask should be fixed.
     if config['architecture'][0] == 'dual-unet':
         criterion = {'border': border_criterion, 'cell': cell_criterion}
         
     elif config['architecture'][0] == 'triple-unet':
-        mask_criterion = nn.CrossEntropyLoss()
+
+        if config["classification_loss"] == "weigthed-cross-entropy":
+            mask_criterion = WeightedCELoss(weight_func=get_weights_tensor)
+        elif config["classification_loss"] == "cross-entropy":
+            mask_criterion = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
+
+
         criterion = {'border': border_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
     return criterion
+
+
+
