@@ -33,6 +33,7 @@ class CellSegDataset(Dataset):
     def __prepare_seg_mask(self, mask_picture):
         # Prepare the segmentation mask for the binary cross entropy.
 
+        mask_picture = copy.deepcopy(mask_picture) # Work on the copy of the object - no reference
         mask_picture[mask_picture > 0] = 1 # NOTE: Treating all the cells as the same class (not distinguish between the EVs and Cells)
         return mask_picture
 
@@ -53,6 +54,14 @@ class CellSegDataset(Dataset):
         # Check the shape of the mask - should be one from the creation of the trianig set of KIT-GE pipeline.
         mask = np.squeeze(copy.deepcopy(mask)) # Remove temporary the channel to apply the transformation
         mask[mask > 0] = 1
+
+        # Work with the boolean array
+        inverted_mask = ~mask.astype(bool)
+
+        inverted_mask = inverted_mask.astype(int)
+        dil_inverted_mask = ndimage.binary_dilation(inverted_mask, iterations = 2)
+        dil_inverted_mask = dil_inverted_mask ^ inverted_mask
+
         # Erode the mask to remove the inner part of the cells (efficiently)
         #eroded_mask = ndimage.binary_erosion(mask).astype(bool)
 
@@ -66,6 +75,8 @@ class CellSegDataset(Dataset):
         cell_borders = dilated_mask ^ eroded_mask 
 
         # DEBUG
+        save_image(img = inverted_mask, path="./tmp", title = "inverted mask")
+        save_image(img = dil_inverted_mask, path="./tmp", title = "dil inverted mask")
         save_image(img = mask, path="./tmp", title = "original mask")
         save_image(img = eroded_mask, path="./tmp", title = "eroded_mask")
         save_image(img = dilated_mask, path="./tmp", title = "dilated_mask")
