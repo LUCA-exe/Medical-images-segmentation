@@ -684,7 +684,7 @@ class AutoUNet(nn.Module):
         return x
 
 
-# NOTE: Neural network to reproduce the original work of "Dual U-Net for segmentation of overlapping glioma nuclei"
+# NOTE: "Tiple-unet" inspired by the original work of "Dual U-Net for segmentation of overlapping glioma nuclei"
 class TUNet(nn.Module):
     """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
 
@@ -775,6 +775,172 @@ class TUNet(nn.Module):
         
         # Fusion layers - applied after concatenate the two output
         self.fusionConv.append(FusionConvBlock(ch_in=2,
+                                          ch_out=64,
+                                          act_fun=act_fun,
+                                          normalization=normalization))
+
+        # Last convolutonal layers and activation function - number of output channels equal to the number of classes.
+        self.fusionConv.append(nn.Conv2d(64, 2, kernel_size=1, stride=1, padding=0))
+
+        if self.softmax_layer:
+            self.fusionConv.append(nn.Softmax(dim=1))
+        else:
+            self.fusionConv.append(nn.Sigmoid())
+
+
+    def forward(self, x):
+        """
+
+        :param x: Model input.
+            :type x:
+        :return: Model output / prediction.
+        """
+
+        x_temp = list()
+
+        # Encoder
+        for i in range(len(self.encoderConv) - 1):
+            x = self.encoderConv[i](x)
+            x_temp.append(x)
+            if self.pool_method == 'max':
+                x = self.pooling(x)
+            elif self.pool_method == 'conv':
+                x = self.pooling[i](x)
+        x = self.encoderConv[-1](x)
+
+        # Intermediate results for concatenation
+        x_temp = list(reversed(x_temp))
+
+        # Decoder 1 (borders + seeds)
+        for i in range(len(self.decoder1Conv) - 1):
+            if i == 0:
+                x1 = self.decoder1Upconv[i](x)
+            else:
+                x1 = self.decoder1Upconv[i](x1)
+            x1 = torch.cat([x1, x_temp[i]], 1)
+            x1 = self.decoder1Conv[i](x1)
+        x1 = self.decoder1Conv[-1](x1)
+
+        # Decoder 2 (cells)
+        for i in range(len(self.decoder2Conv) - 1):
+            if i == 0:
+                x2 = self.decoder2Upconv[i](x)
+            else:
+                x2 = self.decoder2Upconv[i](x2)
+            x2 = torch.cat([x2, x_temp[i]], 1)
+            x2 = self.decoder2Conv[i](x2)
+        x2 = self.decoder2Conv[-1](x2)
+        
+        # Concatenation
+        if self.detach_fusion_layers: # Check if the 'detach' is requested.
+            x3 = torch.cat([x1, x2], dim=1).detach()
+        else:
+            x3 = torch.cat([x1, x2], dim=1)
+
+        # Final fusion layers - Convolutional layers 3
+        x3 = self.fusionConv[0](x3)
+        x3 = self.fusionConv[1](x3)
+        x3 = self.fusionConv[2](x3)
+        return x1, x2, x3
+
+
+# NOTE: Original neural network to reproduce the original work of "Dual U-Net for segmentation of overlapping glioma nuclei"
+class ODUNet(nn.Module):
+    """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
+
+    def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), detach_fusion_layers = False, softmax_layer = False):
+        """
+
+        :param ch_in: Number of channels of the input image.
+            :type ch_in: int
+        :param ch_out: Number of channels of the prediction.
+            :type ch_out: int
+        :param pool_method: 'max' (maximum pooling), 'conv' (convolution with stride 2).
+            :type pool_method: str
+        :param act_fun: 'relu', 'leakyrelu', 'elu', 'mish' (not in the output layer).
+            :type act_fun: str
+        :param normalization: 'bn' (batch normalization), 'gn' (group norm., 8 groups), 'in' (instance norm.).
+            :type normalization: str
+        :param filters: depth of the encoder (and decoder reversed) and number of feature maps used in a block.
+            :type filters: list
+        """
+
+        super().__init__()
+
+        self.ch_in = ch_in
+        self.filters = filters
+        self.pool_method = pool_method
+        self.detach_fusion_layers = detach_fusion_layers
+        self.softmax_layer = softmax_layer
+
+        # Encoder
+        self.encoderConv = nn.ModuleList()
+
+        if self.pool_method == 'max':
+            self.pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+        elif self.pool_method == 'conv':
+            self.pooling = nn.ModuleList()
+
+        # First encoder block
+        n_featuremaps = filters[0]
+        self.encoderConv.append(ConvBlock(ch_in=self.ch_in,
+                                          ch_out=n_featuremaps,
+                                          act_fun=act_fun,
+                                          normalization=normalization))
+        if self.pool_method == 'conv':
+            self.pooling.append(ConvPool(ch_in=n_featuremaps, act_fun=act_fun, normalization=normalization))
+
+        # Remaining encoder blocks
+        while n_featuremaps < filters[1]:
+
+            self.encoderConv.append(ConvBlock(ch_in=n_featuremaps,
+                                              ch_out=(n_featuremaps*2),
+                                              act_fun=act_fun,
+                                              normalization=normalization))
+
+            if n_featuremaps * 2 < filters[1] and self.pool_method == 'conv':
+                self.pooling.append(ConvPool(ch_in=n_featuremaps*2, act_fun=act_fun, normalization=normalization))
+
+            n_featuremaps *= 2
+
+        # Decoder 1 (cell borders) and Decoder 2 (cell distances)
+        self.decoder1Upconv = nn.ModuleList()
+        self.decoder1Conv = nn.ModuleList()
+        self.decoder2Upconv = nn.ModuleList()
+        self.decoder2Conv = nn.ModuleList()
+
+        # Additional fusion layers and final binary segmentation mask prediction
+        self.fusionConv = nn.ModuleList()
+
+        while n_featuremaps > filters[0]:
+            self.decoder1Upconv.append(TranspConvBlock(ch_in=n_featuremaps,
+                                                       ch_out=(n_featuremaps // 2),
+                                                       normalization=normalization))
+            self.decoder1Conv.append(ConvBlock(ch_in=n_featuremaps,
+                                               ch_out=(n_featuremaps // 2),
+                                               act_fun=act_fun,
+                                               normalization=normalization))
+            self.decoder2Upconv.append(TranspConvBlock(ch_in=n_featuremaps,
+                                                       ch_out=(n_featuremaps // 2),
+                                                       normalization=normalization))
+            self.decoder2Conv.append(ConvBlock(ch_in=n_featuremaps,
+                                               ch_out=(n_featuremaps // 2),
+                                               act_fun=act_fun,
+                                               normalization=normalization))
+            n_featuremaps //= 2
+
+        # Last 1x1 convolutions for the two branches
+        self.decoder1Conv.append(nn.Conv2d(n_featuremaps, 2, kernel_size=1, stride=1, padding=0))
+        if self.softmax_layer:
+            self.decoder1Conv.append(nn.Softmax(dim=1))
+        else:
+            self.decoder1Conv.append(nn.Sigmoid())
+        #self.decoder1Conv.append(nn.Softmax(dim=1)) # Additional softmax layer for the final boundary lines
+        
+        self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
+        
+        # Fusion layers - applied after concatenate the two output
+        self.fusionConv.append(FusionConvBlock(ch_in=3,
                                           ch_out=64,
                                           act_fun=act_fun,
                                           normalization=normalization))
