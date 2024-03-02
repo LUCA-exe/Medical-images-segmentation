@@ -39,12 +39,14 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
                       filters=filters,
                       act_fun=act_fun,
                       normalization=normalization)
+
     elif unet_type == 'AutoU':  # Autoencoder U-Net
         model = AutoUNet(ch_in=ch_in,
                          pool_method=pool_method,
                          filters=filters,
                          act_fun=act_fun,
                          normalization=normalization)
+
     elif unet_type == 'triple-unet':  # U-Net with two decoder paths and one single channel outputs (e.g., cell + neighbor dist used in the fusion layers) | triple-unet
         model = TUNet(ch_in=ch_in,
                       ch_out=ch_out,
@@ -54,6 +56,17 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
                       act_fun=act_fun,
                       normalization=normalization,
                       softmax_layer=softmax_layer)
+
+    elif unet_type == 'original-dual-unet': 
+        model = ODUNet(ch_in=ch_in,
+                      ch_out=ch_out,
+                      pool_method=pool_method,
+                      filters=filters,
+                      detach_fusion_layers = detach_fusion_layers,
+                      act_fun=act_fun,
+                      normalization=normalization,
+                      softmax_layer=softmax_layer)
+
     else:
         raise Exception('Architecture "{}" is not known'.format(unet_type))
 
@@ -844,7 +857,7 @@ class TUNet(nn.Module):
         return x1, x2, x3
 
 
-# NOTE: Original neural network to reproduce the original work of "Dual U-Net for segmentation of overlapping glioma nuclei"
+# NOTE: Original neural network ("original-dual-unet") to reproduce the work of "Dual U-Net for segmentation of overlapping glioma nuclei"
 class ODUNet(nn.Module):
     """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
 
@@ -936,7 +949,6 @@ class ODUNet(nn.Module):
         else:
             self.decoder1Conv.append(nn.Sigmoid())
         #self.decoder1Conv.append(nn.Softmax(dim=1)) # Additional softmax layer for the final boundary lines
-        
         self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
         
         # Fusion layers - applied after concatenate the two output

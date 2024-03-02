@@ -104,7 +104,6 @@ class WeightedCELoss(nn.Module):
         super().__init__()
         self.weight_func = weight_func
         self.device = device
-        #self.ce = nn.CrossEntropyLoss()  # Standard cross-entropy loss
 
     def forward(self, input, target):
         """
@@ -131,10 +130,6 @@ class WeightedCELoss(nn.Module):
             
             # TODO: Modify here the shape of the target if necessary - Attention to the shape of the "target" of the cross entropy loss.
             target = target[:, 0, :, :]
-
-            #print(target.size())
-            #print(input.size())
-
             return loss(input, target)
 
         else:
@@ -212,13 +207,28 @@ def get_loss(config, device):
 
         if config["classification_loss"] == "weighted-cross-entropy":
             mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
+
         elif config["classification_loss"] == "cross-entropy":
             mask_criterion = nn.CrossEntropyLoss()
+
         else:
             raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
 
-
         criterion = {'border': border_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
+
+    elif config['architecture'][0] == 'original-dual-unet':
+        
+        if config["classification_loss"] == "weighted-cross-entropy":
+            mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
+
+        elif config["classification_loss"] == "cross-entropy":
+            mask_criterion = nn.CrossEntropyLoss()
+
+        else:
+            raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
+
+        criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
+
     return criterion
 
 

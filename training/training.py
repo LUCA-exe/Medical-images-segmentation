@@ -32,23 +32,28 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         else:
             # NOTE: Attention to the shape of the "target" of the cross entropy loss.
             target = true_batches_list[2][:, 0, :, :]
+
         loss_mask = criterion['mask'](mask_pred_batch, target)
-
-        # NOTE: Attention to the shape of the "target" of the cross entropy loss.
-        #target = true_batches_list[2][:, 0, :, :]
-        #target = true_batches_list[2]
-        # TODO: Implement the weighted loss more elegantly - I have to check if the weights can be passed during the "forward" function of the loss toghther with the input and target.
-        '''if config["classification_loss"] == "weighted-cross-entropy":
-            WeightedCELoss(weight_func=get_weights_tensor)
-            class_weights = get_weights_tensor(true_batches_list[2])
-            loss_mask = criterion['mask'](mask_pred_batch, target, weight=class_weights)
-
-        else:'''
-        #loss_mask = criterion['mask'](mask_pred_batch, target)
-
         loss = loss_border + loss_cell + loss_mask
         losses_list = [loss_border.item(), loss_cell.item(), loss_mask.item()]
 
+    if arch_name == 'original-dual-unet':
+        binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
+        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+
+        if config["classification_loss"] == "weighted-cross-entropy":
+            target_binary_border = true_batches_list[3]
+            target_mask = true_batches_list[2]
+
+        else:
+            # NOTE: Attention to the shape of the "target" of the cross entropy loss.
+            target_binary_border = true_batches_list[3][:, 0, :, :]
+            target_mask = true_batches_list[2][:, 0, :, :]
+            
+        loss_binary_border = criterion['binary_border'](binary_border_pred_batch, target_binary_border)
+        loss_mask = criterion['mask'](mask_pred_batch, target_mask)
+        loss = loss_binary_border + loss_cell + loss_mask
+        losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
     return loss, losses_list
 
 
@@ -296,7 +301,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
                 # TO TEST
                 if config['architecture'][0] == 'original-dual-unet':
-                    running_loss_cell, running_loss_binary_border, running_loss_mask = update_running_losses([running_loss_cell, running_loss_binary_border, running_loss_mask], losses_list, img_batch.size(0))
+                    running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, img_batch.size(0))
 
                 if config['architecture'][0] == 'triple-unet':
                     running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], losses_list, img_batch.size(0))
