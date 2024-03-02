@@ -34,7 +34,6 @@ def main():
 
     # Load paths
     args.dataset = args.dataset[0] # TODO: To fix!!!
-
     path_data = join(args.train_images_path, args.dataset)
     path_models = args.models_folder # Eval all models found here.
     path_best_models = args.save_model # Save best model files/metrics here.
@@ -63,11 +62,13 @@ def main():
     if args.post_processing_pipeline == 'dual-unet': # Call inference from the KIT-GE-(2) model's method
         du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     elif args.post_processing_pipeline == 'triple-unet':
-        triple_unet_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
+        tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
     log.info(">>> Evaluation script ended correctly <<<")
+
+    return None
 
 
 # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
@@ -145,8 +146,8 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
     return None
 
 
-# TODO: Work in progress.
-def triple_unet_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
+# TODO: Work in progress - to test
+def tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
 
     result_dict = {}
     curr_experiment = 0 # Simple counter of the args. combination

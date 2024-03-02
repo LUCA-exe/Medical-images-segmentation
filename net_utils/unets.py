@@ -948,7 +948,6 @@ class ODUNet(nn.Module):
             self.decoder1Conv.append(nn.Softmax(dim=1))
         else:
             self.decoder1Conv.append(nn.Sigmoid())
-        #self.decoder1Conv.append(nn.Softmax(dim=1)) # Additional softmax layer for the final boundary lines
         self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
         
         # Fusion layers - applied after concatenate the two output
@@ -989,14 +988,15 @@ class ODUNet(nn.Module):
         # Intermediate results for concatenation
         x_temp = list(reversed(x_temp))
 
-        # Decoder 1 (borders + seeds)
-        for i in range(len(self.decoder1Conv) - 1):
+        # Decoder 1 (binary cell borders)
+        for i in range(len(self.decoder1Conv) - 2):
             if i == 0:
                 x1 = self.decoder1Upconv[i](x)
             else:
                 x1 = self.decoder1Upconv[i](x1)
             x1 = torch.cat([x1, x_temp[i]], 1)
             x1 = self.decoder1Conv[i](x1)
+        x1 = self.decoder1Conv[-2](x1)
         x1 = self.decoder1Conv[-1](x1)
 
         # Decoder 2 (cells)
@@ -1015,7 +1015,7 @@ class ODUNet(nn.Module):
         else:
             x3 = torch.cat([x1, x2], dim=1)
 
-        # Final fusion layers - Convolutional layers 3
+        # Final fusion layers for the final segmentation mask
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)
         x3 = self.fusionConv[2](x3)

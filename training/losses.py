@@ -136,7 +136,7 @@ class WeightedCELoss(nn.Module):
             raise ValueError(f"The provided weight function is not valid!")
 
 
-# TODO: work in progress
+# TODO: work in progress TO TEST (both effect during training and correctness of the class)
 class WeightedFocalLoss(nn.Module):
     """
     Weighted Focal Loss function for addressing class imbalance in binary segmentation tasks.

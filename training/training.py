@@ -238,7 +238,8 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     arch_name = config['architecture'][0]
 
     # Training process
-    for epoch in range(max_epochs):
+    #for epoch in range(max_epochs):
+    for epoch in range(15):
 
         print('-' * 10)
         print('Epoch {}/{}'.format(epoch + 1, max_epochs))
@@ -316,11 +317,11 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             if phase == 'train': 
 
                 train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
-                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
+                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} - mask loss:  {:.5f} - binary border loss: {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
             else:
 
                 val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
-                print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
+                print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} - mask loss:  {:.5f} - binary border loss: {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
 
                 # NOTE: The update control just the total loss decrement, not the single ones.
 

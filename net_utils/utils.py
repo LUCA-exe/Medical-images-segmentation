@@ -24,13 +24,13 @@ def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_model
     try:
         if second_run:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_2nd_loss.txt')), X=stats,
-                    fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
+                    fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
                     header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
             config['training_time_run_2'], config['trained_epochs_run2'] = tot_time, tot_epochs + 1
 
         else:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), X=stats,
-                    fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
+                    fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
                     header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
             config['training_time'], config['trained_epochs'] = tot_time, tot_epochs + 1
         
