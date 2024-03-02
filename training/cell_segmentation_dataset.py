@@ -39,7 +39,7 @@ class CellSegDataset(Dataset):
 
     
     # TODO: Prepare the "cell borders" from the original mask - work in progress!!!
-    def __extract_cell_borders(self, mask, border_width = 10, iterations = 2):
+    def __extract_cell_borders(self, mask, border_width = 4):
 
         """
         Extracts borders of cells from a binary segmentation mask adn return it for the ground truth batches.
@@ -51,39 +51,22 @@ class CellSegDataset(Dataset):
         Returns:
             np.ndarray: Mask with only cell borders remaining.
         """
-        # Check the shape of the mask - should be one from the creation of the trianig set of KIT-GE pipeline.
+
+        # Check the shape of the mask - should be one from the creation of the trianig set of KIT-GE pipeline
         mask = np.squeeze(copy.deepcopy(mask)) # Remove temporary the channel to apply the transformation
         mask[mask > 0] = 1
 
-        # Work with the boolean array
+        # Work with the boolean array to invert the original mask
         inverted_mask = ~mask.astype(bool)
-
         inverted_mask = inverted_mask.astype(int)
-        dil_inverted_mask = ndimage.binary_dilation(inverted_mask, iterations = 2)
-        dil_inverted_mask = dil_inverted_mask ^ inverted_mask
 
-        # Erode the mask to remove the inner part of the cells (efficiently)
-        #eroded_mask = ndimage.binary_erosion(mask).astype(bool)
-
-        # NOTE: inpsect the effect of the eroded cells when theri location is at the border/split from multiple patches.
-        eroded_mask = ndimage.binary_erosion(mask, iterations=4).astype(mask.dtype)
-
-        # Dilate the eroded mask to slightly enlarge the borders (handling very thin borders)
-        dilated_mask = ndimage.binary_dilation(eroded_mask)
-
+        # Dilate the mask to slightly enlarge the borders (handling very thin borders)
+        dil_inverted_mask = ndimage.binary_dilation(inverted_mask, iterations = border_width)
+        
         # Obtain the borders directly by difference
-        cell_borders = dilated_mask ^ eroded_mask 
-
-        # DEBUG
-        save_image(img = inverted_mask, path="./tmp", title = "inverted mask")
-        save_image(img = dil_inverted_mask, path="./tmp", title = "dil inverted mask")
-        save_image(img = mask, path="./tmp", title = "original mask")
-        save_image(img = eroded_mask, path="./tmp", title = "eroded_mask")
-        save_image(img = dilated_mask, path="./tmp", title = "dilated_mask")
-        save_image(img = cell_borders, path="./tmp", title = "cell_borders_mask")
-        exit(1)
-
-        return cell_borders
+        cell_border = dil_inverted_mask ^ inverted_mask
+        cell_border = np.expand_dims(cell_border, axis=2)
+        return cell_border.astype(mask.dtype)
 
 
     def __getitem__(self, idx):
@@ -98,12 +81,7 @@ class CellSegDataset(Dataset):
         dist_label = tiff.imread(str(dist_label_id)).astype(np.float32)
         # NOTE: Mask need further processing - kept the processing in this class.
         mask_label = tiff.imread(str(mask_label_id)).astype(np.uint8)
-
-        # DEBUG
-        print(type(mask_label))
-        print(mask_label.shape)
-        self.__extract_cell_borders(copy.deepcopy(mask_label))
-
+        binary_border_label = self.__extract_cell_borders(mask_label)
         processed_mask_label = self.__prepare_seg_mask(mask_label)
         dist_neighbor_label = tiff.imread(str(dist_neighbor_label_id)).astype(np.float32)
 
@@ -111,6 +89,7 @@ class CellSegDataset(Dataset):
                   'cell_label': dist_label,
                   'border_label': dist_neighbor_label,
                   'mask_label': processed_mask_label,
+                  'binary_border_label': binary_border_label,
                   'id': img_id.stem}
                   
         # Apply tranformation for the training.

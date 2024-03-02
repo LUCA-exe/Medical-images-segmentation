@@ -190,7 +190,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
     :return: None
     """
-    # Assert that the datasets has been created correctly before the loop over the images.
+    # Assert that the datasets has been created correctly before the loop over the images
     show_training_dataset_samples(log, datasets["train"])
 
     # Get number of training epochs depending on dataset size (just roughly to decrease training time):
@@ -249,16 +249,16 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
             # keep track of running losses
             running_loss = 0.0
-            running_loss_border, running_loss_cell, running_loss_mask = 0.0, 0.0, 0.0
-            loss_labels = ["Total loss", "Border loss", "Cell loss", "Mask loss"]
+            running_loss_border, running_loss_cell, running_loss_mask, running_loss_binary_border = 0.0, 0.0, 0.0, 0.0
+            loss_labels = ["Total loss", "Border loss", "Cell loss", "Mask loss", "Binary border loss"]
 
             # Iterate over data
             for samples in dataloader[phase]:
 
                 # Get img_batch and label_batch and put them on GPU if available
-                img_batch, border_label_batch, cell_label_batch, mask_label_batch = samples # Unpack always all 'labels'
+                img_batch, border_label_batch, cell_label_batch, mask_label_batch, binary_border_batch = samples # Unpack always all 'labels'
                 img_batch = img_batch.to(device)
-                cell_label_batch, border_label_batch, mask_label_batch = cell_label_batch.to(device), border_label_batch.to(device), mask_label_batch.to(device)
+                cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch = cell_label_batch.to(device), border_label_batch.to(device), mask_label_batch.to(device), binary_border_batch.to(device)
 
                 # Zero the parameter gradients
                 optimizer.zero_grad()
@@ -279,8 +279,9 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
                         loss_mask = criterion['mask'](mask_pred_batch, mask_label_batch)
                         loss = loss_border + loss_cell + loss_mask'''
+
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch], arch_name, net, criterion, config)
+                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config)
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
@@ -293,6 +294,10 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                 if config['architecture'][0] == 'dual-unet':
                     running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, img_batch.size(0))
 
+                # TO TEST
+                if config['architecture'][0] == 'original-dual-unet':
+                    running_loss_cell, running_loss_binary_border, running_loss_mask = update_running_losses([running_loss_cell, running_loss_binary_border, running_loss_mask], losses_list, img_batch.size(0))
+
                 if config['architecture'][0] == 'triple-unet':
                     running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], losses_list, img_batch.size(0))
 
@@ -301,15 +306,16 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             epoch_loss_border =  running_loss_border / len(datasets[phase])
             epoch_loss_cell =  running_loss_cell / len(datasets[phase])
             epoch_loss_mask =  running_loss_mask / len(datasets[phase])
+            epoch_loss_binary_border = running_loss_binary_border / len(datasets[phase])
 
             if phase == 'train': 
 
-                train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask])
-                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
+                train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
+                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
             else:
 
-                val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask])
-                print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask))
+                val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
+                print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} mask loss:  {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
 
                 # NOTE: The update control just the total loss decrement, not the single ones.
 

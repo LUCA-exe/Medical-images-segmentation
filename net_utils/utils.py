@@ -17,21 +17,21 @@ def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_model
     # Get the training loss and save it in a formatted '*.txt' file.
 
     # Un-pack the losses in the original variables
-    train_total_loss, train_loss_border, train_loss_cell, train_loss_mask = zip(*train_loss) 
-    val_total_loss, val_loss_border, val_loss_cell, val_loss_mask = zip(*val_loss) 
+    train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border = zip(*train_loss) 
+    val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border = zip(*val_loss) 
     
-    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, val_total_loss, val_loss_border, val_loss_cell, val_loss_mask]))
+    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border, val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border]))
     try:
         if second_run:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_2nd_loss.txt')), X=stats,
                     fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
-                    header='Epoch, training total loss, training border loss, training cell loss, training mask loss, validation total loss, validation border loss, validation cell loss, validation mask loss,', delimiter=',')
+                    header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
             config['training_time_run_2'], config['trained_epochs_run2'] = tot_time, tot_epochs + 1
 
         else:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), X=stats,
                     fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
-                    header='Epoch, training total loss, training border loss, training cell loss, training mask loss, validation total loss, validation border loss, validation cell loss, validation mask loss,', delimiter=',')
+                    header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
             config['training_time'], config['trained_epochs'] = tot_time, tot_epochs + 1
         
         print(f"Training losses saved corretly and current configuration parameters updated")
@@ -49,7 +49,7 @@ def save_inference_final_images(result_path, file_id, prediction_instance):
 
 
 def save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border):
-    # Called if "args.save_raw_pred" is true: save the raw outputs of the model during inference time.
+    # Called if "args.save_raw_pred" is true: save the raw outputs of the model during inference time
     
     tiff.imwrite(str(result_path / ('cell' + file_id)), prediction_cell_batch[h, ..., 0].astype(np.float32))
     tiff.imwrite(str(result_path / ('raw_border' + file_id)), prediction_border_batch[h, ..., 0].astype(np.float32))
