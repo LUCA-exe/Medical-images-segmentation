@@ -61,13 +61,17 @@ def main():
     # NOTE: For now it is implemented evaluation for one dataset
     if args.post_processing_pipeline == 'dual-unet': # Call inference from the KIT-GE-(2) model's method
         du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
+
     elif args.post_processing_pipeline == 'triple-unet':
+        tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
+
+    # TODO: Finish to test
+    elif args.post_processing_pipeline == 'original-dual-unet':
         tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
     log.info(">>> Evaluation script ended correctly <<<")
-
     return None
 
 
@@ -151,6 +155,7 @@ def tu_inference_loop(log, models, path_models, train_sets, path_data, device, n
 
     result_dict = {}
     curr_experiment = 0 # Simple counter of the args. combination
+    eval_f = eval_factory()
 
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
     for model in models: # Loop over all the models found
@@ -165,7 +170,7 @@ def tu_inference_loop(log, models, path_models, train_sets, path_data, device, n
             os.makedirs(path_seg_results, exist_ok=True)
 
             # Get post-processing settings
-            eval_args = EvalArgs(args.post_processing_pipeline,
+            '''eval_args = EvalArgs(args.post_processing_pipeline,
                                     th_cell=None, 
                                     th_seed=None,
                                     apply_clahe=None,
@@ -173,10 +178,16 @@ def tu_inference_loop(log, models, path_models, train_sets, path_data, device, n
                                     cell_type=args.dataset,
                                     save_raw_pred=args.save_raw_pred,
                                     artifact_correction=None,
-                                    apply_merging=args.apply_merging)
+                                    apply_merging=args.apply_merging)'''
+            eval_class_args = eval_f.create_argument_class(args.post_processing_pipeline,
+                                                    args.scale,
+                                                    args.dataset,
+                                                    args.save_raw_pred,
+                                                    args.artifact_correction,
+                                                    args.apply_merging)
             
             # Debug specific args for the current run.
-            log.debug(eval_args)
+            log.debug(eval_class_args)
 
             # Inference on the chosen train set
             args_used = inference_2d(log=log, model_path=model_path,
@@ -185,7 +196,7 @@ def tu_inference_loop(log, models, path_models, train_sets, path_data, device, n
                         device=device,
                         num_gpus = num_gpus,
                         batchsize=args.batch_size,
-                        args=eval_args,
+                        args=eval_class_args,
                         model_pipeline=args.model_pipeline,
                         post_processing_pipeline=args.post_processing_pipeline) 
 

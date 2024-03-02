@@ -15,9 +15,10 @@ from skimage.transform import resize
 from inference.ctc_dataset import CTCDataSet, pre_processing_transforms
 from inference.postprocessing import *
 from net_utils.unets import build_unet
-from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images
+from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture
 
 
+# DEPRECATED
 def create_architecture(log, model_settings, device, num_gpus):
     # TODO: Check which model to build (implement different pipelines/options to build the model)
     
@@ -46,8 +47,10 @@ def load_and_get_architecture(log, model_path, device, num_gpus):
     # Create the architecture given the json configuration file.
     log.debug(f"Model settings: {model_settings}")
 
-    net = create_architecture(log, model_settings, device, num_gpus)
-    # Load the weights.
+    #net = create_architecture(log, model_settings, device, num_gpus)
+    net = create_model_architecture(log, model_settings, device, num_gpus)
+
+    # Load the weights
     load_weights(net, model_path, device, num_gpus)
     
     # Prepare model for evaluation
@@ -92,6 +95,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     dataloader = torch.utils.data.DataLoader(ctc_dataset, batch_size=batchsize, shuffle=False, pin_memory=True,
                                              num_workers=num_workers)
 
+    arch_name = model_settings['architecture'][0]
     # Predict images (iterate over images/files)
     for idx, sample in enumerate(dataloader):
 
@@ -102,19 +106,27 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             pad_batch = [pad_batch[i][0] for i in range(len(pad_batch))]
             img_size = [img_size[i][0] for i in range(len(img_size))]
 
-        # Prediction outputs - dependent on the loaded model pipeline. 
-        if model_settings["architecture"][0] == 'DU':
-            prediction_border_batch, prediction_cell_batch = net(img_batch)
+        # Prediction outputs - dependent on the loaded model pipeline to move inside a function in this module
 
-        elif model_settings["architecture"][0] == "TU":
+        if arch_name == "dual-unet":
+            prediction_border_batch, prediction_cell_batch = net(img_batch)
+            prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+
+        elif arch_name == "original-dual-unet":
+            prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
+            prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            prediction_binary_border_batch = prediction_binary_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+
+        elif arch_name == "triple-unet":
             prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
             prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         log.debug(f".. predicted batch {idx} ..")
 
         # Get rid of pads.
         prediction_cell_batch = prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
-        prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+        #prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         # Save also some raw predictions (not all since float32 --> needs lot of memory)
         save_ids = [0, len(ctc_dataset) // 8, len(ctc_dataset) // 4, 3 * len(ctc_dataset) // 8, len(ctc_dataset) // 2,
@@ -142,7 +154,12 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                                                                     cell_prediction=prediction_cell_batch[h],
                                                                     args=args)
             
+            # TO FINISH TEST
             if args.post_process == 'triple-unet':
+                prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
+            
+            # TO FINISH TEST
+            if args.post_process == 'original_dual-unet':
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
 
             if args.scale < 1:

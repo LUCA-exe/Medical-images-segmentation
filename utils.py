@@ -428,54 +428,6 @@ class train_arg_odu(a_train_arg_class):
         return f"train_args for the original Dual U-net ({attributes})"
 
 
-# DEPRECATED
-class TrainArgs(object):
-    """ Class with training creation parameters.
-    """
-
-    def __init__(self, model_pipeline, act_fun, batch_size, filters, detach_fusion_layers, iterations,
-    loss, norm_method, optimizer, pool_method, pre_train, retrain, split):
-        """ kit-ge training params implemented for now.
-        """
-        if model_pipeline == 'kit-ge':
-            self.arch = 'DU'
-            self.act_fun = act_fun
-            self.batch_size = batch_size
-            self.filters = filters
-            self.detach_fusion_layers = detach_fusion_layers # NOTE: In this configuration of architecture will not be used this parameter.
-            self.iterations = iterations
-            self.loss = loss
-            self.norm_method = norm_method
-            self.optimizer = optimizer
-            self.pool_method = pool_method
-            self.pre_train = pre_train
-            self.retrain = retrain
-            self.split = split
-
-        elif model_pipeline == 'dual-unet': # NOTE: Params for the work "Dual U-Net for the segmentation of Overlapping Glioma Nuclei"
-            self.arch = 'TU'
-            self.act_fun = act_fun
-            self.batch_size = batch_size
-            self.filters = filters
-            self.detach_fusion_layers = detach_fusion_layers
-            self.iterations = iterations
-            self.loss = loss
-            self.norm_method = norm_method
-            self.optimizer = optimizer
-            self.pool_method = pool_method
-            self.pre_train = pre_train
-            self.retrain = retrain
-            self.split = split
-        else:
-            raise Exception('Model architecture "{}" is not known'.format(model_pipeline))
-
-
-    # Override default class function
-    def __str__(self):
-        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"TrainArgs({attributes})"
-
-
 # NOTE: Work in progress
 class i_eval_factory(ABC):
     """Interface for creating evaluation arguments classes."""
@@ -498,25 +450,26 @@ class i_eval_factory(ABC):
 class eval_factory(i_eval_factory):
 
     def create_argument_class(self, *args):
+        # Return the class depending on the chosen post processing pipeline name
 
-        self._arg_len = len(args)
-        if self._arg_len == 9:
-            return eval_arg_du(*args)
+        if args[0] == "dual-unet":
+            return eval_arg_du(args)
+        
+        elif args[0] == "original-dual-unet":
+            return eval_arg_odu(args)
 
-        elif self._arg_len == 6:
-            return eval_arg_tu(*args)
+        elif args[0] == "triple-unet":
+            return eval_arg_tu(args)
 
         else:
-            raise ValueError("Invalid number of arguments for evaluation class.")
+            raise ValueError(f"The post processing pipeline {args[0]} is not supported!")
 
 
 class a_eval_arg_class(ABC):
     """Abstract base class for evaluation arguments."""
 
-    def __init__(self, *args):
-        self._args = args
 
-
+    @abstractmethod
     def __str__(self):
         """
         Abstract method to return in plain text the class attributes.
@@ -537,9 +490,7 @@ class a_eval_arg_class(ABC):
 class eval_arg_du(a_eval_arg_class):
     """Specific argument evaluation class for the KIT-GE model implementation."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        print(args) # DEBUG
+    def __init__(self, args):
         
         # Following the original arguments of the post processing evaluation.
         self.post_pipeline = [0]
@@ -553,20 +504,15 @@ class eval_arg_du(a_eval_arg_class):
         self.apply_merging = args[8]
 
 
-    def get_name(self):
-        return "Evaluation argument class for the original Dual U-net of KIT-GE"
-
-
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"eval_args for Dual U-net of KIT-GE({attributes})"
+        return f"eval_args for Dual U-net (KIT-GE post processing) ({attributes})"
 
 
-class eval_arg_tu(a_eval_arg_class):
-    """Specific argument evaluation class for my implementation of the Dual U-net."""
+class eval_arg_odu(a_eval_arg_class):
+    """Specific argument evaluation class for the implementation of the original Dual U-net."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, args):
 
         # Reducted number of arguments compared to the KIT-GE implementation
         self.post_pipeline = [0] 
@@ -577,8 +523,23 @@ class eval_arg_tu(a_eval_arg_class):
         self.apply_merging = args[5]
 
 
-    def get_name(self):
-        return "Evaluation argument class for my custom implementation."
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"eval_args for original Dual Unet ({attributes})"
+
+
+class eval_arg_tu(a_eval_arg_class):
+    """Specific argument evaluation class for my implementation of the Dual U-net."""
+
+    def __init__(self, args):
+
+        # Reducted number of arguments compared to the KIT-GE implementation
+        self.post_pipeline = [0] 
+        self.scale = args[1]
+        self.cell_type = args[2]
+        self.save_raw_pred = args[3]
+        self.artifact_correction = args[4]
+        self.apply_merging = args[5]
 
 
     def __str__(self):

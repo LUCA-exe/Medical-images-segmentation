@@ -239,7 +239,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
     # Training process
     #for epoch in range(max_epochs):
-    for epoch in range(15):
+    for epoch in range(15): # JUST FOR DEBUG
 
         print('-' * 10)
         print('Epoch {}/{}'.format(epoch + 1, max_epochs))

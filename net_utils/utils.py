@@ -12,6 +12,31 @@ from multiprocessing import cpu_count
 import torch
 import pandas as pd
 
+from net_utils import unets
+
+
+# Copy of the function in the train.py module - test to prove the modularity for the eval.py
+def create_model_architecture(log, model_config, device, num_gpus, pre_train = False):
+    # Given the parsed training arguments, create the U-Net architecture
+    
+    if pre_train:
+        unet_type = 'AutoU' # Get CNN (U-Net without skip connections)
+    else:
+        unet_type = model_config['architecture'][0]
+
+    net = unets.build_unet(log, unet_type=unet_type, 
+                                act_fun=model_config['architecture'][2],
+                                pool_method=model_config['architecture'][1],
+                                normalization=model_config['architecture'][3],
+                                device=device,
+                                num_gpus=num_gpus,
+                                ch_in=1,
+                                ch_out=1,
+                                filters=model_config['architecture'][4],
+                                detach_fusion_layers=model_config['architecture'][5],
+                                softmax_layer=model_config['architecture'][6])
+    return net
+
 
 def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_models, config, tot_time, tot_epochs):
     # Get the training loss and save it in a formatted '*.txt' file.
