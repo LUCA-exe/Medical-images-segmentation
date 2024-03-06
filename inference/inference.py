@@ -133,7 +133,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                     5 * len(ctc_dataset), 3 * len(ctc_dataset) // 4, 7 * len(ctc_dataset) // 8, len(ctc_dataset) - 1]
 
         # Go through predicted batch and apply post-processing (not parallelized)
-        for h in range(len(prediction_border_batch)):
+        for h in range(len(prediction_cell_batch)): # NOTE: For now this batch is the only one that is always computed - to change!
 
             log.debug('.. processing {0} ..'.format(ids_batch[h]))
 
@@ -149,17 +149,17 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             file_id = ids_batch[h].split('t')[-1] + '.tif'
 
             # TODO: Implement different post-processing options.
-            if args.post_processing == 'dual-unet':
+            if args.post_pipeline == 'dual-unet':
                 prediction_instance, border = border_cell_distance_post_processing(border_prediction=prediction_border_batch[h],
                                                                     cell_prediction=prediction_cell_batch[h],
                                                                     args=args)
             
             # TO FINISH TEST
-            if args.post_process == 'triple-unet':
+            if args.post_pipeline == 'triple-unet':
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
             
             # TO FINISH TEST
-            if args.post_process == 'original_dual-unet':
+            if args.post_pipeline == 'original-dual-unet':
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
 
             if args.scale < 1:

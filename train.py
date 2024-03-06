@@ -105,6 +105,7 @@ def get_model_config(log, train_args, num_gpus):
     return model_config
 
 
+# NOTE: Moved in the net_utils.utils
 def create_model_architecture(log, pre_train, model_config, device, num_gpus):
     # Given the parsed training arguments, create the U-Net architecture
     

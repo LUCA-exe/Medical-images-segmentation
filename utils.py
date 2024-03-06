@@ -515,12 +515,13 @@ class eval_arg_odu(a_eval_arg_class):
     def __init__(self, args):
 
         # Reducted number of arguments compared to the KIT-GE implementation
-        self.post_pipeline = [0] 
-        self.scale = args[1]
-        self.cell_type = args[2]
-        self.save_raw_pred = args[3]
-        self.artifact_correction = args[4]
-        self.apply_merging = args[5]
+        self.post_pipeline = args[0] 
+        self.apply_clahe = args[1]
+        self.scale = args[2]
+        self.cell_type = args[3]
+        self.save_raw_pred = args[4]
+        self.artifact_correction = args[5]
+        self.apply_merging = args[6]
 
 
     def __str__(self):

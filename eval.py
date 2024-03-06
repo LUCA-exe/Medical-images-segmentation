@@ -170,16 +170,8 @@ def tu_inference_loop(log, models, path_models, train_sets, path_data, device, n
             os.makedirs(path_seg_results, exist_ok=True)
 
             # Get post-processing settings
-            '''eval_args = EvalArgs(args.post_processing_pipeline,
-                                    th_cell=None, 
-                                    th_seed=None,
-                                    apply_clahe=None,
-                                    scale=args.scale,
-                                    cell_type=args.dataset,
-                                    save_raw_pred=args.save_raw_pred,
-                                    artifact_correction=None,
-                                    apply_merging=args.apply_merging)'''
             eval_class_args = eval_f.create_argument_class(args.post_processing_pipeline,
+                                                    args.apply_clahe,
                                                     args.scale,
                                                     args.dataset,
                                                     args.save_raw_pred,
@@ -190,15 +182,14 @@ def tu_inference_loop(log, models, path_models, train_sets, path_data, device, n
             log.debug(eval_class_args)
 
             # Inference on the chosen train set
-            args_used = inference_2d(log=log, model_path=model_path,
+            args_used = inference_2d(log=log, 
+                        model_path=model_path,
                         data_path=os.path.join(path_data, train_set),
                         result_path=path_seg_results,
                         device=device,
                         num_gpus = num_gpus,
                         batchsize=args.batch_size,
-                        args=eval_class_args,
-                        model_pipeline=args.model_pipeline,
-                        post_processing_pipeline=args.post_processing_pipeline) 
+                        args=eval_class_args) 
 
             if args.eval_metric == 'software':
                 seg_measure, det_measure = ctc_metrics(path_data=path_data,
