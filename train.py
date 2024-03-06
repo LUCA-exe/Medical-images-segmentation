@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths, check_path, train_factory
+from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, train_factory
 from parser import get_parser, get_processed_args
 from net_utils.utils import unique_path, write_train_info
 from net_utils import unets
@@ -22,8 +22,9 @@ from training.cell_segmentation_dataset import CellSegDataset
 def set_up_args_and_folder():
     # Parse initial arguments and set up environment variables/folder.
 
-    set_environment_paths() # Read .env file and set up the temporary folders.
-    log = create_logging() # Set up 'logger' object and set up the current run folders.
+    set_environment_paths_and_folders() # Read .env file and set-up the temporary folders
+
+    log = create_logging() # Set up 'logger' object and set up the current run folders
     
     args = get_parser() # Set up dict arguments
     args = get_processed_args(args)

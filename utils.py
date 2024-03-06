@@ -73,7 +73,6 @@ def create_logging():
   # Add the handlers to the loggers
   logger.addHandler(info_handler)
   logger.addHandler(debug_handler)
-
   return logger
 
 
@@ -94,14 +93,33 @@ def set_device():
 
 
 # NOTE: Updating to be used by all modules in this project
-def set_environment_paths():
+def set_environment_paths_and_folders():
 
     # Load the paths on the environment
     load_dotenv()
 
     # Set-up folders
+    clear_folder(os.getenv('TEMPORARY_PATH', None))
     os.makedirs(os.getenv('TEMPORARY_PATH', None), exist_ok=True)
     return None
+
+
+def clear_folder(folder_path):
+  """Clears all files from the specified folder.
+
+  Args:
+    folder_path: The path to the folder to clear.
+
+  Raises:
+    IOError: If an error occurs during file deletion.
+  """
+  for file in os.listdir(folder_path):
+    file_path = os.path.join(folder_path, file)
+    if os.path.isfile(file_path):
+      try:
+        os.remove(file_path)
+      except OSError as e:
+        raise IOError(f"Error deleting file: {file_path}") from e
 
 
 def check_and_download_evaluation_software(log, software_path):

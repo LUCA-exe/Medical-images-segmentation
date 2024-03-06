@@ -7,13 +7,14 @@ import torch.optim as optim
 from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import torch.nn as nn
+from copy import deepcopy
 
 from training.ranger2020 import Ranger
 from training.losses import get_loss, get_weights_tensor, WeightedCELoss
-from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples
+from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples, save_image
 
 
-def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config):
+def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, debug_counter):
     
     if arch_name == 'dual-unet':
         border_pred_batch, cell_pred_batch = net(img_batch)
@@ -54,6 +55,14 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_mask = criterion['mask'](mask_pred_batch, target_mask)
         loss = loss_binary_border + loss_cell + loss_mask
         losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+
+    # DEBUG  - detach is not an inplace modification
+    if debug_counter % 5 == 0:
+        # Just first of the batch
+        save_image(np.squeeze(mask_pred_batch[0].cpu().detach().numpy()[0, :, :]), "./tmp", f"first layer predicted_mask sample {debug_counter}")
+        save_image(np.squeeze(mask_pred_batch[0].cpu().detach().numpy()[1, :, :]), "./tmp", f"second layer predicted_mask {debug_counter}")
+        save_image(np.squeeze(img_batch[0].cpu().detach().numpy()), "./tmp", f"original_image {debug_counter}")
+
     return loss, losses_list
 
 
@@ -239,6 +248,10 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
     # Training process
     #for epoch in range(max_epochs):
+    
+    # TEMPORARY DEBUG VAR
+    debug_counter = 0
+
     for epoch in range(15): # JUST FOR DEBUG
 
         print('-' * 10)
@@ -287,7 +300,8 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         loss = loss_border + loss_cell + loss_mask'''
 
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config)
+                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config, debug_counter)
+                    debug_counter += 1
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
