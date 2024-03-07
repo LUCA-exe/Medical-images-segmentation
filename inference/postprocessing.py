@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from scipy.ndimage import gaussian_filter, binary_dilation
+from scipy.ndimage import gaussian_filter, binary_dilation, binary_erosion
 from skimage.segmentation import watershed
 from skimage import measure
 from skimage.feature import peak_local_max, canny
@@ -185,7 +185,7 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
 
 
 # NOTE: Simple solution using a binary mask prediction for a post processing phase
-def seg_mask_post_processing(mask, binary_border, args):
+def seg_mask_post_processing(mask, binary_border, original_image, args):
     """ Assignining different IDs in the final segmentation mask prediction.
 
     :param mask: Binary mask prediction.
@@ -196,18 +196,28 @@ def seg_mask_post_processing(mask, binary_border, args):
     """
 
     # Simple parameters to control the thresholdings
-    border_width = 10
+    border_width = 2
     th_border, th_nucleus = 0.2, 0.4
     binary_channel = 1
 
     # Processing the binary mask
-    border_nucleus = mask > th_border
-    nucleus = mask > th_nucleus
+    border_nucleus = np.squeeze(mask[binary_channel, :, :] > th_border)
+    nucleus = np.squeeze(mask[binary_channel, :, :] > th_nucleus)
 
-    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask channel {binary_channel} pred")
-    save_image(np.squeeze(border_nucleus[binary_channel, :, :]), "./tmp", f"Border an nucleus mask")
-    save_image(np.squeeze(nucleus[binary_channel, :, :]), "./tmp", f"Nucleus mask")
+    # Erosion to create the seed - no custom structuring element
+    seeds = binary_erosion(border_nucleus, iterations = border_width)
+
+
+    # Apply watershed
+    prediction_instance = watershed(image=-np.squeeze(mask[binary_channel, :, :]), markers=seeds, mask=border_nucleus, watershed_line=False)
+
+    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediciton (channel {binary_channel})")
+    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
+    save_image(border_nucleus, "./tmp", f"Border and nucleus mask")
+    save_image(nucleus, "./tmp", f"Nucleus mask")
+    save_image(np.squeeze(original_image), "./tmp", f"Original image")
+    save_image(seeds, "./tmp", f"Mask eroded (Value eroded {border_width})")
+    save_image(prediction_instance, "./tmp", f"Final image using Watershed")
     exit(1)
 
-    processed_mask = measure.label(mask, background=0)
     return np.squeeze(processed_mask.astype(np.uint16))
