@@ -184,7 +184,7 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
-def seg_mask_post_processing(mask, args):
+def seg_mask_post_processing(mask, binary_border, args):
     """ Assignining different IDs in the final segmentation mask prediction.
 
     :param mask: Binary mask prediction.
@@ -193,6 +193,12 @@ def seg_mask_post_processing(mask, args):
         :type args:
     :return: Instance segmentation mask.
     """
+
+    # DEBUG
+    binary_channel = 1
+    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask channel {binary_channel} pred")
+    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border channel {binary_channel} pred")
+    exit(1)
 
     processed_mask = measure.label(mask, background=0)
     return np.squeeze(processed_mask.astype(np.uint16))

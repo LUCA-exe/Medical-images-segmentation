@@ -114,8 +114,11 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
         elif arch_name == "original-dual-unet":
             prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
-            prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
-            prediction_binary_border_batch = prediction_binary_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            # NOTE: The selection of the "padded" dim has to comprhend all the channels in case of binary prediction
+            prediction_mask_batch = prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            prediction_binary_border_batch = prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            #prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            #prediction_binary_border_batch = prediction_binary_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         elif arch_name == "triple-unet":
             prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
@@ -124,7 +127,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
         log.debug(f".. predicted batch {idx} ..")
 
-        # Get rid of pads.
+        # Get rid of pads
         prediction_cell_batch = prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
         #prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
@@ -160,7 +163,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             
             # TO FINISH TEST
             if args.post_pipeline == 'original-dual-unet':
-                prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
+                prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], binary_border = prediction_binary_border_batch[h], args = args)
 
             if args.scale < 1:
                 prediction_instance = resize(prediction_instance,
