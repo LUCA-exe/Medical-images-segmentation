@@ -14,7 +14,26 @@ from training.losses import get_loss, get_weights_tensor, WeightedCELoss
 from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples, save_image
 
 
-def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, debug_counter):
+def sample_plot_during_validation(batches_list, binary_pred = True):
+    # Function to plot sample batches during the validation phase to monitor visually the training
+    
+    binary_channel = 0
+    # Take always the first element of the batch for every batch provided -  the first batch is alway the true image and the remaining all the prediction
+    for idx, batch in enumerate(batches_list):
+        
+        # If the batches of the true image
+        if idx == 0:
+            save_image(np.squeeze(batch[0].cpu().detach().numpy()), "./tmp", f"Original image batch sample {sample_counter}")
+
+        # Saving the batch image considering two channel (prediceted segmentation mask)
+        if binary_pred == True:
+            save_image(np.squeeze(batch[0].cpu().detach().numpy()[binary_channel, :, :]), "./tmp", f"Binary batch {idx} sample {sample_counter} (Channel {binary_channel})")
+        else:
+            raise NotImplementedError(f"Not implemented the distance predicted image visualization!")
+        
+
+
+def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, phase):
     
     if arch_name == 'dual-unet':
         border_pred_batch, cell_pred_batch = net(img_batch)
@@ -55,14 +74,11 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_mask = criterion['mask'](mask_pred_batch, target_mask)
         loss = loss_binary_border + loss_cell + loss_mask
         losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-
-    # DEBUG  - detach is not an inplace modification
-    if debug_counter % 5 == 0:
-        # Just first of the batch
-        save_image(np.squeeze(mask_pred_batch[0].cpu().detach().numpy()[0, :, :]), "./tmp", f"first layer predicted_mask sample {debug_counter}")
-        save_image(np.squeeze(mask_pred_batch[0].cpu().detach().numpy()[1, :, :]), "./tmp", f"second layer predicted_mask {debug_counter}")
-        save_image(np.squeeze(img_batch[0].cpu().detach().numpy()), "./tmp", f"original_image {debug_counter}")
-
+        
+        # Qualitative plotting in the validation phase - for now just in this architecture
+        if phase == "val":
+            # NOTE: Plot all binary prediction or floating prediction
+            sample_plot_during_validation([img_batch, binary_border_pred_batch, mask_pred_batch])
     return loss, losses_list
 
 
@@ -249,8 +265,8 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     # Training process
     #for epoch in range(max_epochs):
     
-    # TEMPORARY DEBUG VAR
-    debug_counter = 0
+    # Validation sample counter - index of what to plot in training phase
+    #sample_counter = 0
 
     for epoch in range(15): # JUST FOR DEBUG
 
@@ -300,14 +316,14 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         loss = loss_border + loss_cell + loss_mask'''
 
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config, debug_counter)
+                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config, phase)
                     debug_counter += 1
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-
+                        
                 # Statistics - both general and single losses
                 running_loss += loss.item() * img_batch.size(0) # NOTE: loss.item() as default contains  already the average of the mini_batch loss.
 
