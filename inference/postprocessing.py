@@ -184,6 +184,7 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
+# NOTE: Simple solution using a binary mask prediction for a post processing phase
 def seg_mask_post_processing(mask, binary_border, args):
     """ Assignining different IDs in the final segmentation mask prediction.
 
@@ -194,10 +195,18 @@ def seg_mask_post_processing(mask, binary_border, args):
     :return: Instance segmentation mask.
     """
 
-    # DEBUG
+    # Simple parameters to control the thresholdings
+    border_width = 10
+    th_border, th_nucleus = 0.2, 0.4
     binary_channel = 1
+
+    # Processing the binary mask
+    border_nucleus = mask > th_border
+    nucleus = mask > th_nucleus
+
     save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask channel {binary_channel} pred")
-    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border channel {binary_channel} pred")
+    save_image(np.squeeze(border_nucleus[binary_channel, :, :]), "./tmp", f"Border an nucleus mask")
+    save_image(np.squeeze(nucleus[binary_channel, :, :]), "./tmp", f"Nucleus mask")
     exit(1)
 
     processed_mask = measure.label(mask, background=0)
