@@ -105,21 +105,23 @@ def set_environment_paths_and_folders():
 
 
 def clear_folder(folder_path):
-  """Clears all files from the specified folder.
 
-  Args:
-    folder_path: The path to the folder to clear.
+    """Clears all files from the specified folder.
 
-  Raises:
-    IOError: If an error occurs during file deletion.
-  """
-  for file in os.listdir(folder_path):
-    file_path = os.path.join(folder_path, file)
-    if os.path.isfile(file_path):
-      try:
-        os.remove(file_path)
-      except OSError as e:
-        raise IOError(f"Error deleting file: {file_path}") from e
+    Args:
+        folder_path: The path to the folder to clear.
+
+    Raises:
+        IOError: If an error occurs during file deletion.
+    """
+    if os.path.isdir(folder_path):
+        for file in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file)
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError as e:
+                    raise IOError(f"Error deleting file: {file_path}") from e
 
 
 def check_and_download_evaluation_software(log, software_path):

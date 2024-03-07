@@ -14,26 +14,29 @@ from training.losses import get_loss, get_weights_tensor, WeightedCELoss
 from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples, save_image
 
 
-def sample_plot_during_validation(batches_list, binary_pred = True):
-    # Function to plot sample batches during the validation phase to monitor visually the training
+def sample_plot_during_validation(batches_list,  val_phase_counter, binary_pred = True):
+    # Util function to plot sample batches during the validation phase to monitor visually the training
     
+    # NOTE: For now take the first channel (class 0)
     binary_channel = 0
+    # NOTE: For now take the first image
+    sample = 0
     # Take always the first element of the batch for every batch provided -  the first batch is alway the true image and the remaining all the prediction
     for idx, batch in enumerate(batches_list):
         
         # If the batches of the true image
         if idx == 0:
-            save_image(np.squeeze(batch[0].cpu().detach().numpy()), "./tmp", f"Original image batch sample {sample_counter}")
+            save_image(np.squeeze(batch[sample].cpu().detach().numpy()), "./tmp", f"Original image batch sample {sample} (Validation {val_phase_counter})")
 
-        # Saving the batch image considering two channel (prediceted segmentation mask)
-        if binary_pred == True:
-            save_image(np.squeeze(batch[0].cpu().detach().numpy()[binary_channel, :, :]), "./tmp", f"Binary batch {idx} sample {sample_counter} (Channel {binary_channel})")
         else:
-            raise NotImplementedError(f"Not implemented the distance predicted image visualization!")
-        
+            # Saving the batch image considering two channel (prediceted segmentation mask)
+            if binary_pred == True:
+                save_image(np.squeeze(batch[sample].cpu().detach().numpy()[binary_channel, :, :]), "./tmp", f"Binary batch {idx} sample {sample} (Channel {binary_channel}) (Validation {val_phase_counter})")
+            else:
+                raise NotImplementedError(f"Not implemented the distance predicted image visualization!")
 
 
-def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, phase):
+def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, phase, val_phase_counter):
     
     if arch_name == 'dual-unet':
         border_pred_batch, cell_pred_batch = net(img_batch)
@@ -77,8 +80,8 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         
         # Qualitative plotting in the validation phase - for now just in this architecture
         if phase == "val":
-            # NOTE: Plot all binary prediction or floating prediction
-            sample_plot_during_validation([img_batch, binary_border_pred_batch, mask_pred_batch])
+            # NOTE: Plot all binary prediction or all floating prediction
+            sample_plot_during_validation([img_batch, binary_border_pred_batch, mask_pred_batch], val_phase_counter)
     return loss, losses_list
 
 
@@ -261,13 +264,12 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     epochs_wo_improvement, train_loss, val_loss,  = 0, [], []
     since = time.time()
     arch_name = config['architecture'][0]
+    # Validation sample counter - index of what to plot in training phase
+    val_phase_counter = -1
 
     # Training process
     #for epoch in range(max_epochs):
     
-    # Validation sample counter - index of what to plot in training phase
-    #sample_counter = 0
-
     for epoch in range(15): # JUST FOR DEBUG
 
         print('-' * 10)
@@ -280,6 +282,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             if phase == 'train':
                 net.train()  # Set model to training mode
             else:
+                val_phase_counter += 1
                 net.eval()  # Set model to evaluation mode
 
             # keep track of running losses
@@ -316,8 +319,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         loss = loss_border + loss_cell + loss_mask'''
 
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config, phase)
-                    debug_counter += 1
+                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config, phase, val_phase_counter)
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
