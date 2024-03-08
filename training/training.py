@@ -33,7 +33,8 @@ def sample_plot_during_validation(batches_list,  val_phase_counter, binary_pred 
             if binary_pred == True:
                 save_image(np.squeeze(batch[sample].cpu().detach().numpy()[binary_channel, :, :]), "./tmp", f"Binary batch {idx} sample {sample} (Channel {binary_channel}) (Validation {val_phase_counter})")
             else:
-                raise NotImplementedError(f"Not implemented the distance predicted image visualization!")
+                save_image(np.squeeze(batch[sample].cpu().detach().numpy()), "./tmp", f"Floating batch {idx} sample {sample} (Validation {val_phase_counter})")
+            
 
 
 def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, phase, val_phase_counter):
@@ -44,6 +45,10 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
         loss = loss_border + loss_cell
         losses_list = [loss_border.item(), loss_cell.item()]
+
+        # Qualitative plotting in the validation phase - for now just in this architecture
+        if phase == "val":
+            sample_plot_during_validation([img_batch, border_pred_batch, cell_pred_batch], val_phase_counter, binary_pred = False)
 
     if arch_name == 'triple-unet':
         border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
@@ -255,7 +260,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     show_training_dataset_samples(log, datasets["train"])
 
     # Get number of training epochs depending on dataset size (just roughly to decrease training time):
-    config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']))
+    config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']), config)
     # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
     print(f"Number of epochs without improvement allowed {2 * config['max_epochs'] // 20 + 5}")
 
@@ -296,9 +301,7 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     val_phase_counter = -1
 
     # Training process
-    #for epoch in range(max_epochs):
-    
-    for epoch in range(15): # JUST FOR DEBUG
+    for epoch in range(max_epochs):
 
         print('-' * 10)
         print('Epoch {}/{}'.format(epoch + 1, max_epochs))
