@@ -184,40 +184,41 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
-# NOTE: Simple solution using a binary mask prediction for a post processing phase
-def seg_mask_post_processing(mask, binary_border, original_image, args):
+# NOTE: Simple solution using a binary mask prediction for a post processing phase - evaluate if you have to use watershed or not
+def seg_mask_post_processing(mask, binary_border, original_image, cell_distance, args):
     """ Assignining different IDs in the final segmentation mask prediction.
 
     :param mask: Binary mask prediction.
 
-    :param args: Post-processing settings (th_cell, th_seed, n_splitting, fuse_z_seeds).
+    :param args: Post-processing settings.
         :type args:
     :return: Instance segmentation mask.
     """
 
-    # Simple parameters to control the thresholdings
-    border_width = 2
-    th_border, th_nucleus = 0.2, 0.4
+    # Simple parameters to control the thresholdings of markers and mask
+    th_mask, th_seeds = 0.4, 0.6
     binary_channel = 1
 
     # Processing the binary mask
-    border_nucleus = np.squeeze(mask[binary_channel, :, :] > th_border)
-    nucleus = np.squeeze(mask[binary_channel, :, :] > th_nucleus)
-
-    # Erosion to create the seed - no custom structuring element
-    seeds = binary_erosion(border_nucleus, iterations = border_width)
+    processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
+    seeds =  np.squeeze(mask[binary_channel, :, :] > th_seeds)
 
 
     # Apply watershed
-    prediction_instance = watershed(image=-np.squeeze(mask[binary_channel, :, :]), markers=seeds, mask=border_nucleus, watershed_line=False)
+    prediction_instance = watershed(image=-np.squeeze(cell_distance), markers=seeds, mask=processed_mask, watershed_line=False)
 
-    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediciton (channel {binary_channel})")
+    save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
+    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
     save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
-    save_image(border_nucleus, "./tmp", f"Border and nucleus mask")
-    save_image(nucleus, "./tmp", f"Nucleus mask")
+    save_image(processed_mask, "./tmp", f"Processed mask")
+    save_image(seeds, "./tmp", f"Seeds")
     save_image(np.squeeze(original_image), "./tmp", f"Original image")
-    save_image(seeds, "./tmp", f"Mask eroded (Value eroded {border_width})")
     save_image(prediction_instance, "./tmp", f"Final image using Watershed")
+
+    print(np.unique(seeds))
+    print(np.unique(seeds[:50, 50]))
+    seeds = seeds.astype(np.uint16)
+    print(np.unique)
     exit(1)
 
     return np.squeeze(processed_mask.astype(np.uint16))
