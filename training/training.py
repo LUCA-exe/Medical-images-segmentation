@@ -108,8 +108,8 @@ def set_up_optimizer_and_scheduler(config, net, best_loss):
                                         factor=0.25,
                                         patience=config['max_epochs'] // 20,
                                         verbose=True,
-                                        min_lr=3e-6) 
-            break_condition = 2 * config['max_epochs'] // 20 + 5
+                                        min_lr=6e-5) 
+            break_condition = 2 * config['max_epochs'] // 20 + 8
 
         elif config['optimizer'] == 'ranger':
 
@@ -163,7 +163,7 @@ def set_up_optimizer_and_scheduler(config, net, best_loss):
                                         patience=config['max_epochs'] // 4,
                                         verbose=True) 
         # NOTE: No break condition mentioned on the paper
-        break_condition = config['max_epochs']
+        break_condition = config['max_epochs'] // 4
 
 
     else:
