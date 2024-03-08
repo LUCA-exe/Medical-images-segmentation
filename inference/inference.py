@@ -161,7 +161,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             if args.post_pipeline == 'triple-unet':
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
             
-            # NOTE: Simple solution in testing --> after that first enhancment
+            # NOTE: Simple solution in testing --> after that, provide first enhancment
             if args.post_pipeline == 'original-dual-unet':
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], binary_border = prediction_binary_border_batch[h], original_image = img_batch[h].cpu().numpy(),  cell_distance = prediction_cell_batch[h], args = args)
 

@@ -92,64 +92,86 @@ def set_up_optimizer_and_scheduler(config, net, best_loss):
         :type n_samples: int
     :return: maximum amount of training epochs
     """
+    if config["architecture"][0] == "dual-unet":
 
-    if config['optimizer'] == 'adam':
+        if config['optimizer'] == 'adam':
+
+            optimizer = optim.Adam(net.parameters(),
+                                lr=8e-4,
+                                betas=(0.9, 0.999),
+                                eps=1e-08,
+                                weight_decay=0,
+                                amsgrad=True)
+
+            scheduler = ReduceLROnPlateau(optimizer,
+                                        mode='min',
+                                        factor=0.25,
+                                        patience=config['max_epochs'] // 20,
+                                        verbose=True,
+                                        min_lr=3e-6) 
+            break_condition = 2 * config['max_epochs'] // 20 + 5
+
+        elif config['optimizer'] == 'ranger':
+
+            lr = 6e-3
+            if best_loss < 1e3:  # probably second run
+
+                second_run = True
+
+                optimizer = Ranger(net.parameters(),
+                                lr=0.09 * lr,
+                                alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
+                                betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
+                                # Gradient centralization on or off, applied to conv layers only or conv + fc layers
+                                use_gc=True, gc_conv_only=False, gc_loc=True)
+
+                scheduler = CosineAnnealingLR(optimizer,
+                                            T_max=config['max_epochs'] // 10,
+                                            eta_min=3e-5,
+                                            last_epoch=-1,
+                                            verbose=True)
+                break_condition = config['max_epochs'] // 10 + 1
+                max_epochs = config['max_epochs'] // 10
+            else:
+                optimizer = Ranger(net.parameters(),
+                                lr=lr,
+                                alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
+                                betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
+                                # Gradient centralization on or off, applied to conv layers only or conv + fc layers
+                                use_gc=True, gc_conv_only=False, gc_loc=True)
+                scheduler = ReduceLROnPlateau(optimizer,
+                                            mode='min',
+                                            factor=0.25,
+                                            patience=config['max_epochs'] // 10,
+                                            verbose=True,
+                                            min_lr=0.075*lr)
+                break_condition = 2 * config['max_epochs'] // 10 + 5
+        else:
+            raise Exception('Optimizer not known')
+
+    # Config from thei original paper
+    elif config["architecture"][0] == "original-dual-unet":
+
         optimizer = optim.Adam(net.parameters(),
-                               lr=8e-4,
-                               betas=(0.9, 0.999),
-                               eps=1e-08,
-                               weight_decay=0,
-                               amsgrad=True)
+                                betas=(0.9, 0.99),
+                                weight_decay=1e-4,
+                                amsgrad=True)
 
         scheduler = ReduceLROnPlateau(optimizer,
-                                      mode='min',
-                                      factor=0.25,
-                                      patience=config['max_epochs'] // 20,
-                                      verbose=True,
-                                      min_lr=3e-6) 
-        break_condition = 2 * config['max_epochs'] // 20 + 5
+                                        mode='min',
+                                        factor=0.1,
+                                        patience=config['max_epochs'] // 4,
+                                        verbose=True) 
+        # NOTE: No break condition mentioned on the paper
+        break_condition = config['max_epochs']
 
-    elif config['optimizer'] == 'ranger':
 
-        lr = 6e-3
-        if best_loss < 1e3:  # probably second run
-
-            second_run = True
-
-            optimizer = Ranger(net.parameters(),
-                               lr=0.09 * lr,
-                               alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
-                               betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
-                               # Gradient centralization on or off, applied to conv layers only or conv + fc layers
-                               use_gc=True, gc_conv_only=False, gc_loc=True)
-
-            scheduler = CosineAnnealingLR(optimizer,
-                                          T_max=config['max_epochs'] // 10,
-                                          eta_min=3e-5,
-                                          last_epoch=-1,
-                                          verbose=True)
-            break_condition = config['max_epochs'] // 10 + 1
-            max_epochs = config['max_epochs'] // 10
-        else:
-            optimizer = Ranger(net.parameters(),
-                               lr=lr,
-                               alpha=0.5, k=6, N_sma_threshhold=5,  # Ranger options
-                               betas=(.95, 0.999), eps=1e-6, weight_decay=0,  # Adam options
-                               # Gradient centralization on or off, applied to conv layers only or conv + fc layers
-                               use_gc=True, gc_conv_only=False, gc_loc=True)
-            scheduler = ReduceLROnPlateau(optimizer,
-                                          mode='min',
-                                          factor=0.25,
-                                          patience=config['max_epochs'] // 10,
-                                          verbose=True,
-                                          min_lr=0.075*lr)
-            break_condition = 2 * config['max_epochs'] // 10 + 5
     else:
-        raise Exception('Optimizer not known')
+        raise Exception('Architecture not known')
     return optimizer, scheduler, break_condition
 
 
-def get_max_epochs(n_samples):
+def get_max_epochs(n_samples, config):
     """ Get maximum amount of training epochs.
 
     :param n_samples: number of training samples.
@@ -157,6 +179,7 @@ def get_max_epochs(n_samples):
     :return: maximum amount of training epochs
     """
 
+    # From original repository
     if n_samples >= 1000:
         max_epochs = 200
     elif n_samples >= 500:
@@ -170,6 +193,11 @@ def get_max_epochs(n_samples):
     else:
         max_epochs = 560
 
+    # NOTE: Temporary fix - following the original paper
+    if config["architecture"][0] == "dual-unet":
+        max_epochs = 200
+    elif config["architecture"][0] == "original-dual-unet":
+         max_epochs = 40
     return max_epochs
 
 

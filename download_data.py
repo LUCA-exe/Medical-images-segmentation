@@ -17,7 +17,7 @@ from parser import get_parser, get_processed_args
 def main():
     """ Function to call the download data utils.
     """
-    set_environment_paths()
+    set_environment_paths_and_folders()
     log = create_logging() # Set up 'logger' object 
 
     args = get_parser() # Set up dict arguments

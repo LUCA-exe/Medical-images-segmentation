@@ -199,26 +199,21 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
     th_mask, th_seeds = 0.4, 0.6
     binary_channel = 1
 
-    # Processing the binary mask
+    # Processing the binary mask with simple thresholding
     processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
-    seeds =  np.squeeze(mask[binary_channel, :, :] > th_seeds)
+    seeds = np.squeeze(mask[binary_channel, :, :] > th_seeds)
 
 
     # Apply watershed
     prediction_instance = watershed(image=-np.squeeze(cell_distance), markers=seeds, mask=processed_mask, watershed_line=False)
+    prediction_instance = measure.label(prediction_instance)
 
-    save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
-    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
-    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
-    save_image(processed_mask, "./tmp", f"Processed mask")
-    save_image(seeds, "./tmp", f"Seeds")
-    save_image(np.squeeze(original_image), "./tmp", f"Original image")
-    save_image(prediction_instance, "./tmp", f"Final image using Watershed")
-
-    print(np.unique(seeds))
-    print(np.unique(seeds[:50, 50]))
-    seeds = seeds.astype(np.uint16)
-    print(np.unique)
-    exit(1)
-
-    return np.squeeze(processed_mask.astype(np.uint16))
+    # Temporary - Debug print
+    #save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
+    #save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
+    #save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
+    #save_image(processed_mask, "./tmp", f"Processed mask")
+    #save_image(seeds, "./tmp", f"Seeds")
+    #save_image(np.squeeze(original_image), "./tmp", f"Original image")
+    #save_image(prediction_instance, "./tmp", f"Final image using Watershed")
+    return np.squeeze(prediction_instance.astype(np.uint16))
