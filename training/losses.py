@@ -199,7 +199,8 @@ class MultiClassJLoss(nn.Module):
     for i in range(C):
       for k in range(C):
         if i != k:  # Avoid self-comparison
-          alpha_i = torch.sum(predictions[:, i] * targets.float(), dim=(1, 2))  # Soft TPR for class i
+          # alpha_i = torch.sum(predictions[:, i] * targets.float(), dim=(1, 2))  # Soft TPR for class i
+          alpha_i = torch.sum(predictions[:, i] * targets.float())  # Soft TPR for class i
           beta_ik = torch.sum((1 - predictions[:, i]) * targets.float(), dim=(1, 2))  # Soft TNR (negative class k)
           delta_ik = (torch.mean(predictions[:, i] / self.class_weights[i, k]) - torch.mean(predictions[:, k] / self.class_weights[i, k])) / 2
           
