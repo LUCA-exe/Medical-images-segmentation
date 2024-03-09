@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 import torch
 
 def get_weights_tensor(target_mask_batch: torch.Tensor, device: torch.device = None) -> torch.Tensor:
@@ -165,10 +166,28 @@ class MultiClassJLoss(nn.Module):
     """
 
     B, C, H, W = predictions.shape
-    targets = targets.long()  # Ensure targets are long type (integers)
+  
+    # Ensure shape compatibility for BCE loss
+    if C != 1:
 
-    # Calculate binary cross-entropy loss
-    bce_loss = F.binary_cross_entropy_with_logits(predictions, targets.float(), reduction='mean')
+        # If predictions are multi-class, reduce them to binary for each class
+        targets = targets.long()  # Ensure targets are long type (integers)
+        bce_loss = torch.zeros((1))
+
+        for i in range(C):
+            bool_mask = targets == i
+            byte_mask = bool_mask.byte()  # Convert boolean mask to byte (int8)
+
+            # Directly use byte_mask for BCE loss (no need to add to bce_loss) - both input and target have to be float!
+            bce_loss += F.binary_cross_entropy_with_logits(
+                predictions[:, i], byte_mask.float(), reduction='mean'
+            )
+    else:
+        # Otherwise, directly calculate binary cross-entropy with float target
+        targets = targets.float()  # Ensure targets are float for BCE loss
+        bce_loss = F.binary_cross_entropy_with_logits(
+            predictions, targets, reduction='mean'
+        )
 
     # Calculate J-regularization term
     j_reg_term = torch.zeros(1)
@@ -182,7 +201,8 @@ class MultiClassJLoss(nn.Module):
         if i != k:  # Avoid self-comparison
           alpha_i = torch.sum(predictions[:, i] * targets.float(), dim=(1, 2))  # Soft TPR for class i
           beta_ik = torch.sum((1 - predictions[:, i]) * targets.float(), dim=(1, 2))  # Soft TNR (negative class k)
-          delta_ik = (torch.mean(predictions[:, i] / self.class_weights[i]) - torch.mean(predictions[:, k] / self.class_weights[k])) / 2
+          delta_ik = (torch.mean(predictions[:, i] / self.class_weights[i, k]) - torch.mean(predictions[:, k] / self.class_weights[i, k])) / 2
+          
           j_reg_term += self.class_weights[i, k] * torch.log(0.5 + alpha_i * delta_ik)
 
     # Combine loss terms
@@ -278,6 +298,12 @@ def get_loss(config, device):
         elif config["classification_loss"] == "cross-entropy":
             mask_criterion = nn.CrossEntropyLoss()
 
+        # NOTE: Finish test
+        elif config["classification_loss"] == "j-cross-entropy":
+            mask_criterion = MultiClassJLoss(lambda_=0.5,  # Adjust weighting factor as needed
+                                            class_weights=torch.tensor([[1.0, 1.0, 1.0],  # Example class weights - try with 2 and 3 classes.
+                                                                        [1.0, 1.0, 1.0],
+                                                                        [1.0, 1.0, 1.0]]))
         else:
             raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
 
