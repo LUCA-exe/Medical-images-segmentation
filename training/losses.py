@@ -90,7 +90,7 @@ def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int) -> torch.T
     return class_weights
 
 
-# TODO: Custom class to dinamically use a crtierion woth the current class imbalancness - It overrides the forward pass.
+# NOTE: Custom class to dinamically use a criterion with the current class imbalanceness
 class WeightedCELoss(nn.Module):
     """
     Wrapper function for dynamically weighted cross-entropy loss.
@@ -134,6 +134,60 @@ class WeightedCELoss(nn.Module):
 
         else:
             raise ValueError(f"The provided weight function is not valid!")
+
+
+# NOTE: Work in progress - to test the values and the efficacy in training
+class MultiClassJLoss(nn.Module):
+  """
+  Combined loss function with multi-class J-regularization and binary cross-entropy.
+  """
+
+  def __init__(self, lambda_=1.0, class_weights=None):
+    """
+    Args:
+        lambda_: Weighting factor for J-regularization term (default: 1.0).
+        class_weights: Optional tensor of size (C, C) for pairwise class weights.
+    """
+    super(MultiClassJLoss, self).__init__()
+    self.lambda_ = lambda_
+    self.class_weights = class_weights
+
+  def forward(self, predictions, targets):
+    """
+    Calculates the combined loss.
+
+    Args:
+        predictions: Predicted probability tensor (shape: [B, C, H, W]).
+        targets: Ground truth label tensor (shape: [B, H, W]).
+
+    Returns:
+        Combined loss (tensor).
+    """
+
+    B, C, H, W = predictions.shape
+    targets = targets.long()  # Ensure targets are long type (integers)
+
+    # Calculate binary cross-entropy loss
+    bce_loss = F.binary_cross_entropy_with_logits(predictions, targets.float(), reduction='mean')
+
+    # Calculate J-regularization term
+    j_reg_term = torch.zeros(1)
+
+    if self.class_weights is None:
+      self.class_weights = torch.ones((C, C))
+
+    # Iterate through class pairs
+    for i in range(C):
+      for k in range(C):
+        if i != k:  # Avoid self-comparison
+          alpha_i = torch.sum(predictions[:, i] * targets.float(), dim=(1, 2))  # Soft TPR for class i
+          beta_ik = torch.sum((1 - predictions[:, i]) * targets.float(), dim=(1, 2))  # Soft TNR (negative class k)
+          delta_ik = (torch.mean(predictions[:, i] / self.class_weights[i]) - torch.mean(predictions[:, k] / self.class_weights[k])) / 2
+          j_reg_term += self.class_weights[i, k] * torch.log(0.5 + alpha_i * delta_ik)
+
+    # Combine loss terms
+    loss = bce_loss + self.lambda_ * j_reg_term
+    return loss
 
 
 # TODO: work in progress TO TEST (both effect during training and correctness of the class)
