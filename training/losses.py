@@ -189,22 +189,43 @@ class MultiClassJLoss(nn.Module):
             predictions, targets, reduction='mean'
         )
 
-    # Calculate J-regularization term
-    j_reg_term = torch.zeros(1)
+    # NOTE: For now the dim is 2 fixed, it should follow the number of classes.
+    # Calculate normalization factors (n_i) for each class in the batch
+    n_i = torch.sum(targets == i, dim=(1, 2))  # Sum over batch and spatial dimensions
 
-    if self.class_weights is None:
-      self.class_weights = torch.ones((C, C))
+    # One-hot encode targets for calculating y_i(p)
+    one_hot_targets = F.one_hot(targets, num_classes=C)  # One-hot encoding
+
+    n_i_unsqueeze = n_i.unsqueeze(1).unsqueeze(2).unsqueeze(2)  # Unsqueeze for broadcasting
+
+    # Calculate normalized predictions (varphi_i)
+    normalized_predictions = one_hot_targets / n_i_unsqueeze.float()  # Unsqueeze for broadcasting
 
     # Iterate through class pairs
+    j_reg_term = torch.zeros(B)  # Initialize J_reg_term for batch accumulation
+
+    if self.class_weights is None:
+        self.class_weights = torch.ones((C, C))
+
     for i in range(C):
-      for k in range(C):
-        if i != k:  # Avoid self-comparison
-          # alpha_i = torch.sum(predictions[:, i] * targets.float(), dim=(1, 2))  # Soft TPR for class i
-          alpha_i = torch.sum(predictions[:, i] * targets.float())  # Soft TPR for class i
-          beta_ik = torch.sum((1 - predictions[:, i]) * targets.float(), dim=(1, 2))  # Soft TNR (negative class k)
-          delta_ik = (torch.mean(predictions[:, i] / self.class_weights[i, k]) - torch.mean(predictions[:, k] / self.class_weights[i, k])) / 2
-          
-          j_reg_term += self.class_weights[i, k] * torch.log(0.5 + alpha_i * delta_ik)
+        for k in range(C):
+            if i != k:  # Avoid self-comparison
+                # Calculate difference of normalized activations (Delta_ik)
+                delta_ik = (normalized_predictions[:, i] - normalized_predictions[:, k]) / 2
+
+                # Membership function (z_i(p)) using targets and predictions
+                z_i = torch.gather(predictions, dim=1, index=targets.unsqueeze(1))  # Gather class probabilities
+                z_i = z_i.unsqueeze(1)  # Unsqueeze to add a dimension for class C
+                
+                # DEBUG
+                print(z_i.shape)
+                print(delta_ik.shape)
+
+                # Summation over pixels (Omega)
+                sum_z_i_delta_ik = torch.sum(z_i * delta_ik, dim=(1, 2))
+
+                # J_reg term for each class pair in the batch
+                j_reg_term += self.class_weights[i, k] * torch.log(0.5 + sum_z_i_delta_ik)
 
     # Combine loss terms
     loss = bce_loss + self.lambda_ * j_reg_term
