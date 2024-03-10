@@ -143,7 +143,7 @@ class MultiClassJLoss(nn.Module):
   Combined loss function with multi-class J-regularization and binary cross-entropy.
   """
 
-  def __init__(self, lambda_=1.0, class_weights=None):
+  def __init__(self, lambda_=1.0, class_weights=None, device=None):
     """
     Args:
         lambda_: Weighting factor for J-regularization term (default: 1.0).
@@ -152,6 +152,10 @@ class MultiClassJLoss(nn.Module):
     super(MultiClassJLoss, self).__init__()
     self.lambda_ = lambda_
     self.class_weights = class_weights
+
+    # Temporary code
+    if device != None:
+        self.device = device
 
   def forward(self, predictions, targets):
     """
@@ -164,7 +168,6 @@ class MultiClassJLoss(nn.Module):
     Returns:
         Combined loss (tensor).
     """
-
     B, C, H, W = predictions.shape
   
     # Ensure shape compatibility for BCE loss
@@ -172,7 +175,7 @@ class MultiClassJLoss(nn.Module):
 
         # If predictions are multi-class, reduce them to binary for each class
         targets = targets.long()  # Ensure targets are long type (integers)
-        bce_loss = torch.zeros((1))
+        bce_loss = torch.zeros((1)).to(self.device)
 
         for i in range(C):
             bool_mask = targets == i
@@ -180,7 +183,7 @@ class MultiClassJLoss(nn.Module):
 
             # Directly use byte_mask for BCE loss (no need to add to bce_loss) - both input and target have to be float!
             bce_loss += F.binary_cross_entropy_with_logits(
-                predictions[:, i], byte_mask.float(), reduction='mean'
+                predictions[:, i, :, :], byte_mask.float(), reduction='mean'
             )
     else:
         # Otherwise, directly calculate binary cross-entropy with float target
@@ -189,46 +192,41 @@ class MultiClassJLoss(nn.Module):
             predictions, targets, reduction='mean'
         )
 
-    # NOTE: For now the dim is 2 fixed, it should follow the number of classes.
-    # Calculate normalization factors (n_i) for each class in the batch
-    n_i = torch.sum(targets == i, dim=(1, 2))  # Sum over batch and spatial dimensions
-
-    # One-hot encode targets for calculating y_i(p)
+    # One-hot encode targets for calculating y_i(p) - calculate normalization factors (n_i) for each class in the batch
     one_hot_targets = F.one_hot(targets, num_classes=C)  # One-hot encoding
 
-    n_i_unsqueeze = n_i.unsqueeze(1).unsqueeze(2).unsqueeze(2)  # Unsqueeze for broadcasting
+    # Sum pixel counts across spatial dimensions (H and W)
+    n_i = torch.sum(one_hot_targets, dim=(1, 2))
 
-    # Calculate normalized predictions (varphi_i)
-    normalized_predictions = one_hot_targets / n_i_unsqueeze.float()  # Unsqueeze for broadcasting
-
-    # Iterate through class pairs
-    j_reg_term = torch.zeros(B)  # Initialize J_reg_term for batch accumulation
+    # In case of zero division
+    eps =  1e-6
+    # Reshape
+    reshaped_n_i = n_i.unsqueeze(1).unsqueeze(2)  # Shape: [2, 1, 1, 2]
+    # Calculate normalized targets (varphi_i)
+    normalized_targets = one_hot_targets / (reshaped_n_i+ eps).float() 
+    
+    # Initialize J_reg_term for batch accumulation - TO TEST
+    j_reg_term = torch.zeros(B).to(self.device)
 
     if self.class_weights is None:
         self.class_weights = torch.ones((C, C))
 
+    # Iterate through class pairs considering the all batch
     for i in range(C):
         for k in range(C):
             if i != k:  # Avoid self-comparison
                 # Calculate difference of normalized activations (Delta_ik)
-                delta_ik = (normalized_predictions[:, i] - normalized_predictions[:, k]) / 2
+                delta_ik = (normalized_targets[:, :, :, i] - normalized_targets[:, :, :, k]) / 2
 
-                # Membership function (z_i(p)) using targets and predictions
-                z_i = torch.gather(predictions, dim=1, index=targets.unsqueeze(1))  # Gather class probabilities
-                z_i = z_i.unsqueeze(1)  # Unsqueeze to add a dimension for class C
-                
-                # DEBUG
-                print(z_i.shape)
-                print(delta_ik.shape)
-
-                # Summation over pixels (Omega)
-                sum_z_i_delta_ik = torch.sum(z_i * delta_ik, dim=(1, 2))
+                reshaped_delta_ik = delta_ik.unsqueeze(1)
+                # Multiply the correpsondent i-channel with the computed delta_ik
+                sum_multiplied_z_i = torch.sum(predictions[:, i, :, :] * reshaped_delta_ik)
 
                 # J_reg term for each class pair in the batch
-                j_reg_term += self.class_weights[i, k] * torch.log(0.5 + sum_z_i_delta_ik)
+                j_reg_term += self.class_weights[i, k] * torch.log(0.5 + sum_multiplied_z_i)
 
-    # Combine loss terms
-    loss = bce_loss + self.lambda_ * j_reg_term
+    # Combine loss terms after taking the mean of the j_reg_term batch
+    loss = bce_loss + self.lambda_ * j_reg_term.mean()
     return loss
 
 
@@ -325,7 +323,8 @@ def get_loss(config, device):
             mask_criterion = MultiClassJLoss(lambda_=0.5,  # Adjust weighting factor as needed
                                             class_weights=torch.tensor([[1.0, 1.0, 1.0],  # Example class weights - try with 2 and 3 classes.
                                                                         [1.0, 1.0, 1.0],
-                                                                        [1.0, 1.0, 1.0]]))
+                                                                        [1.0, 1.0, 1.0]]),
+                                                                        device = device)
         else:
             raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
 
