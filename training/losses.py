@@ -329,8 +329,69 @@ def get_loss(config, device):
             raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
 
         criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
-
     return criterion
+
+
+
+# Utility function to apply the j cross entropy function
+def compute_j_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, target_mask_batch, criterion):
+    # Pred. batches as dict. to decrease the number of args passed to the function
+
+    # Adapt the dim. of the target batches
+    target_binary_border = target_binary_border_batch[:, 0, :, :]
+    target_mask =  target_mask_batch[:, 0, :, :]
+
+    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], cell_batch)
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
+    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
+
+    loss = loss_binary_border + loss_cell + loss_mask
+    # The custom j regularized cross entropy is a value from functional package - not an object
+    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+
+    # DEBUG
+    print(loss)
+    print(losses_list)
+
+
+    return loss, losses_list
+
+
+# Utility function to apply the cross entropy function
+def compute_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, target_mask_batch, criterion):
+    # Pred. batches as dict. to decrease the number of args passed to the function
+
+    # Adapt the dim. of the target batches
+    target_binary_border = target_binary_border_batch[:, 0, :, :]
+    target_mask =  target_mask_batch[:, 0, :, :]    
+
+    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], cell_batch)
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
+    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
+
+    loss = loss_binary_border + loss_cell + loss_mask
+    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+    return loss, losses_list
+
+
+# Utility function to apply the weighted cross entropy function
+def compute_weighted_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, target_mask_batch, criterion):
+    # Pred. batches as dict. to decrease the number of args passed to the function
+
+    # Not need to adapt the dim. of the target batches
+    target_binary_border = target_binary_border_batch
+    target_mask =  target_mask_batch   
+
+    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], cell_batch)
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
+    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
+
+    loss = loss_binary_border + loss_cell + loss_mask
+    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+    return loss, losses_list
+
+
+
 
 
 

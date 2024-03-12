@@ -10,7 +10,7 @@ import torch.nn as nn
 from copy import deepcopy
 
 from training.ranger2020 import Ranger
-from training.losses import get_loss, get_weights_tensor, WeightedCELoss
+from training.losses import get_loss, get_weights_tensor, WeightedCELoss, compute_cross_entropy, compute_weighted_cross_entropy, compute_j_cross_entropy
 from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples, save_image
 
 
@@ -43,6 +43,7 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         border_pred_batch, cell_pred_batch = net(img_batch)
         loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
         loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+
         loss = loss_border + loss_cell
         losses_list = [loss_border.item(), loss_cell.item()]
 
@@ -67,8 +68,21 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
 
     if arch_name == 'original-dual-unet':
         binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
-        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
 
+        # Prepare dict. of predicted batches
+        pred_batches = {"binary_border_pred_batch": binary_border_pred_batch, "cell_pred_batch": cell_pred_batch,  "mask_pred_batch":  mask_pred_batch}
+        
+        # Added 'interface' function for readibility
+        if config["classification_loss"] == "cross-entropy":
+            loss, losses_list = compute_cross_entropy(pred_batches, true_batches_list[3], true_batches_list[1], true_batches_list[2], criterion)
+        
+        elif config["classification_loss"] == "weighted-cross-entropy":
+            loss, losses_list = compute_weighted_cross_entropy(pred_batches, true_batches_list[3], true_batches_list[1], true_batches_list[2], criterion)
+
+        elif config["classification_loss"] == "j-cross-entropy":
+            loss, losses_list = compute_j_cross_entropy(pred_batches, true_batches_list[3], true_batches_list[1], true_batches_list[2], criterion)
+        '''
+        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
         if config["classification_loss"] == "weighted-cross-entropy":
             target_binary_border = true_batches_list[3]
             target_mask = true_batches_list[2]
@@ -81,8 +95,9 @@ def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterio
         loss_binary_border = criterion['binary_border'](binary_border_pred_batch, target_binary_border)
         loss_mask = criterion['mask'](mask_pred_batch, target_mask)
         loss = loss_binary_border + loss_cell + loss_mask
+
         losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-        
+        '''
         # Qualitative plotting in the validation phase - for now just in this architecture
         if phase == "val":
             # NOTE: Plot all binary prediction or all floating prediction
@@ -358,7 +373,10 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         optimizer.step()
                         
                 # Statistics - both general and single losses
-                running_loss += loss.item() * img_batch.size(0) # NOTE: loss.item() as default contains  already the average of the mini_batch loss.
+                #if config["classification_loss"] != "j-cross-entropy":
+                running_loss += loss.item() * img_batch.size(0) # NOTE: loss.item() as default contains already the average of the mini_batch loss.
+                #else:
+                    #running_loss += loss * img_batch.size(0)
 
                 if config['architecture'][0] == 'dual-unet':
                     running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, img_batch.size(0))
