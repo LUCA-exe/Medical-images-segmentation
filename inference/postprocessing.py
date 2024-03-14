@@ -108,6 +108,9 @@ def get_minimum_area_to_remove(connected_components, percentage=0.1):
 
   # Set a minimum threshold
   min_area = np.maximum(min_area, 4)
+
+  # NOTE: Just override the min area component in case of my dataset for the firt testing
+  min_area = 10
   return min_area
 
 
@@ -122,6 +125,10 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
         :type args:
     :return: Instance segmentation mask.
     """
+    # DANGER!!! Bug in training
+    tmp =  border_prediction
+    border_prediction = cell_prediction
+    cell_prediction = tmp
 
     # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring) - Fixed parameters
     sigma_cell = 0.5
@@ -134,7 +141,7 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
 
     # Get mask for watershed - straight up eliminations of low intensity pixel.
     mask = cell_prediction > th_cell
-    
+
     # Get seeds for marker-based watershed
     borders = np.tan(border_prediction ** 2)
 
@@ -184,6 +191,25 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
+def simple_seg_mask_post_processing(mask, binary_border, original_image, cell_distance, args):
+    """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
+
+    :param mask: Binary mask prediction.
+
+    :param args: Post-processing settings.
+        :type args:
+    :return: Instance segmentation mask.
+    """
+    # Simple parameters to control the thresholdings of markers and mask
+    th_mask = 0.1
+    binary_channel = 1
+
+    # Processing the binary mask with simple thresholding
+    processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
+    prediction_instance = measure.label(processed_mask)
+    return np.squeeze(prediction_instance.astype(np.uint16))
+
+
 # NOTE: Simple solution using a binary mask prediction for a post processing phase - evaluate if you have to use watershed or not
 def seg_mask_post_processing(mask, binary_border, original_image, cell_distance, args):
     """ Assignining different IDs in the final segmentation mask prediction.
@@ -196,7 +222,7 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
     """
 
     # Simple parameters to control the thresholdings of markers and mask
-    th_mask, th_seeds = 0.4, 0.6
+    th_mask, th_seeds = 0.2, 0.4
     binary_channel = 1
 
     # Processing the binary mask with simple thresholding
@@ -208,12 +234,13 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
     prediction_instance = watershed(image=-np.squeeze(cell_distance), markers=seeds, mask=processed_mask, watershed_line=False)
     prediction_instance = measure.label(prediction_instance)
 
-    # Temporary - Debug print
-    #save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
-    #save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
-    #save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
-    #save_image(processed_mask, "./tmp", f"Processed mask")
-    #save_image(seeds, "./tmp", f"Seeds")
+    # Temporary - Debug 
+    save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
+    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
+    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
+    save_image(processed_mask, "./tmp", f"Processed mask")
+    save_image(seeds, "./tmp", f"Seeds")
     #save_image(np.squeeze(original_image), "./tmp", f"Original image")
     #save_image(prediction_instance, "./tmp", f"Final image using Watershed")
+    exit(1)
     return np.squeeze(prediction_instance.astype(np.uint16))

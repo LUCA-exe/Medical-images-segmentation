@@ -513,7 +513,7 @@ class eval_arg_du(a_eval_arg_class):
     def __init__(self, args):
         
         # Following the original arguments of the post processing evaluation.
-        self.post_pipeline = [0]
+        self.post_pipeline = args[0]
         self.th_cell = args[1]
         self.th_seed = args[2]
         self.apply_clahe = args[3]
