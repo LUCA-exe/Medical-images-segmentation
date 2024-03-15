@@ -5,6 +5,7 @@ from skimage.segmentation import watershed
 from skimage import measure
 from skimage.feature import peak_local_max, canny
 from skimage.morphology import binary_closing
+import torch
 
 from net_utils.utils import get_nucleus_ids, save_image
 
@@ -114,8 +115,8 @@ def get_minimum_area_to_remove(connected_components, percentage=0.1):
   return min_area
 
 
-def border_cell_distance_post_processing(border_prediction, cell_prediction, args):
-    """ Post-processing for distance label (cell + neighbor distances) prediction.
+def border_cell_post_processing(border_prediction, cell_prediction, args):
+    """ Post-processing WT for distance label (cell + neighbor distances continuos tensors) prediction.
 
     :param border_prediction: Neighbor distance prediction.
         :type border_prediction:
@@ -126,9 +127,9 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     :return: Instance segmentation mask.
     """
     # DANGER!!! Bug in training
-    tmp =  border_prediction
-    border_prediction = cell_prediction
-    cell_prediction = tmp
+    #tmp =  border_prediction
+    #border_prediction = cell_prediction
+    #cell_prediction = tmp
 
     # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring) - Fixed parameters
     sigma_cell = 0.5
@@ -191,7 +192,7 @@ def border_cell_distance_post_processing(border_prediction, cell_prediction, arg
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
-def simple_seg_mask_post_processing(mask, binary_border, original_image, cell_distance, args):
+def simple_binary_border_mask_post_processing(mask, binary_border, original_image, cell_distance, args, diff_between_channels = 0.2):
     """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
 
     :param mask: Binary mask prediction.
@@ -201,8 +202,18 @@ def simple_seg_mask_post_processing(mask, binary_border, original_image, cell_di
     :return: Instance segmentation mask.
     """
     # Simple parameters to control the thresholdings of markers and mask
-    th_mask = 0.1
+    
+    processed_mask = torch.diff(mask, dim=0)
+    th_processed_mask = processed_mask > diff_between_channels
     binary_channel = 1
+    
+    # Qualitative debug
+    save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
+    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
+    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
+    save_image(processed_mask, "./tmp", f"Processed mask")
+    save_image(th_processed_mask, "./tmp", f"Thresholded Processed mask")
+    exit(1)
 
     # Processing the binary mask with simple thresholding
     processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)

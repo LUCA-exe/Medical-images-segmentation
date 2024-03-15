@@ -5,7 +5,7 @@ This is the evaluation main function that call inference and the metrics computa
 import os
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths_and_folders, EvalArgs, check_path, eval_factory
+from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, eval_factory
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
