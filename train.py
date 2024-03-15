@@ -10,7 +10,7 @@ from os.path import join, exists
 from collections import defaultdict
 from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, train_factory
 from parser import get_parser, get_processed_args
-from net_utils.utils import unique_path, write_train_info
+from net_utils.utils import unique_path, write_train_info, create_model_architecture
 from net_utils import unets
 from training.create_training_sets import create_ctc_training_sets, get_file
 from training.training import train, train_auto, get_max_epochs, get_weights
@@ -71,26 +71,8 @@ def get_training_args_class(log, args, train_factory):
 
 
 def get_model_config(log, train_args, num_gpus):
-    # Get training settings - As in 'eval.py', the args for training are split in a specific parser for readibility.
+    # Get training settings
     
-    '''# TODO: Separate in other function -->
-    train_args = TrainArgs(model_pipeline = args.model_pipeline,
-                            act_fun = args.act_fun,
-                            batch_size = args.batch_size, 
-                            filters = args.filters,
-                            detach_fusion_layers = args.detach_fusion_layers,
-                            iterations = args.iterations,
-                            loss = args.loss,
-                            norm_method = args.norm_method,
-                            optimizer = args.optimizer,
-                            pool_method = args.pool_method,
-                            pre_train = args.pre_train,
-                            retrain = args.retrain,
-                            split = args.split) # WARNING: What is split for?
-
-    # Training parameters used for all the iterations/crop options given                         
-    log.info(f"Training parameters {train_args}")'''
-
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
     model_config = {'architecture': train_args.get_arch_args(),
                     'batch_size': train_args.batch_size,
@@ -106,7 +88,7 @@ def get_model_config(log, train_args, num_gpus):
     return model_config
 
 
-# NOTE: Moved in the net_utils.utils
+'''# NOTE: Moved in the net_utils.utils
 def create_model_architecture(log, pre_train, model_config, device, num_gpus):
     # Given the parsed training arguments, create the U-Net architecture
     
@@ -126,7 +108,7 @@ def create_model_architecture(log, pre_train, model_config, device, num_gpus):
                                 filters=model_config['architecture'][4],
                                 detach_fusion_layers=model_config['architecture'][5],
                                 softmax_layer=model_config['architecture'][6])
-    return net
+    return net'''
 
 def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):
     # Loop to iterate over the different trained/re-trained architectures.
@@ -242,7 +224,7 @@ def set_up_training():
     # Parse the training arguments and settings for the specific model pipeline
     train_args = get_training_args_class(log, args, factory)
     model_config = get_model_config(log, train_args, num_gpus)
-    net = create_model_architecture(log, train_args.pre_train, model_config, device, num_gpus)
+    net = create_model_architecture(log, model_config, device, num_gpus, train_args.pre_train)
 
     # Set up and execute the actual trainig
     set_up_training_loops(log, train_args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)

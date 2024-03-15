@@ -1015,7 +1015,7 @@ class ODUNet(nn.Module):
         else:
             x3 = torch.cat([x1, x2], dim=1)
 
-        # Final fusion layers for the final segmentation mask
+        # Final fusion (3 - binary mask) layers for the final segmentation mask
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)
         x3 = self.fusionConv[2](x3)

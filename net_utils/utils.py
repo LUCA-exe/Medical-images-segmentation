@@ -15,9 +15,8 @@ import pandas as pd
 from net_utils import unets
 
 
-# Copy of the function in the train.py module - test to prove the modularity for the eval.py
 def create_model_architecture(log, model_config, device, num_gpus, pre_train = False):
-    # Given the parsed training arguments, create the U-Net architecture
+    # Given the parsed training arguments, create the U-Net architecture - used both by training and eval phases
     
     if pre_train:
         unet_type = 'AutoU' # Get CNN (U-Net without skip connections)
@@ -559,16 +558,15 @@ def save_image(img, path, title, use_cmap = False):
 
 def show_training_dataset_samples(log, dataset, samples = 10):
     # Visual debug for the images used in the training set.
+
     log.debug(f"Visually inspect the first {samples} samples of images from the training Dataset")
     folder = os.getenv("TEMPORARY_PATH")
     for idx in range(samples):
 
-        image_list = dataset[idx]
+        image_dict = dataset[idx]
+        for pos, (key, image) in enumerate(image_dict.items()):
 
-        for pos, image in enumerate(image_list): # Plot all images except the last one: the mask tensor.
-
-            curr_title = "Sample " + str(idx) + f" image {str(pos)}"
+            curr_title = "Sample " + str(idx) + f" type ({key})"
             save_image(np.squeeze(image), folder, curr_title)
-
-    log.debug(f"Images correctly saved in {folder}!")
+    log.debug(f"Images correctly saved in {folder} before the training phase!")
     return True

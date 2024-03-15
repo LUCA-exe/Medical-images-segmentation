@@ -548,4 +548,12 @@ class ToTensor(object):
         # NOTE: "*.long" cast for the cross entropy loss
         mask_label = torch.from_numpy(sample['mask_label']).to(torch.long)
         binary_border_label = torch.from_numpy(sample['binary_border_label']).to(torch.long)
-        return img, border_label, cell_label, mask_label, binary_border_label
+
+        # Recompose the dict. for readibility
+        processed_sample = sample = {'image': img,
+                                     'cell_label': cell_label,
+                                     'border_label': border_label,
+                                     'mask_label': mask_label,
+                                     'binary_border_label': binary_border_label}
+        #return img, border_label, cell_label, mask_label, binary_border_label
+        return processed_sample

@@ -225,7 +225,7 @@ class MultiClassJLoss(nn.Module):
                 # J_reg term for each class pair in the batch
                 j_reg_term += self.class_weights[i, k] * torch.log(0.5 + sum_multiplied_z_i)
 
-    # Combine loss terms after taking the mean of the j_reg_term batch
+    # Combine loss terms after taking the mean of the j_reg_term batch (what should i do with the bce_loss? mean or keeping the sum?)
     loss = bce_loss + self.lambda_ * j_reg_term.mean()
     return loss
 
@@ -332,16 +332,13 @@ def get_loss(config, device):
     return criterion
 
 
-
-# Utility function to apply the j cross entropy function
-def compute_j_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, target_mask_batch, criterion):
-    # Pred. batches as dict. to decrease the number of args passed to the function
+def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
 
     # Adapt the dim. of the target batches
-    target_binary_border = target_binary_border_batch[:, 0, :, :]
-    target_mask =  target_mask_batch[:, 0, :, :]
+    target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
+    target_mask =  batches_dict["mask_label"][:, 0, :, :]
 
-    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], cell_batch)
+    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], batches_dict["cell_label"])
     loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
     loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
 
@@ -352,20 +349,17 @@ def compute_j_cross_entropy(pred_batches, target_binary_border_batch, cell_batch
     # DEBUG
     print(loss)
     print(losses_list)
-
-
     return loss, losses_list
 
 
-# Utility function to apply the cross entropy function
-def compute_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, target_mask_batch, criterion):
-    # Pred. batches as dict. to decrease the number of args passed to the function
+def compute_cross_entropy(pred_batches, batches_dict, criterion):
+    # Pred. batches as dict. to decrease the number of args - batches dict. is the correspondent GT images batches
 
     # Adapt the dim. of the target batches
-    target_binary_border = target_binary_border_batch[:, 0, :, :]
-    target_mask =  target_mask_batch[:, 0, :, :]    
+    target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
+    target_mask =  batches_dict["mask_label"][:, 0, :, :]    
 
-    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], cell_batch)
+    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], batches_dict["cell_label"])
     loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
     loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
 
@@ -374,17 +368,12 @@ def compute_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, 
     return loss, losses_list
 
 
-# Utility function to apply the weighted cross entropy function
-def compute_weighted_cross_entropy(pred_batches, target_binary_border_batch, cell_batch, target_mask_batch, criterion):
-    # Pred. batches as dict. to decrease the number of args passed to the function
+def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
+    # Wrappper function to encapsulate the loss computation
 
-    # Not need to adapt the dim. of the target batches
-    target_binary_border = target_binary_border_batch
-    target_mask =  target_mask_batch   
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], cell_batch)
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
-    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
+    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], batches_dict["cell_label"])
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], batches_dict["binary_border_label"])
+    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], batches_dict["mask_label"])
 
     loss = loss_binary_border + loss_cell + loss_mask
     losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]

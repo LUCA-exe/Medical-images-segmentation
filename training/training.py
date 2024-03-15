@@ -14,11 +14,9 @@ from training.losses import get_loss, get_weights_tensor, WeightedCELoss, comput
 from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples, save_image
 
 
-def sample_plot_during_validation(batches_list,  val_phase_counter, binary_pred = True):
-    # Util function to plot sample batches during the validation phase to monitor visually the training
+def sample_plot_during_validation(batches_list, val_phase_counter, binary_pred = True, binary_channel = 1):
+    # Wrapper/util function to plot sample batches during the validation phase to monitor visually the training
     
-    # NOTE: For now take the first channel (class 0)
-    binary_channel = 0
     # NOTE: For now take the first image
     sample = 0
     # Take always the first element of the batch for every batch provided -  the first batch is alway the true image and the remaining all the prediction
@@ -36,72 +34,56 @@ def sample_plot_during_validation(batches_list,  val_phase_counter, binary_pred 
                 save_image(np.squeeze(batch[sample].cpu().detach().numpy()), "./tmp", f"Floating batch {idx} sample {sample} (Validation {val_phase_counter})")
             
 
+def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase, val_phase_counter):
+    # Extendible function for the deepen of the sstudy on different architecture
 
-def get_losses_from_model(img_batch, true_batches_list, arch_name, net, criterion, config, phase, val_phase_counter):
-    
     if arch_name == 'dual-unet':
-        border_pred_batch, cell_pred_batch = net(img_batch)
-        loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
-        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+        border_pred_batch, cell_pred_batch = net(batches_dict["image"])
+        loss_border = criterion['border'](border_pred_batch, batches_dict["border_label"])
+        loss_cell = criterion['cell'](cell_pred_batch, batches_dict["cell_label"])
 
         loss = loss_border + loss_cell
         losses_list = [loss_border.item(), loss_cell.item()]
 
-        # Qualitative plotting in the validation phase - for now just in this architecture
+        # Qualitative plotting in the validation phase
         if phase == "val":
-            sample_plot_during_validation([img_batch, border_pred_batch, cell_pred_batch], val_phase_counter, binary_pred = False)
+            sample_plot_during_validation([batches_dict["image"], border_pred_batch, cell_pred_batch], val_phase_counter, binary_pred = False)
 
     if arch_name == 'triple-unet':
-        border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
-        loss_border = criterion['border'](border_pred_batch, true_batches_list[0])
-        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
+        border_pred_batch, cell_pred_batch, mask_pred_batch = net(batches_dict["image"])
+        loss_border = criterion['border'](border_pred_batch, batches_dict["border_label"])
+        loss_cell = criterion['cell'](cell_pred_batch, batches_dict["cell_label"])
 
         if config["classification_loss"] == "weighted-cross-entropy":
-            target = true_batches_list[2]
+            target = batches_dict["mask_label"]
         else:
             # NOTE: Attention to the shape of the "target" of the cross entropy loss.
-            target = true_batches_list[2][:, 0, :, :]
+            target = batches_dict["mask_label"][:, 0, :, :]
 
         loss_mask = criterion['mask'](mask_pred_batch, target)
         loss = loss_border + loss_cell + loss_mask
         losses_list = [loss_border.item(), loss_cell.item(), loss_mask.item()]
 
     if arch_name == 'original-dual-unet':
-        binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
 
+        binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(batches_dict["image"])
         # Prepare dict. of predicted batches
-        pred_batches = {"binary_border_pred_batch": binary_border_pred_batch, "cell_pred_batch": cell_pred_batch,  "mask_pred_batch":  mask_pred_batch}
+        pred_batches = {"binary_border_pred": binary_border_pred_batch, "cell_pred": cell_pred_batch,  "mask_pred":  mask_pred_batch}
         
         # Added 'interface' function for readibility
         if config["classification_loss"] == "cross-entropy":
-            loss, losses_list = compute_cross_entropy(pred_batches, true_batches_list[3], true_batches_list[1], true_batches_list[2], criterion)
+            loss, losses_list = compute_cross_entropy(pred_batches, batches_dict, criterion)
         
         elif config["classification_loss"] == "weighted-cross-entropy":
-            loss, losses_list = compute_weighted_cross_entropy(pred_batches, true_batches_list[3], true_batches_list[1], true_batches_list[2], criterion)
+            loss, losses_list = compute_weighted_cross_entropy(pred_batches, batches_dict, criterion)
 
         elif config["classification_loss"] == "j-cross-entropy":
-            loss, losses_list = compute_j_cross_entropy(pred_batches, true_batches_list[3], true_batches_list[1], true_batches_list[2], criterion)
-        '''
-        loss_cell = criterion['cell'](cell_pred_batch, true_batches_list[1])
-        if config["classification_loss"] == "weighted-cross-entropy":
-            target_binary_border = true_batches_list[3]
-            target_mask = true_batches_list[2]
-
-        else:
-            # NOTE: Attention to the shape of the "target" of the cross entropy loss.
-            target_binary_border = true_batches_list[3][:, 0, :, :]
-            target_mask = true_batches_list[2][:, 0, :, :]
-            
-        loss_binary_border = criterion['binary_border'](binary_border_pred_batch, target_binary_border)
-        loss_mask = criterion['mask'](mask_pred_batch, target_mask)
-        loss = loss_binary_border + loss_cell + loss_mask
-
-        losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-        '''
-        # Qualitative plotting in the validation phase - for now just in this architecture
+            loss, losses_list = compute_j_cross_entropy(pred_batches, batches_dict, criterion)
+        
+        # Qualitative plotting in the validation phase
         if phase == "val":
             # NOTE: Plot all binary prediction or all floating prediction
-            sample_plot_during_validation([img_batch, binary_border_pred_batch, mask_pred_batch], val_phase_counter)
+            sample_plot_during_validation([batches_dict["image"], pred_batches["binary_border_pred"],  pred_batches["mask_pred"]], val_phase_counter)
     return loss, losses_list
 
 
@@ -253,6 +235,17 @@ def update_running_losses(running_losses_list, losses_list, batch_size):
     return updated_running_losses
 
 
+def move_batches_to_device(samples_dict, device):
+    # util function to get the dict. batch from the dataloader and move to the correct device
+
+    # Un-pack the dict.
+    for key, tensor in samples_dict.items():
+        samples_dict[key] = samples_dict[key].to(device)
+
+    # Return updated dict.
+    return samples_dict
+
+
 def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     """ Train the model.
 
@@ -340,32 +333,18 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             for samples in dataloader[phase]:
 
                 # Get img_batch and label_batch and put them on GPU if available
-                img_batch, border_label_batch, cell_label_batch, mask_label_batch, binary_border_batch = samples # Unpack always all 'labels'
-                img_batch = img_batch.to(device)
-                cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch = cell_label_batch.to(device), border_label_batch.to(device), mask_label_batch.to(device), binary_border_batch.to(device)
+                #img_batch, border_label_batch, cell_label_batch, mask_label_batch, binary_border_batch = samples # Unpack always all 'labels'
+                samples_dict = samples
+                samples_dict = move_batches_to_device(samples_dict, device)
 
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
                 # Forward pass (track history if only in train)
                 with torch.set_grad_enabled(phase == 'train'):
-                    
-                    '''# NOTE: Depending on the architecture, you can have different number of outputs
-                    if config['architecture'][0] == 'dual-unet':
-                        border_pred_batch, cell_pred_batch = net(img_batch)
-                        loss_border = criterion['border'](border_pred_batch, border_label_batch)
-                        loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
-                        loss = loss_border + loss_cell
-
-                    if config['architecture'][0] == 'triple-unet':
-                        border_pred_batch, cell_pred_batch, mask_pred_batch = net(img_batch)
-                        loss_border = criterion['border'](border_pred_batch, border_label_batch)
-                        loss_cell = criterion['cell'](cell_pred_batch, cell_label_batch)
-                        loss_mask = criterion['mask'](mask_pred_batch, mask_label_batch)
-                        loss = loss_border + loss_cell + loss_mask'''
 
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(img_batch, [cell_label_batch, border_label_batch, mask_label_batch, binary_border_batch], arch_name, net, criterion, config, phase, val_phase_counter)
+                    loss, losses_list = get_losses_from_model(samples_dict, arch_name, net, criterion, config, phase, val_phase_counter)
 
                     # Backward (optimize only if in training phase)
                     if phase == 'train':
@@ -373,20 +352,17 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                         optimizer.step()
                         
                 # Statistics - both general and single losses
-                #if config["classification_loss"] != "j-cross-entropy":
-                running_loss += loss.item() * img_batch.size(0) # NOTE: loss.item() as default contains already the average of the mini_batch loss.
-                #else:
-                    #running_loss += loss * img_batch.size(0)
+                running_loss += loss.item() * samples_dict["image"].size(0) # NOTE: loss.item() as default contains already the average of the mini_batch loss.
 
                 if config['architecture'][0] == 'dual-unet':
-                    running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, img_batch.size(0))
+                    running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, samples_dict["image"].size(0))
 
                 # TO TEST
                 if config['architecture'][0] == 'original-dual-unet':
-                    running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, img_batch.size(0))
+                    running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
 
                 if config['architecture'][0] == 'triple-unet':
-                    running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], losses_list, img_batch.size(0))
+                    running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
 
             # Compute average epoch losses
             epoch_loss = running_loss / len(datasets[phase])
