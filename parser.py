@@ -83,6 +83,7 @@ def get_parser():
     parser.add_argument('--subset', '-ss', default='01', type=str, help='Subset to evaluate on') # Possible options: [01, 02,01+02]
     parser.add_argument('--th_cell', '-tc', default=0.07, nargs='+', help='Threshold for adjusting cell size')
     parser.add_argument('--th_seed', '-ts', default=0.45, nargs='+', help='Threshold for seeds')
+    parser.add_argument('--fusion_overlap', '-fo', type=float, default=0.60, help='Percent of overlap of EVs between the features maps')
 
     args = parser.parse_args()
     return args

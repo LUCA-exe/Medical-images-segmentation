@@ -527,6 +527,30 @@ class eval_arg_du(a_eval_arg_class):
         return f"eval_args for Dual U-net (KIT-GE post processing) ({attributes})"
 
 
+# Normal dual unet post processing methods (WT) with an additonal EVs prediction from the network - fusion dual unet
+class eval_arg_fdu(a_eval_arg_class):
+    """Specific argument evaluation class for the KIT-GE model implementation."""
+
+    def __init__(self, args):
+        
+        # Following the original arguments of the post processing evaluation.
+        self.post_pipeline = args[0]
+        self.th_cell = args[1]
+        self.th_seed = args[2]
+        self.apply_clahe = args[3]
+        self.scale = args[4]
+        self.cell_type = args[5]
+        self.save_raw_pred = args[6]
+        self.artifact_correction = args[7]
+        self.apply_merging = args[8]
+        self.fusion_overlap = args[9]
+
+
+    def __str__(self):
+        attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f"eval_args for Fusion Dual U-net (optimized KIT-GE post processing) ({attributes})"
+
+
 class eval_arg_odu(a_eval_arg_class):
     """Specific argument evaluation class for the implementation of the original Dual U-net."""
 

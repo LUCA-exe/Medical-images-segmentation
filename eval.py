@@ -62,6 +62,9 @@ def main():
     if args.post_processing_pipeline == 'dual-unet': # Call inference from the KIT-GE-(2) model's method
         du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
 
+    if args.post_processing_pipeline == 'fusion-dual-unet': # Call inference from the KIT-GE-(2) model's method
+        fdu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
+
     elif args.post_processing_pipeline == 'triple-unet':
         tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
 
@@ -75,8 +78,8 @@ def main():
     return None
 
 
-# Implementing kit-ge inference loop if 'post-processing' selected is theirs.
 def du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
+    # Implementing kit-ge inference loop if 'post-processing' selected is theirs.
 
     result_dict = {}
     curr_experiment = 0 # Simple counter of the args. combination
@@ -96,16 +99,6 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
                     log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
                     os.makedirs(path_seg_results, exist_ok=True)
 
-                    '''# Get post-processing settings
-                    eval_args = EvalArgs(args.post_processing_pipeline,
-                                            th_cell=float(th_cell), 
-                                            th_seed=float(th_seed),
-                                            apply_clahe=args.apply_clahe,
-                                            scale=args.scale,
-                                            cell_type=args.dataset,
-                                            save_raw_pred=args.save_raw_pred,
-                                            artifact_correction=args.artifact_correction,
-                                            apply_merging=args.apply_merging)'''
                     eval_class_args = eval_f.create_argument_class(args.post_processing_pipeline,
                                                     float(th_cell), 
                                                     float(th_seed),
@@ -115,6 +108,72 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
                                                     args.save_raw_pred,
                                                     args.artifact_correction,
                                                     args.apply_merging)
+                    
+                    # Debug specific args for the current run.
+                    log.debug(eval_class_args)
+
+                    # Inference on the chosen train set
+                    args_used = inference_2d(log=log, model_path=model_path,
+                                data_path=os.path.join(path_data, train_set),
+                                result_path=path_seg_results,
+                                device=device,
+                                num_gpus = num_gpus,
+                                batchsize=args.batch_size,
+                                args=eval_class_args) 
+
+                    if args.eval_metric == 'software':
+                        seg_measure, det_measure = ctc_metrics(path_data=path_data,
+                                                                path_results=path_seg_results,
+                                                                path_software=args.evaluation_software_path,
+                                                                subset=train_set,
+                                                                mode=args.mode)
+                        
+                        _, so, fnv, fpv = count_det_errors(os.path.join(path_seg_results, SOFTWARE_DET_FILE))
+
+                    else:
+                        raise NotImplementedError(f"Other metrics not implemented yet ..")
+
+                    # NOTE: Every post-processing pipeline have internal specific args - custom aggregation later (both for visualization/tranform in '*.csv' file).
+                    result_dict[curr_experiment] = {'model':model, 'th_cell': str(th_cell), 'th_seed': str(th_seed), 'train_set': str(train_set), 'SEG':seg_measure, 'DET': det_measure, 'SO':so, 'FNV':fnv, 'FPV': fpv}
+                    curr_experiment += 1
+                   
+    # Save the metrics - It will update the file if there is already an "*.json" with the same name.
+    result_file_name = f"{args.model_pipeline}_{args.post_processing_pipeline}_{path_data.split('/')[-1]}_eval_results"
+    save_metrics(log, result_dict, path_data, name = result_file_name)
+    return None
+
+
+def fdu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args):
+    # Implementing fusion kit-ge inference loop
+
+    result_dict = {}
+    curr_experiment = 0 # Simple counter of the args. combination
+    eval_f = eval_factory()
+
+    # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
+    for model in models: # Loop over all the models found
+        model_path = os.path.join(path_models, model) # Create model path
+        for th_seed in args.th_seed:# Go through thresholds
+            for th_cell in args.th_cell:
+                for train_set in train_sets:
+
+                    log.info(f'> Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
+
+                    # Set up current results folder for the segmentation maps
+                    path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model.split('.')[0]}_{th_seed}_{th_cell}")
+                    log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
+                    os.makedirs(path_seg_results, exist_ok=True)
+
+                    eval_class_args = eval_f.create_argument_class(args.post_processing_pipeline,
+                                                    float(th_cell), 
+                                                    float(th_seed),
+                                                    args.apply_clahe,
+                                                    args.scale,
+                                                    args.dataset,
+                                                    args.save_raw_pred,
+                                                    args.artifact_correction,
+                                                    args.apply_merging
+                                                    args.fusion_overlap)
                     
                     # Debug specific args for the current run.
                     log.debug(eval_class_args)
