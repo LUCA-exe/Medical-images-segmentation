@@ -6,6 +6,7 @@ from skimage import measure
 from skimage.feature import peak_local_max, canny
 from skimage.morphology import binary_closing
 import torch
+import copy
 
 from net_utils.utils import get_nucleus_ids, save_image
 
@@ -252,6 +253,31 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
+def remove_false_positive_by_overlapping(prediction, single_channel_prediction, min_cell_area = 2000):
+    # Take two images as numpy array
+
+    # Deep copy the original prediction
+    prediction = copy.deepcopy(prediction)
+    sc_mask = single_channel_prediction > 0
+    # Loop over every area in the original input images
+    for reg_prop in measure.regionprops(prediction):
+
+        if reg_prop.area < min_cell_area:
+            # It is usually an EVs
+            
+            # Get mask for the current position of the "predicted" EVs
+            curr_mask = prediction == reg_prop.label 
+
+            # Check if there's any overlap with objects in image2
+            overlap = np.any(curr_mask * sc_mask)
+
+            # Update the prediction if not overlap is present
+            if not overlap:
+                prediction[curr_mask] = 0  # Remove the region in the predicted image in the predicted image
+    # Adjusted prediction
+    return prediction
+
+
 # WORK IN PROGRESS: This function can be seen as wrapper and feature fusion functions
 def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border_prediction, sc_cell_prediction, args):
     """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channgel prediction.
@@ -268,10 +294,14 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
 
     # DEBUG
-    prediction_instance [prediction_instance > 0] = 200
-    sc_prediction_instance [sc_prediction_instance > 0] = 200
+    #prediction_instance[prediction_instance > 0] = 200
+    #sc_prediction_instance[sc_prediction_instance > 0] = 200
     save_image(prediction_instance, "./tmp", f"Original final results")
     save_image(sc_prediction_instance, "./tmp", f"Single channel results")
+
+    # TO TEST
+    processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
+    # TO implement adding new regions from the single channel 
+    save_image(processed_prediction, "./tmp", f"Original final results")
     exit(1)
-    
     return None
