@@ -33,18 +33,21 @@ class CTCDataSet(Dataset):
     def __getitem__(self, idx): # Here adapat my 3 channel images to the single channel expected input.
 
         img_id = self.img_ids[idx]
+        image = tiff.imread(str(img_id))  
 
-        img = tiff.imread(str(img_id))
-
-        if len(img.shape) > 2: # Preferred choice for my 2D dataset.
-            img = np.sum(img, axis=2) # Keep all object
-            #img = img[1024:, 1024:] # NOTE: Temporary fix
+        # Processing in case of RGB images as my dataset
+        if len(image.shape) > 2:
+            single_channel_img = image[:, :, 0] # 0 is the EVs channel (Red)
+            img = np.sum(image, axis=2) # Keep all object
+        else:
+            # Flag for the other dataset
+            single_channel_image = None
 
         sample = {'image': img,
-                  'id': img_id.stem}
-
+                # AD-HOC for my dataset
+                'single_channel_image': single_channel_img,
+                'id': img_id.stem}
         sample = self.transform(sample)
-
         return sample
 
 
@@ -81,6 +84,12 @@ class ContrastEnhancement(object):
             img = (65535 * img).astype(np.uint16)
             sample['image'] = img
 
+            # TODO: refactor the tranformation in a private function of this objetc
+            if not sample["single_channel_image"] is None:
+                img = sample["single_channel_image"]
+                img = equalize_adapthist(np.squeeze(img), clip_limit=0.01)
+                img = (65535 * img).astype(np.uint16)
+                sample["single_channel_image"] = img
         return sample
 
 
@@ -89,11 +98,14 @@ class Normalization(object):
     def __call__(self, sample):
 
         img = sample['image']
-
         img = 2 * (img.astype(np.float32) - img.min()) / (img.max() - img.min()) - 1
-
         sample['image'] = img
 
+        # TODO: refactor the tranformation in a private function of this objetc
+        if not sample["single_channel_image"] is None:
+            img = sample["single_channel_image"]
+            img = 2 * (img.astype(np.float32) - img.min()) / (img.max() - img.min()) - 1
+            sample["single_channel_image"] = img
         return sample
 
 
@@ -106,6 +118,12 @@ class Padding(object):
         sample['image'] = img
         sample['pads'] = pads
 
+        # TODO: refactor the tranformation in a private function of this objetc
+        if not sample["single_channel_image"] is None:
+            img = sample["single_channel_image"]
+            img, pads = zero_pad_model_input(img=img, pad_val=np.min(img))
+            sample["single_channel_image"] = img
+            sample["single_channel_image"] = pads
         return sample
 
 
@@ -120,12 +138,20 @@ class Scaling(object):
         sample['original_size'] = img.shape
 
         if self.scale < 1:
+
             if len(img.shape) == 3:
                 img = rescale(img, (1, self.scale, self.scale), order=2, preserve_range=True).astype(img.dtype)
             else:
-                img = rescale(img, (self.scale, self.scale), order=2, preserve_range=True).astype(img.dtype)
-            sample['image'] = img
 
+                img = rescale(img, (self.scale, self.scale), order=2, preserve_range=True).astype(img.dtype)
+                
+                # Additional processing on the single channel if not None
+                if not sample['single_channel_image'] is None:
+                    single_channel_img = sample['single_channel_image']
+                    single_channel_img = rescale(single_channel_img, (self.scale, self.scale), order=2, preserve_range=True).astype(single_channel_img.dtype)
+                    sample['single_channel_image'] = single_channel_img
+
+            sample['image'] = img
         return sample
 
 
@@ -141,4 +167,5 @@ class ToTensor(object):
 
         img = torch.from_numpy(img).to(torch.float)
 
-        return img, sample['id'], sample['pads'], sample['original_size']
+        #return img, sample['id'], sample['pads'], sample['original_size']
+        return sample # Directly return the dict. of the batches

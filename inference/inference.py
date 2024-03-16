@@ -99,7 +99,9 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     # Predict images (iterate over images/files)
     for idx, sample in enumerate(dataloader):
 
+        # Pack a dict. for readibility/simplicity
         img_batch, ids_batch, pad_batch, img_size = sample
+        
         img_batch = img_batch.to(device)
 
         if batchsize > 1:  # all images in a batch have same dimensions and pads

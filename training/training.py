@@ -337,6 +337,14 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                 samples_dict = samples
                 samples_dict = move_batches_to_device(samples_dict, device)
 
+                # DEBUG
+                print(samples_dict.keys())
+                print(samples_dict["image"].shape)
+
+                # DEBUG the images of this batch
+                exit(1)
+
+
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
