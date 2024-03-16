@@ -184,7 +184,6 @@ def border_cell_post_processing(border_prediction, cell_prediction, args):
                 if len(merge_ids) == 2:
                     prediction_instance[prediction_instance == merge_ids[1]] = merge_ids[0]
         prediction_instance = measure.label(prediction_instance)
-
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
@@ -269,6 +268,8 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
 
     # DEBUG
+    prediction_instance [prediction_instance > 0] = 200
+    sc_prediction_instance [sc_prediction_instance > 0] = 200
     save_image(prediction_instance, "./tmp", f"Original final results")
     save_image(sc_prediction_instance, "./tmp", f"Single channel results")
     exit(1)

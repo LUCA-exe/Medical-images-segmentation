@@ -472,6 +472,9 @@ class eval_factory(i_eval_factory):
 
         if args[0] == "dual-unet":
             return eval_arg_du(args)
+
+        if args[0] == "fusion-dual-unet":
+            return eval_arg_fdu(args)
         
         elif args[0] == "original-dual-unet":
             return eval_arg_odu(args)

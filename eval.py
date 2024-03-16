@@ -62,7 +62,7 @@ def main():
     if args.post_processing_pipeline == 'dual-unet': # Call inference from the KIT-GE-(2) model's method
         du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
 
-    if args.post_processing_pipeline == 'fusion-dual-unet': # Call inference from the KIT-GE-(2) model's method
+    if args.post_processing_pipeline == 'fusion-dual-unet':
         fdu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
 
     elif args.post_processing_pipeline == 'triple-unet':
@@ -74,6 +74,7 @@ def main():
     
     else: # Call other inference loop ..
         raise NotImplementedError(f"Other inference options not implemented yet ..")
+        
     log.info(">>> Evaluation script ended correctly <<<")
     return None
 
