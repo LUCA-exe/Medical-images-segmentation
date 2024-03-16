@@ -126,10 +126,6 @@ def border_cell_post_processing(border_prediction, cell_prediction, args):
         :type args:
     :return: Instance segmentation mask.
     """
-    # DANGER!!! Bug in training
-    #tmp =  border_prediction
-    #border_prediction = cell_prediction
-    #cell_prediction = tmp
 
     # Smooth predictions slightly + clip border prediction (to avoid negative values being positive after squaring) - Fixed parameters
     sigma_cell = 0.5
@@ -255,3 +251,26 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
     #save_image(prediction_instance, "./tmp", f"Final image using Watershed")
     exit(1)
     return np.squeeze(prediction_instance.astype(np.uint16))
+
+
+# WORK IN PROGRESS: This function can be seen as wrapper and feature fusion functions
+def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border_prediction, sc_cell_prediction, args):
+    """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channgel prediction.
+
+    :param border_prediction: Neighbor distance prediction.
+        :type border_prediction:
+    :param cell_prediction: Cell distance prediction.
+        :type cell_prediction:
+    :param args: Post-processing settings (th_cell, th_seed, n_splitting, fuse_z_seeds).
+        :type args:
+    :return: Instance segmentation mask.
+    """
+    prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
+    sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
+
+    # DEBUG
+    save_image(prediction_instance, "./tmp", f"Original final results")
+    save_image(sc_prediction_instance, "./tmp", f"Single channel results")
+    exit(1)
+    
+    return None

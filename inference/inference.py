@@ -15,7 +15,7 @@ from skimage.transform import resize
 from inference.ctc_dataset import CTCDataSet, pre_processing_transforms
 from inference.postprocessing import *
 from net_utils.unets import build_unet
-from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture
+from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, save_image
 
 
 '''# DEPRECATED
@@ -60,6 +60,20 @@ def load_and_get_architecture(log, model_path, device, num_gpus):
     return net, model_settings
 
 
+def move_batches_to_device(samples_dict, device, keys_to_move = ["image", "single_channel_image"]):
+    # util function to get the dict. batch from the dataloader and move to the correct device
+
+    # Un-pack the dict.
+    for key, tensor in samples_dict.items():
+        if key in keys_to_move:
+
+            if not samples_dict[key] is None:
+                samples_dict[key] = samples_dict[key].to(device)
+
+    # Return updated dict.
+    return samples_dict
+
+
 # For now use this simple 'dataloader' loop for evaluation of different pipelines.
 def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batchsize, args):
     """ Inference function for 2D Cell Tracking Challenge data sets.
@@ -100,22 +114,48 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     for idx, sample in enumerate(dataloader):
 
         # Pack a dict. for readibility/simplicity
-        img_batch, ids_batch, pad_batch, img_size = sample
         
-        img_batch = img_batch.to(device)
+        sample = move_batches_to_device(sample, device)
+        #img_batch, ids_batch, pad_batch, img_size = sample
+        #img_batch = img_batch.to(device)
+
+        # DEBUG
+        '''print(sample.keys())
+        print(sample["image"].shape)
+        save_image(np.squeeze(sample["image"][0].cpu().detach().numpy()[0, :, :]), "./tmp", f"First image")
+        save_image(np.squeeze(sample["single_channel_image"][0].cpu().detach().numpy()[0, :, :]), "./tmp", f"First image single channel")
+        save_image(np.squeeze(sample["image"][1].cpu().detach().numpy()[0, :, :]), "./tmp", f"Second image")        
+        exit(1)'''
 
         if batchsize > 1:  # all images in a batch have same dimensions and pads
-            pad_batch = [pad_batch[i][0] for i in range(len(pad_batch))]
-            img_size = [img_size[i][0] for i in range(len(img_size))]
+            pad_batch = [sample["pads"][i][0] for i in range(len(sample["pads"]))]
+            img_size = [sample['original_size'][i][0] for i in range(len(sample['original_size']))]
 
-        # Prediction outputs - dependent on the loaded model pipeline to move inside a function in this module
+        # Prediction outputs - dependent on the loaded model pipeline and the chosen post-processing pipeline to move inside a function in this module
 
         if arch_name == "dual-unet":
-            prediction_border_batch, prediction_cell_batch = net(img_batch)
-            prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+
+            # NOTE: temporary path for the custom post-processing pipeline
+            if args.post_pipeline == "fusion-dual-unet":
+                prediction_border_batch, prediction_cell_batch = net(sample["image"])
+
+                # Additional prediction for the single channel images
+                sc_prediction_border_batch, sc_prediction_cell_batch = net(sample["single_channel_image"])
+
+                # Adjust the pads and move to cpu for further processing
+                prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+
+                # Adjust the additional inferred images
+                sc_prediction_border_batch = sc_prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+                sc_prediction_cell_batch = sc_prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            
+            else:
+                # Normal post-processing pipeline
+                prediction_border_batch, prediction_cell_batch = net(sample["image"])
+                prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         elif arch_name == "original-dual-unet":
-            prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
+            prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
             # NOTE: The selection of the "padded" dim has to comprhend all the channels in case of binary prediction
             prediction_mask_batch = prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
             prediction_binary_border_batch = prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
@@ -123,7 +163,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             #prediction_binary_border_batch = prediction_binary_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         elif arch_name == "triple-unet":
-            prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(img_batch)
+            prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
             prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
             prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
@@ -140,10 +180,10 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
         # Go through predicted batch and apply post-processing (not parallelized)
         for h in range(len(prediction_cell_batch)): # NOTE: For now this batch is the only one that is always computed - to change!
 
-            log.debug('.. processing {0} ..'.format(ids_batch[h]))
+            log.debug('.. processing {0} ..'.format(sample["id"][h]))
 
             # Get actual file number:
-            file_num = int(ids_batch[h].split('t')[-1])
+            file_num = int(sample["id"][h].split('t')[-1])
 
             # Save not all raw predictions to save memory
             if file_num in save_ids and args.save_raw_pred:
@@ -151,13 +191,21 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             else:
                 save_raw_pred = False
 
-            file_id = ids_batch[h].split('t')[-1] + '.tif'
+            file_id = sample["id"][h].split('t')[-1] + '.tif'
 
-            # TODO: Implement different post-processing options.
+            # Implementing different post-processing options
             if args.post_pipeline == 'dual-unet':
                 
                 prediction_instance, border = border_cell_post_processing(border_prediction=prediction_border_batch[h],
                                                                     cell_prediction=prediction_cell_batch[h],
+                                                                    args=args)
+
+            if args.post_pipeline == 'fusion-dual-unet':
+                
+                prediction_instance, border = sc_border_cell_post_processing(border_prediction=prediction_border_batch[h],
+                                                                    cell_prediction=prediction_cell_batch[h],
+                                                                    sc_border_prediction=sc_prediction_border_batch[h],
+                                                                    sc_cell_prediction=sc_prediction_cell_batch[h],
                                                                     args=args)
             
             # TO FINISH TEST

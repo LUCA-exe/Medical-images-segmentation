@@ -172,7 +172,7 @@ def fdu_inference_loop(log, models, path_models, train_sets, path_data, device, 
                                                     args.dataset,
                                                     args.save_raw_pred,
                                                     args.artifact_correction,
-                                                    args.apply_merging
+                                                    args.apply_merging,
                                                     args.fusion_overlap)
                     
                     # Debug specific args for the current run.

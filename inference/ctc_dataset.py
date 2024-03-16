@@ -37,13 +37,15 @@ class CTCDataSet(Dataset):
 
         # Processing in case of RGB images as my dataset
         if len(image.shape) > 2:
+
             single_channel_img = image[:, :, 0] # 0 is the EVs channel (Red)
             img = np.sum(image, axis=2) # Keep all object
         else:
             # Flag for the other dataset
-            single_channel_image = None
+            single_channel_img = None
 
         sample = {'image': img,
+
                 # AD-HOC for my dataset
                 'single_channel_image': single_channel_img,
                 'id': img_id.stem}
@@ -121,9 +123,8 @@ class Padding(object):
         # TODO: refactor the tranformation in a private function of this objetc
         if not sample["single_channel_image"] is None:
             img = sample["single_channel_image"]
-            img, pads = zero_pad_model_input(img=img, pad_val=np.min(img))
+            img, _ = zero_pad_model_input(img=img, pad_val=np.min(img))
             sample["single_channel_image"] = img
-            sample["single_channel_image"] = pads
         return sample
 
 
@@ -161,11 +162,17 @@ class ToTensor(object):
     def __call__(self, sample):
 
         img = sample['image']
-
         if len(img.shape) == 2:
+
             img = img[None, :, :]
+            if not sample["single_channel_image"] is None:
+
+                single_channel_image = sample["single_channel_image"]
+                single_channel_image = single_channel_image[None, :, :]
+                single_channel_image = torch.from_numpy(single_channel_image).to(torch.float)
+                sample["single_channel_image"] = single_channel_image
 
         img = torch.from_numpy(img).to(torch.float)
-
+        sample["image"] = img
         #return img, sample['id'], sample['pads'], sample['original_size']
         return sample # Directly return the dict. of the batches
