@@ -290,28 +290,29 @@ def add_positive_label_by_overlapping(prediction, single_channel_prediction,  ce
     # Loop over every area in the original input images
     for reg_prop in measure.regionprops(prediction):
 
+        # Get mask for the current position of the "predicted" EVs
+        curr_mask = prediction == reg_prop.label 
+        total_pixels = np.sum(curr_mask)
+
+        # Check if there's any overlap with objects in image2
+        overlap_mask = curr_mask * sc_mask
+        total_overlapped_pixel = np.sum(overlap_mask)
+
         if reg_prop.area > min_cell_area:
             # Add the EVs to the cells (probably overlapping on the cells entity)
 
-            # TODO: Add the hypothethic overlapping EVs with the cells
+            # TODO: Add the hypothethic overlapping EVs with the cells as an additional cells
+            pass
             
-
         if reg_prop.area < min_cell_area:
             # It is usually an EVs
         
-            # Get mask for the current position of the "predicted" EVs
-            curr_mask = prediction == reg_prop.label 
-            total_pixels = np.sum(curr_mask)
-
-            # Check if there's any overlap with objects in image2
-            overlap_mask = curr_mask * sc_mask
-
-            total_overlapped_pixel = np.sum(overlap_mask)
+            
             # If the overlapped pixel are greater than the percentage fuse the two elements
             if total_overlapped_pixel > cells_overlap * (total_pixels/100):
 
                 # Fuse the two EVs to increment the accuracy of that current labeled entity
-                final_mask = curr_mask + sc_mask
+                final_mask = curr_mask + ... # FETCH the actual single mask correspondent to EVs mask overlapping
                 prediction[final_mask] = reg_prop.label
     return prediction
 
