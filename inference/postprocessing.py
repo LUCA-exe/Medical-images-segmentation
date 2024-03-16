@@ -254,7 +254,7 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
 
 
 def remove_false_positive_by_overlapping(prediction, single_channel_prediction, min_cell_area = 2000):
-    # Take two images as numpy array
+    # Take two images as numpy array and use one the "clean" the others
 
     # Deep copy the original prediction
     prediction = copy.deepcopy(prediction)
@@ -275,6 +275,44 @@ def remove_false_positive_by_overlapping(prediction, single_channel_prediction, 
             if not overlap:
                 prediction[curr_mask] = 0  # Remove the region in the predicted image in the predicted image
     # Adjusted prediction
+    return prediction
+
+
+def add_positive_label_by_overlapping(prediction, single_channel_prediction,  cells_overlap, min_cell_area = 2000):
+    # All the entity present in the single channel image are added to the original prediction
+
+    # Deep copy the original prediction
+    prediction = copy.deepcopy(prediction)
+    # Get the next label from the already used ones
+    next_usable_label = np.max(np.unique(prediction)) + 1
+
+    sc_mask = single_channel_prediction > 0
+    # Loop over every area in the original input images
+    for reg_prop in measure.regionprops(prediction):
+
+        if reg_prop.area > min_cell_area:
+            # Add the EVs to the cells (probably overlapping on the cells entity)
+
+            # TODO: Add the hypothethic overlapping EVs with the cells
+            
+
+        if reg_prop.area < min_cell_area:
+            # It is usually an EVs
+        
+            # Get mask for the current position of the "predicted" EVs
+            curr_mask = prediction == reg_prop.label 
+            total_pixels = np.sum(curr_mask)
+
+            # Check if there's any overlap with objects in image2
+            overlap_mask = curr_mask * sc_mask
+
+            total_overlapped_pixel = np.sum(overlap_mask)
+            # If the overlapped pixel are greater than the percentage fuse the two elements
+            if total_overlapped_pixel > cells_overlap * (total_pixels/100):
+
+                # Fuse the two EVs to increment the accuracy of that current labeled entity
+                final_mask = curr_mask + sc_mask
+                prediction[final_mask] = reg_prop.label
     return prediction
 
 
@@ -301,7 +339,8 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
 
     # TO TEST
     processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
-    # TO implement adding new regions from the single channel 
-    save_image(processed_prediction, "./tmp", f"Original final results")
+    save_image(processed_prediction, "./tmp", f"Original processed final results")
+    processed_prediction = add_positive_label_by_overlapping(prediction_instance, sc_prediction_instance, args.fusion_overlap)
+    save_image(processed_prediction, "./tmp", f"Original processed final results with more EVs")
     exit(1)
     return None
