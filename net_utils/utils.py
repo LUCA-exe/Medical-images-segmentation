@@ -556,6 +556,14 @@ def save_image(img, path, title, use_cmap = False):
     return None
 
 
+def log_final_images_properties(log, image):
+    # util function to debug the final instance prediction
+
+    n_region = np.unique(image)
+    log.debug(f".. the current image has {len(n_region)} labeled cells ..")
+    return None
+
+
 def show_training_dataset_samples(log, dataset, samples = 10):
     # Visual debug for the images used in the training set.
 

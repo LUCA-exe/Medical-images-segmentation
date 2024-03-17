@@ -15,7 +15,7 @@ from skimage.transform import resize
 from inference.ctc_dataset import CTCDataSet, pre_processing_transforms
 from inference.postprocessing import *
 from net_utils.unets import build_unet
-from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, save_image
+from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, save_image, log_final_images_properties
 
 
 '''# DEPRECATED
@@ -227,6 +227,9 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
             prediction_instance = foi_correction(mask=prediction_instance, cell_type=args.cell_type)
 
+            # Log the caracteristics of the saved images with an util functions
+            log_final_images_properties(log, prediction_instance)
+            
             # Save images in the 'results' folder
             save_inference_final_images(result_path, file_id, prediction_instance)
             if save_raw_pred: save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border)

@@ -112,7 +112,7 @@ def get_minimum_area_to_remove(connected_components, percentage=0.1):
   min_area = np.maximum(min_area, 4)
 
   # NOTE: Just override the min area component in case of my dataset for the firt testing
-  min_area = 10
+  min_area = 30
   return min_area
 
 
