@@ -294,27 +294,69 @@ def add_positive_label_by_overlapping(prediction, single_channel_prediction,  ce
         curr_mask = prediction == reg_prop.label 
         total_pixels = np.sum(curr_mask)
 
-        # Check if there's any overlap with objects in image2
+        # Check if there's any overlap with objects in the single-channel image
         overlap_mask = curr_mask * sc_mask
         total_overlapped_pixel = np.sum(overlap_mask)
-
-        if reg_prop.area > min_cell_area:
-            # Add the EVs to the cells (probably overlapping on the cells entity)
-
-            # TODO: Add the hypothethic overlapping EVs with the cells as an additional cells
-            pass
+              
+        # If the overlapped pixel are greater than the percentage fuse the two elements
+        if total_overlapped_pixel > cells_overlap * (total_pixels/100):
             
-        if reg_prop.area < min_cell_area:
-            # It is usually an EVs
-        
-            
-            # If the overlapped pixel are greater than the percentage fuse the two elements
-            if total_overlapped_pixel > cells_overlap * (total_pixels/100):
+            if reg_prop.area > min_cell_area:
+                # Add the EVs to the cells (probably overlapping on the cells entity)
+                
+                # I know that the 'overlap_mask' for sure is part of the current EVs considered from the single-channel prediction
+                single_channel_evs_mask = get_partially_covered_regions(sc_mask, overlap_mask)
 
-                # Fuse the two EVs to increment the accuracy of that current labeled entity
-                final_mask = curr_mask + ... # FETCH the actual single mask correspondent to EVs mask overlapping
-                prediction[final_mask] = reg_prop.label
+                # Add just the EVs on the original image (over the cells) and increment the label
+                prediction[single_channel_evs_mask] = next_usable_label
+                next_usable_label += 1
+            
+            if reg_prop.area < min_cell_area:
+                # if the two EVs masks overlap then keep just the overlapped part in the original image as refining process of the EVs
+
+                # Remove the EVs region in the original image and replace it
+                prediction[curr_mask] = 0
+                # Use the original EVs label
+                prediction[overlap_mask] = reg_prop.label
     return prediction
+
+
+# Util functions for the fusion post-processing methods (a lot of iterations)
+def get_partially_covered_regions(labeled_image, mask):   
+    """
+    Identifies connected regions in an image that are partially covered by a mask.
+
+    Args:
+        image: A numpy array representing the image containing labeled components (integers).
+                Background should be represented by 0.
+        mask: A numpy array representing the mask (boolean or integer, True/1 for mask region).
+
+    Returns:
+        A list of numpy arrays, where each array represents a connected region in the
+        image that is partially covered by the mask.
+    """
+
+    # Store partially covered regions
+    partially_covered_regions = []
+
+    # Iterate through unique labels
+    for label in np.unique(labeled_image):
+
+        if label == 0:  # Skip background label
+            continue
+
+        # Get mask for current label
+        mask_current_label = labeled_image == label
+
+        # Check for any overlap with the mask
+        overlap = np.any(mask_current_label & mask)
+
+        # Extract entire region if there's overlap
+        if overlap:
+            return mask_current_label
+
+    # Something is wrong
+    return None
 
 
 # WORK IN PROGRESS: This function can be seen as wrapper and feature fusion functions
@@ -341,7 +383,8 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     # TO TEST
     processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
     save_image(processed_prediction, "./tmp", f"Original processed final results")
-    processed_prediction = add_positive_label_by_overlapping(prediction_instance, sc_prediction_instance, args.fusion_overlap)
-    save_image(processed_prediction, "./tmp", f"Original processed final results with more EVs")
+    refined_evs_prediction = add_positive_label_by_overlapping(prediction_instance, sc_prediction_instance, args.fusion_overlap)
+    save_image(refined_evs_prediction, "./tmp", f"Original processed final results with more EVs")
     exit(1)
+
     return None
