@@ -253,11 +253,12 @@ def seg_mask_post_processing(mask, binary_border, original_image, cell_distance,
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
-def remove_false_positive_by_overlapping(prediction, single_channel_prediction, min_cell_area = 2000):
+def remove_false_positive_by_overlapping(prediction, single_channel_prediction, min_cell_area = 4000):
     # Take two images as numpy array and use one the "clean" the others
 
     # Deep copy the original prediction
     prediction = copy.deepcopy(prediction)
+
     sc_mask = single_channel_prediction > 0
     # Loop over every area in the original input images
     for reg_prop in measure.regionprops(prediction):
@@ -373,21 +374,8 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
     sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
 
-    print(f"Number of regions {len(np.unique(prediction_instance))}")
-    save_image(prediction_instance, "./tmp", f"Original final results")
-    save_image(sc_prediction_instance, "./tmp", f"Single channel results")
-
-    # TO TEST
-    processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
-    save_image(processed_prediction, "./tmp", f"Original denoised results")
+    processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)    
     refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
-    save_image(refined_evs_prediction, "./tmp", f"Original processed final results with more EVs")
-    print(f"Number of regions {len(np.unique(refined_evs_prediction))}")
 
-    # DEBUG
-    final_image_to_test = copy.deepcopy(refined_evs_prediction)
-    final_image_to_test[final_image_to_test > 0] = 1
-    save_image(final_image_to_test, "./tmp", f"Trial image")
-    
     # TODO: Implement the 'refined' version of the borders
     return refined_evs_prediction, None

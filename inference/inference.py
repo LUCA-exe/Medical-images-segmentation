@@ -229,7 +229,6 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
             # Log the caracteristics of the saved images with an util functions
             log_final_images_properties(log, prediction_instance)
-            
             # Save images in the 'results' folder
             save_inference_final_images(result_path, file_id, prediction_instance)
             if save_raw_pred: save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border)
