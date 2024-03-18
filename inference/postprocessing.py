@@ -389,5 +389,5 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     final_image_to_test[final_image_to_test > 0] = 1
     save_image(final_image_to_test, "./tmp", f"Trial image")
     
-    # TODO: Implement the 'refined version of the borders
+    # TODO: Implement the 'refined' version of the borders
     return refined_evs_prediction, None
