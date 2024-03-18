@@ -308,6 +308,7 @@ def add_positive_label_by_overlapping(prediction, single_channel_prediction,  ce
                 single_channel_evs_mask = get_partially_covered_regions(sc_mask, overlap_mask)
 
                 # Add just the EVs on the original image (over the cells) and increment the label
+                #TODO: ADD binary erosion to create a gap between the cells and the new added EVs
                 prediction[single_channel_evs_mask] = next_usable_label
                 next_usable_label += 1
             
@@ -316,7 +317,7 @@ def add_positive_label_by_overlapping(prediction, single_channel_prediction,  ce
 
                 # Remove the EVs region in the original image and replace it
                 prediction[curr_mask] = 0
-                # Use the original EVs label
+                # Use the original EVs label from the sc_prediction (should be the 'refined' one)
                 prediction[overlap_mask] = reg_prop.label
     return prediction
 
@@ -354,8 +355,6 @@ def get_partially_covered_regions(labeled_image, mask):
         # Extract entire region if there's overlap
         if overlap:
             return mask_current_label
-
-    # Something is wrong
     return None
 
 
@@ -374,17 +373,21 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
     sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
 
-    # DEBUG
-    #prediction_instance[prediction_instance > 0] = 200
-    #sc_prediction_instance[sc_prediction_instance > 0] = 200
+    print(f"Number of regions {len(np.unique(prediction_instance))}")
     save_image(prediction_instance, "./tmp", f"Original final results")
     save_image(sc_prediction_instance, "./tmp", f"Single channel results")
 
     # TO TEST
     processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
-    save_image(processed_prediction, "./tmp", f"Original processed final results")
-    refined_evs_prediction = add_positive_label_by_overlapping(prediction_instance, sc_prediction_instance, args.fusion_overlap)
+    save_image(processed_prediction, "./tmp", f"Original denoised results")
+    refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
     save_image(refined_evs_prediction, "./tmp", f"Original processed final results with more EVs")
-    exit(1)
+    print(f"Number of regions {len(np.unique(refined_evs_prediction))}")
 
-    return None
+    # DEBUG
+    final_image_to_test = copy.deepcopy(refined_evs_prediction)
+    final_image_to_test[final_image_to_test > 0] = 1
+    save_image(final_image_to_test, "./tmp", f"Trial image")
+    
+    # TODO: Implement the 'refined version of the borders
+    return refined_evs_prediction, None
