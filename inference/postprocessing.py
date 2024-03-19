@@ -257,29 +257,28 @@ def remove_false_positive_by_overlapping(prediction, single_channel_prediction, 
     # Take two images as numpy array and use one the "clean" the others
 
     # Deep copy the original prediction
-    prediction = copy.deepcopy(prediction)
+    new_prediction = copy.deepcopy(prediction)
 
     sc_mask = single_channel_prediction > 0
     # Loop over every area in the original input images
-    for reg_prop in measure.regionprops(prediction):
+    for reg_prop in measure.regionprops(new_prediction):
 
         if reg_prop.area < min_cell_area:
             # It is usually an EVs
             
             # Get mask for the current position of the "predicted" EVs
-            curr_mask = prediction == reg_prop.label 
+            curr_mask = new_prediction == reg_prop.label 
 
             # Check if there's any overlap with objects in image2
             overlap = np.any(curr_mask * sc_mask)
 
             # Update the prediction if not overlap is present
             if not overlap:
-                prediction[curr_mask] = 0  # Remove the region in the predicted image in the predicted image
-    # Adjusted prediction
-    return prediction
+                new_prediction[curr_mask] = 0  # Remove the region in the predicted image in the predicted image
+    return new_prediction
 
 
-def add_positive_label_by_overlapping(prediction, single_channel_prediction,  cells_overlap, min_cell_area = 2000):
+def add_positive_label_by_overlapping(prediction, single_channel_prediction,  cells_overlap = 0.7, min_cell_area = 2000):
     # All the entity present in the single channel image are added to the original prediction
 
     # Deep copy the original prediction
@@ -293,37 +292,39 @@ def add_positive_label_by_overlapping(prediction, single_channel_prediction,  ce
 
         # Get mask for the current position of the "predicted" EVs
         curr_mask = prediction == reg_prop.label 
-        total_pixels = np.sum(curr_mask)
-
-        # Check if there's any overlap with objects in the single-channel image
+        # Check if there's any overlap with objects in the single-channel image and the current mask
         overlap_mask = curr_mask * sc_mask
-        total_overlapped_pixel = np.sum(overlap_mask)
+
+        if np.any(overlap_mask):
+            
+            # Take the entire region that is overlapping with a cells or evs on my original prediction
+            sc_evs_mask = get_partially_covered_regions(sc_mask, overlap_mask)
+            # Dimension of the overlapped shape
+            total_overlapped_pixel = np.sum(overlap_mask)
+            current_evs_area = np.sum(sc_evs_mask)
               
-        # If the overlapped pixel are greater than the percentage fuse the two elements
-        if total_overlapped_pixel > cells_overlap * (total_pixels/100):
-            
-            if reg_prop.area > min_cell_area:
-                # Add the EVs to the cells (probably overlapping on the cells entity)
+            # If the overlapped pixel are greater than the percentage fuse the two elements
+            if total_overlapped_pixel > cells_overlap * (current_evs_area/100):
                 
-                # I know that the 'overlap_mask' for sure is part of the current EVs considered from the single-channel prediction
-                single_channel_evs_mask = get_partially_covered_regions(sc_mask, overlap_mask)
+                if reg_prop.area > min_cell_area:
+                    # Add the EVs to the cells (probably overlapping on the cells entity)
 
-                # Add just the EVs on the original image (over the cells) and increment the label
-                #TODO: ADD binary erosion to create a gap between the cells and the new added EVs
-                prediction[single_channel_evs_mask] = next_usable_label
-                next_usable_label += 1
-            
-            if reg_prop.area < min_cell_area:
-                # if the two EVs masks overlap then keep just the overlapped part in the original image as refining process of the EVs
+                    # Add just the EVs on the original image (over the cells) and increment the label
+                    #TODO: ADD binary erosion to create a gap between the cells and the new added EVs
+                    prediction[sc_evs_mask] = next_usable_label
+                    next_usable_label += 1
+                
+                if reg_prop.area < min_cell_area:
+                    # if the two EVs masks overlap then keep just the overlapped part in the original image as refining process of the EVs
 
-                # Remove the EVs region in the original image and replace it
-                prediction[curr_mask] = 0
-                # Use the original EVs label from the sc_prediction (should be the 'refined' one)
-                prediction[overlap_mask] = reg_prop.label
+                    # Remove the EVs region in the original image and replace it
+                    prediction[curr_mask] = 0
+                    # Use the original EVs label from the sc_prediction (should be the 'refined' one)
+                    prediction[overlap_mask] = next_usable_label
+                    next_usable_label += 1
     return prediction
 
 
-# Util functions for the fusion post-processing methods (a lot of iterations)
 def get_partially_covered_regions(labeled_image, mask):   
     """
     Identifies connected regions in an image that are partially covered by a mask.
@@ -359,8 +360,51 @@ def get_partially_covered_regions(labeled_image, mask):
     return None
 
 
+def filter_regions_by_size(mask, min_dim = 1, max_dim = 3000):
+    """
+    Filters a labeled mask image, removing regions with size outside a specified range.
+
+    Args:
+        mask: A 2D NumPy array representing the labeled mask image (positive integer labels).
+        min_dim: The minimum allowed dimension (pixels) for a region to be kept (inclusive).
+        max_dim: The maximum allowed dimension (pixels) for a region to be kept (inclusive).
+
+    Returns:
+        A new 2D NumPy array representing the filtered mask image, where regions
+        violating the size constraints are removed.
+    """
+
+    # Ensure consistent data types
+    #mask = mask.astype(np.int32)  # Ensure integer type for calculations
+
+    # Find connected components and get their labels and counts
+    labels, counts = np.unique(mask, return_counts=True)
+
+    # Validate input parameters (optional but recommended)
+    if min_dim < 1:
+        raise ValueError("Minimum dimension must be greater than or equal to 1.")
+    if max_dim < min_dim:
+        raise ValueError("Maximum dimension must be greater than or equal to minimum dimension.")
+
+    # Filter labels based on size constraints
+    filtered_counts = []
+    for count in counts:
+        if count > min_dim and count < max_dim:
+            filtered_counts.append(True)
+        else:
+            filtered_counts.append(False)
+
+    # Create a mask with only the filtered labels
+    filtered_mask = np.zeros_like(mask)
+    for idx, val in enumerate(filtered_counts):
+
+        if val == True:
+            filtered_mask[mask == labels[idx]] = labels[idx]
+    return filtered_mask
+
+
 # WORK IN PROGRESS: This function can be seen as wrapper and feature fusion functions
-def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border_prediction, sc_cell_prediction, args):
+def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border_prediction, sc_cell_prediction, args, just_evs=True):
     """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channgel prediction.
 
     :param border_prediction: Neighbor distance prediction.
@@ -372,10 +416,10 @@ def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border
     :return: Instance segmentation mask.
     """
     prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
-    sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
 
-    processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)    
-    refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
+    if just_evs == True:
+        sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
+        processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
+        refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
 
-    # TODO: Implement the 'refined' version of the borders
     return refined_evs_prediction, None
