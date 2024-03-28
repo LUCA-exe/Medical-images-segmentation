@@ -137,6 +137,21 @@ class WeightedCELoss(nn.Module):
             raise ValueError(f"The provided weight function is not valid!")
 
 
+# NOTE: Work in progress - finish to implement
+class CrossEntropyDiceLoss(nn.Module):
+    """
+    Wrapper function for dynamically weighted cross-entropy loss plus the Dice loss for refining the borders.
+
+    Args:
+        weight_func (callable, optional): Function that calculates class weights for each batch.
+                                            Defaults to None.
+    """
+
+    def __init__(self, weight_func=None, device = None):
+        pass
+
+
+
 # NOTE: Work in progress - to test the values and the efficacy in training
 class MultiClassJLoss(nn.Module):
   """
