@@ -188,7 +188,8 @@ def border_cell_post_processing(border_prediction, cell_prediction, args):
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
-def simple_binary_border_mask_post_processing(mask, binary_border, original_image, cell_distance, args, diff_between_channels = 0.2):
+#def simple_binary_border_mask_post_processing(mask, binary_border, original_image, cell_distance, args, diff_between_channels = 0.2):
+def simple_binary_border_mask_post_processing(mask, original_image, args):
     """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
 
     :param mask: Binary mask prediction.
@@ -199,21 +200,21 @@ def simple_binary_border_mask_post_processing(mask, binary_border, original_imag
     """
     # Simple parameters to control the thresholdings of markers and mask
     
-    processed_mask = torch.diff(mask, dim=0)
-    th_processed_mask = processed_mask > diff_between_channels
-    binary_channel = 1
-    
-    # Qualitative debug
-    save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
-    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
-    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
-    save_image(processed_mask, "./tmp", f"Processed mask")
-    save_image(th_processed_mask, "./tmp", f"Thresholded Processed mask")
-    exit(1)
+    #processed_mask = torch.diff(mask, dim=0)
+    #th_processed_mask = processed_mask > diff_between_channels
 
-    # Processing the binary mask with simple thresholding
+    # Fixed parameters
+    th_mask = 0.1 # NOTE: Can be fine-tuned
+    binary_channel = 1
+
+    # Processing the binary mask with simple thresholding (fine-tunable)
     processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
-    prediction_instance = measure.label(processed_mask)
+    processed_mask = measure.label(processed_mask, background = 0)
+
+    # Added noise removal for the smaller areas -  for now fixed area to remove
+    prediction_instance = remove_smaller_areas(processed_mask, 10)
+    
+    #prediction_instance = measure.label(processed_mask)
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 

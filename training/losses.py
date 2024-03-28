@@ -359,9 +359,9 @@ def compute_cross_entropy(pred_batches, batches_dict, criterion):
     target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
     target_mask =  batches_dict["mask_label"][:, 0, :, :]    
 
-    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], target_binary_border)
-    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], target_mask)
+    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], target_binary_border)
+    loss_mask = criterion['mask'](pred_batches["mask_pred"], target_mask)
 
     loss = loss_binary_border + loss_cell + loss_mask
     losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
@@ -371,9 +371,9 @@ def compute_cross_entropy(pred_batches, batches_dict, criterion):
 def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
     # Wrappper function to encapsulate the loss computation
 
-    loss_cell = criterion['cell'](pred_batches["cell_pred_batch"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred_batch"], batches_dict["binary_border_label"])
-    loss_mask = criterion['mask'](pred_batches["mask_pred_batch"], batches_dict["mask_label"])
+    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], batches_dict["binary_border_label"])
+    loss_mask = criterion['mask'](pred_batches["mask_pred"], batches_dict["mask_label"])
 
     loss = loss_binary_border + loss_cell + loss_mask
     losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
