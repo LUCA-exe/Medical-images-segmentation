@@ -189,7 +189,7 @@ def border_cell_post_processing(border_prediction, cell_prediction, args):
 
 
 #def simple_binary_border_mask_post_processing(mask, binary_border, original_image, cell_distance, args, diff_between_channels = 0.2):
-def simple_binary_mask_post_processing(mask, original_image, args, denoise = True):
+def simple_binary_mask_post_processing(mask, original_image, args, denoise = False):
     """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
 
     :param mask: Binary mask prediction.
@@ -200,7 +200,7 @@ def simple_binary_mask_post_processing(mask, original_image, args, denoise = Tru
     """
 
     # Fixed parameters
-    th_mask = 0.1 # NOTE: Can be fine-tuned
+    th_mask = 0.4 # NOTE: Can be fine-tuned
     binary_channel = 1
 
     # Processing the binary mask with simple thresholding (fine-tunable)
@@ -208,7 +208,7 @@ def simple_binary_mask_post_processing(mask, original_image, args, denoise = Tru
     prediction_instance = measure.label(processed_mask, background = 0)
 
     if denoise: # Controlled by function arg.
-        # Added noise removal for the smaller areas -  for now fixed area to remove
+        # Added noise removal for the smaller areas - for now fixed area to remove
         prediction_instance = remove_smaller_areas(prediction_instance, 10)
     
     #prediction_instance = measure.label(processed_mask)
