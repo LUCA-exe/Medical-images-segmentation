@@ -18,23 +18,6 @@ from net_utils.unets import build_unet
 from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, save_image, log_final_images_properties
 
 
-'''# DEPRECATED
-def create_architecture(log, model_settings, device, num_gpus):
-    # TODO: Check which model to build (implement different pipelines/options to build the model)
-    
-    net = build_unet(log, unet_type=model_settings['architecture'][0],
-                    act_fun=model_settings['architecture'][2],
-                    pool_method=model_settings['architecture'][1],
-                    normalization=model_settings['architecture'][3],
-                    device=device,
-                    num_gpus=num_gpus,
-                    ch_in=1,
-                    ch_out=1,
-                    filters=model_settings['architecture'][4],
-                    detach_fusion_layers=model_settings['architecture'][5])
-    return net'''
-
-
 def load_and_get_architecture(log, model_path, device, num_gpus):
     # Load architecture from the "*.json" and prepare it for the evaluation phase.
 
@@ -216,7 +199,7 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
             if args.post_pipeline == 'original-dual-unet':
                 
-                prediction_instance = simple_binary_border_mask_post_processing(mask = prediction_mask_batch[h], original_image = sample["image"][h].cpu().numpy(), args = args)
+                prediction_instance = simple_binary_mask_post_processing(mask = prediction_mask_batch[h], original_image = sample["image"][h].cpu().numpy(), args = args)
             
             if args.scale < 1:
                 prediction_instance = resize(prediction_instance,

@@ -189,7 +189,7 @@ def border_cell_post_processing(border_prediction, cell_prediction, args):
 
 
 #def simple_binary_border_mask_post_processing(mask, binary_border, original_image, cell_distance, args, diff_between_channels = 0.2):
-def simple_binary_border_mask_post_processing(mask, original_image, args):
+def simple_binary_mask_post_processing(mask, original_image, args, denoise = True):
     """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
 
     :param mask: Binary mask prediction.
@@ -198,10 +198,6 @@ def simple_binary_border_mask_post_processing(mask, original_image, args):
         :type args:
     :return: Instance segmentation mask.
     """
-    # Simple parameters to control the thresholdings of markers and mask
-    
-    #processed_mask = torch.diff(mask, dim=0)
-    #th_processed_mask = processed_mask > diff_between_channels
 
     # Fixed parameters
     th_mask = 0.1 # NOTE: Can be fine-tuned
@@ -209,48 +205,35 @@ def simple_binary_border_mask_post_processing(mask, original_image, args):
 
     # Processing the binary mask with simple thresholding (fine-tunable)
     processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
-    processed_mask = measure.label(processed_mask, background = 0)
+    prediction_instance = measure.label(processed_mask, background = 0)
 
-    # Added noise removal for the smaller areas -  for now fixed area to remove
-    prediction_instance = remove_smaller_areas(processed_mask, 10)
+    if denoise: # Controlled by function arg.
+        # Added noise removal for the smaller areas -  for now fixed area to remove
+        prediction_instance = remove_smaller_areas(prediction_instance, 10)
     
     #prediction_instance = measure.label(processed_mask)
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
-# NOTE: Simple solution using a binary mask prediction for a post processing phase - evaluate if you have to use watershed or not
-def seg_mask_post_processing(mask, binary_border, original_image, cell_distance, args):
-    """ Assignining different IDs in the final segmentation mask prediction.
-
-    :param mask: Binary mask prediction.
-
-    :param args: Post-processing settings.
-        :type args:
-    :return: Instance segmentation mask.
+# NOTE: Finish testing
+def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, original_image,  args):
+    """ 
+        Assignining different IDs in the final segmentation mask prediction using a complex watershed algorithm.
     """
 
     # Simple parameters to control the thresholdings of markers and mask
-    th_mask, th_seeds = 0.2, 0.4
+    th_mask, th_seeds, sigma_cell = 0.2, 0.3, 0.5
+    # Increased smoothness on the regressed image   
+    cell_prediction = gaussian_filter(cell_prediction, sigma = sigma_cell)
     binary_channel = 1
 
     # Processing the binary mask with simple thresholding
     processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
-    seeds = np.squeeze(mask[binary_channel, :, :] > th_seeds)
-
+    seeds = np.squeeze(cell_prediction > th_seeds)
 
     # Apply watershed
-    prediction_instance = watershed(image=-np.squeeze(cell_distance), markers=seeds, mask=processed_mask, watershed_line=False)
+    prediction_instance = watershed(image=-np.squeeze(cell_prediction), markers=seeds, mask=processed_mask, watershed_line=False)
     prediction_instance = measure.label(prediction_instance)
-
-    # Temporary - Debug 
-    save_image(np.squeeze(cell_distance), "./tmp", f"Original cell distances image")
-    save_image(np.squeeze(mask[binary_channel, :, :]), "./tmp", f"Mask prediction (channel {binary_channel})")
-    save_image(np.squeeze(binary_border[binary_channel, :, :]), "./tmp", f"Binary border prediciton (channel {binary_channel})")
-    save_image(processed_mask, "./tmp", f"Processed mask")
-    save_image(seeds, "./tmp", f"Seeds")
-    #save_image(np.squeeze(original_image), "./tmp", f"Original image")
-    #save_image(prediction_instance, "./tmp", f"Final image using Watershed")
-    exit(1)
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
