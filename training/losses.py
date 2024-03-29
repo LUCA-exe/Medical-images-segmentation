@@ -147,148 +147,138 @@ class CrossEntropyDiceLoss(nn.Module):
                                             Defaults to None.
     """
 
-    def __init__(self, weight_func=None, device = None):
-        pass
+    def __init__(self, weight_func = None, device = None):
+        super().__init__()
+        self.weight_func = weight_func
+        self.device = device
 
+
+    def forward(self, inputs, targets):
+
+        if self.weight_func is not None:
+
+            # Calculate class weights based on the current batch
+            class_weights = self.weight_func(targets, device = self.device)
+
+            # Compute weighted cross entropy loss
+            cross_entropy_loss = F.cross_entropy(inputs, targets, weight=class_weights)
+
+            # Compute Dice loss
+            dice_loss = self._dice_loss(inputs, targets)
+
+            # Combine the two losses
+            combined_loss = cross_entropy_loss + dice_loss
+            return combined_loss
+
+        else:
+            raise Exception(f"The provided weight funciton for the cross-entropy loss is not valid")
+
+        
+    def _dice_loss(self, inputs, targets, smooth=1):
+
+        # Compute Dice coefficient
+        inputs = F.softmax(inputs, dim=1)  # Convert logits to probabilities
+        inputs = inputs[:, 1]  # Assuming binary classification
+        intersection = torch.sum(inputs * targets)
+        union = torch.sum(inputs) + torch.sum(targets)
+        dice_coeff = (2 * intersection + smooth) / (union + smooth)
+
+        # Convert Dice coefficient to Dice loss
+        dice_loss = 1 - dice_coeff
+        return dice_loss
 
 
 # NOTE: Work in progress - to test the values and the efficacy in training
 class MultiClassJLoss(nn.Module):
-  """
-  Combined loss function with multi-class J-regularization and binary cross-entropy.
-  """
-
-  def __init__(self, lambda_=1.0, class_weights=None, device=None):
     """
-    Args:
-        lambda_: Weighting factor for J-regularization term (default: 1.0).
-        class_weights: Optional tensor of size (C, C) for pairwise class weights.
-    """
-    super(MultiClassJLoss, self).__init__()
-    self.lambda_ = lambda_
-    self.class_weights = class_weights
-
-    # Temporary code
-    if device != None:
-        self.device = device
-
-  def forward(self, predictions, targets):
-    """
-    Calculates the combined loss.
-
-    Args:
-        predictions: Predicted probability tensor (shape: [B, C, H, W]).
-        targets: Ground truth label tensor (shape: [B, H, W]).
-
-    Returns:
-        Combined loss (tensor).
-    """
-    B, C, H, W = predictions.shape
-  
-    # Ensure shape compatibility for BCE loss
-    if C != 1:
-
-        # If predictions are multi-class, reduce them to binary for each class
-        targets = targets.long()  # Ensure targets are long type (integers)
-        bce_loss = torch.zeros((1)).to(self.device)
-
-        for i in range(C):
-            bool_mask = targets == i
-            byte_mask = bool_mask.byte()  # Convert boolean mask to byte (int8)
-
-            # Directly use byte_mask for BCE loss (no need to add to bce_loss) - both input and target have to be float!
-            bce_loss += F.binary_cross_entropy_with_logits(
-                predictions[:, i, :, :], byte_mask.float(), reduction='mean'
-            )
-    else:
-        # Otherwise, directly calculate binary cross-entropy with float target
-        targets = targets.float()  # Ensure targets are float for BCE loss
-        bce_loss = F.binary_cross_entropy_with_logits(
-            predictions, targets, reduction='mean'
-        )
-
-    # One-hot encode targets for calculating y_i(p) - calculate normalization factors (n_i) for each class in the batch
-    one_hot_targets = F.one_hot(targets, num_classes=C)  # One-hot encoding
-
-    # Sum pixel counts across spatial dimensions (H and W)
-    n_i = torch.sum(one_hot_targets, dim=(1, 2))
-
-    # In case of zero division
-    eps =  1e-6
-    # Reshape
-    reshaped_n_i = n_i.unsqueeze(1).unsqueeze(2)  # Shape: [2, 1, 1, 2]
-    # Calculate normalized targets (varphi_i)
-    normalized_targets = one_hot_targets / (reshaped_n_i+ eps).float() 
-    
-    # Initialize J_reg_term for batch accumulation - TO TEST
-    j_reg_term = torch.zeros(B).to(self.device)
-
-    if self.class_weights is None:
-        self.class_weights = torch.ones((C, C))
-
-    # Iterate through class pairs considering the all batch
-    for i in range(C):
-        for k in range(C):
-            if i != k:  # Avoid self-comparison
-                # Calculate difference of normalized activations (Delta_ik)
-                delta_ik = (normalized_targets[:, :, :, i] - normalized_targets[:, :, :, k]) / 2
-
-                reshaped_delta_ik = delta_ik.unsqueeze(1)
-                # Multiply the correpsondent i-channel with the computed delta_ik
-                sum_multiplied_z_i = torch.sum(predictions[:, i, :, :] * reshaped_delta_ik)
-
-                # J_reg term for each class pair in the batch
-                j_reg_term += self.class_weights[i, k] * torch.log(0.5 + sum_multiplied_z_i)
-
-    # Combine loss terms after taking the mean of the j_reg_term batch (what should i do with the bce_loss? mean or keeping the sum?)
-    loss = bce_loss + self.lambda_ * j_reg_term.mean()
-    return loss
-
-
-# TODO: work in progress TO TEST (both effect during training and correctness of the class)
-class WeightedFocalLoss(nn.Module):
-    """
-    Weighted Focal Loss function for addressing class imbalance in binary segmentation tasks.
-
-    Args:
-        alpha (float, optional): Hyperparameter to down-weight well-classified examples.
-                                 Defaults to 0.25.
-        gamma (float, optional): Hyperparameter for focusing on hard-to-classify examples.
-                                 Defaults to 2.
+    Combined loss function with multi-class J-regularization and binary cross-entropy.
     """
 
-    def __init__(self, alpha=0.25, gamma=2):
-        super().__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-
-    def forward(self, input, target, weights):
+    def __init__(self, lambda_=1.0, class_weights=None, device=None):
         """
-        Calculates the Weighted Focal Loss.
+        Args:
+            lambda_: Weighting factor for J-regularization term (default: 1.0).
+            class_weights: Optional tensor of size (C, C) for pairwise class weights.
+        """
+        super(MultiClassJLoss, self).__init__()
+        self.lambda_ = lambda_
+        self.class_weights = class_weights
+
+        # Temporary code
+        if device != None:
+            self.device = device
+
+    def forward(self, predictions, targets):
+        """
+        Calculates the combined loss.
 
         Args:
-            input (torch.Tensor): Predicted logits (before sigmoid) with shape (N, C, H, W).
-            target (torch.Tensor): Ground truth labels with shape (N, H, W).
-            weights (torch.Tensor): Per-class weights with shape (C,).
+            predictions: Predicted probability tensor (shape: [B, C, H, W]).
+            targets: Ground truth label tensor (shape: [B, H, W]).
 
         Returns:
-            torch.Tensor: Weighted Focal Loss with shape (1,).
+            Combined loss (tensor).
         """
+        B, C, H, W = predictions.shape
+    
+        # Ensure shape compatibility for BCE loss
+        if C != 1:
 
-        # Calculate base binary cross-entropy loss for each pixel
-        ce_loss = nn.functional.binary_cross_entropy_with_logits(input, target, reduction="none")
+            # If predictions are multi-class, reduce them to binary for each class
+            targets = targets.long()  # Ensure targets are long type (integers)
+            bce_loss = torch.zeros((1)).to(self.device)
 
-        # Calculate probability of being the true class
-        pt = torch.exp(-ce_loss)
+            for i in range(C):
+                bool_mask = targets == i
+                byte_mask = bool_mask.byte()  # Convert boolean mask to byte (int8)
 
-        # Modulate loss for hard-to-classify examples and down-weight easy examples
-        focal_loss = (self.alpha * pt ** self.gamma) * ce_loss
+                # Directly use byte_mask for BCE loss (no need to add to bce_loss) - both input and target have to be float!
+                bce_loss += F.binary_cross_entropy_with_logits(
+                    predictions[:, i, :, :], byte_mask.float(), reduction='mean'
+                )
+        else:
+            # Otherwise, directly calculate binary cross-entropy with float target
+            targets = targets.float()  # Ensure targets are float for BCE loss
+            bce_loss = F.binary_cross_entropy_with_logits(
+                predictions, targets, reduction='mean'
+            )
 
-        # Apply per-class weights
-        weighted_loss = weights * focal_loss
+        # One-hot encode targets for calculating y_i(p) - calculate normalization factors (n_i) for each class in the batch
+        one_hot_targets = F.one_hot(targets, num_classes=C)  # One-hot encoding
 
-        # Return the average weighted loss
-        return weighted_loss.mean()
+        # Sum pixel counts across spatial dimensions (H and W)
+        n_i = torch.sum(one_hot_targets, dim=(1, 2))
+
+        # In case of zero division
+        eps =  1e-6
+        # Reshape
+        reshaped_n_i = n_i.unsqueeze(1).unsqueeze(2)  # Shape: [2, 1, 1, 2]
+        # Calculate normalized targets (varphi_i)
+        normalized_targets = one_hot_targets / (reshaped_n_i+ eps).float() 
+        
+        # Initialize J_reg_term for batch accumulation - TO TEST
+        j_reg_term = torch.zeros(B).to(self.device)
+
+        if self.class_weights is None:
+            self.class_weights = torch.ones((C, C))
+
+        # Iterate through class pairs considering the all batch
+        for i in range(C):
+            for k in range(C):
+                if i != k:  # Avoid self-comparison
+                    # Calculate difference of normalized activations (Delta_ik)
+                    delta_ik = (normalized_targets[:, :, :, i] - normalized_targets[:, :, :, k]) / 2
+
+                    reshaped_delta_ik = delta_ik.unsqueeze(1)
+                    # Multiply the correpsondent i-channel with the computed delta_ik
+                    sum_multiplied_z_i = torch.sum(predictions[:, i, :, :] * reshaped_delta_ik)
+
+                    # J_reg term for each class pair in the batch
+                    j_reg_term += self.class_weights[i, k] * torch.log(0.5 + sum_multiplied_z_i)
+
+        # Combine loss terms after taking the mean of the j_reg_term batch (what should i do with the bce_loss? mean or keeping the sum?)
+        loss = bce_loss + self.lambda_ * j_reg_term.mean()
+        return loss
 
 
 def get_loss(config, device):
@@ -330,6 +320,9 @@ def get_loss(config, device):
         if config["classification_loss"] == "weighted-cross-entropy":
             mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
 
+        elif config["classification_loss"] == "cross-entropy-dice":
+            mask_criterion = nn.CrossEntropyLoss()
+        
         elif config["classification_loss"] == "cross-entropy":
             mask_criterion = nn.CrossEntropyLoss()
 
@@ -345,6 +338,47 @@ def get_loss(config, device):
 
         criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
     return criterion
+
+
+def compute_cross_entropy(pred_batches, batches_dict, criterion):
+    # Pred. batches as dict. to decrease the number of args - batches dict. is the correspondent GT images batches
+
+    # Adapt the dim. of the target batches
+    target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
+    target_mask =  batches_dict["mask_label"][:, 0, :, :]    
+
+    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], target_binary_border)
+    loss_mask = criterion['mask'](pred_batches["mask_pred"], target_mask)
+
+    loss = loss_binary_border + loss_cell + loss_mask
+    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+    return loss, losses_list
+
+
+def compute_weighted_cross_entropy_dice(pred_batches, batches_dict, criterion):
+    # Wrappper function to encapsulate the loss computation (in this case of the cross-entropy plus the dice contribution)
+
+    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], batches_dict["binary_border_label"])
+    loss_mask = criterion['mask'](pred_batches["mask_pred"], batches_dict["mask_label"])
+
+    loss = loss_binary_border + loss_cell + loss_mask
+    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+    return loss, losses_list
+
+
+def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
+    # Wrappper function to encapsulate the loss computation
+
+    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
+    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], batches_dict["binary_border_label"])
+    loss_mask = criterion['mask'](pred_batches["mask_pred"], batches_dict["mask_label"])
+
+    loss = loss_binary_border + loss_cell + loss_mask
+    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
+    return loss, losses_list
+
 
 
 def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
@@ -365,36 +399,6 @@ def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
     print(loss)
     print(losses_list)
     return loss, losses_list
-
-
-def compute_cross_entropy(pred_batches, batches_dict, criterion):
-    # Pred. batches as dict. to decrease the number of args - batches dict. is the correspondent GT images batches
-
-    # Adapt the dim. of the target batches
-    target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
-    target_mask =  batches_dict["mask_label"][:, 0, :, :]    
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], target_binary_border)
-    loss_mask = criterion['mask'](pred_batches["mask_pred"], target_mask)
-
-    loss = loss_binary_border + loss_cell + loss_mask
-    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-    return loss, losses_list
-
-
-def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
-    # Wrappper function to encapsulate the loss computation
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], batches_dict["binary_border_label"])
-    loss_mask = criterion['mask'](pred_batches["mask_pred"], batches_dict["mask_label"])
-
-    loss = loss_binary_border + loss_cell + loss_mask
-    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-    return loss, losses_list
-
-
 
 
 

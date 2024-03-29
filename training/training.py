@@ -74,6 +74,9 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
         if config["classification_loss"] == "cross-entropy":
             loss, losses_list = compute_cross_entropy(pred_batches, batches_dict, criterion)
         
+        elif config["classification_loss"] == "cross-entropy-dice":
+            loss, losses_list = compute_weighted_cross_entropy(pred_batches, batches_dict, criterion)
+        
         elif config["classification_loss"] == "weighted-cross-entropy":
             loss, losses_list = compute_weighted_cross_entropy(pred_batches, batches_dict, criterion)
 
