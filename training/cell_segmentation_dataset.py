@@ -53,8 +53,9 @@ class CellSegDataset(Dataset):
         """
 
         # Check the shape of the mask - should be one from the creation of the trianig set of KIT-GE pipeline
-        mask = np.squeeze(copy.deepcopy(mask)) # Remove temporary the channel to apply the transformation
-        mask[mask > 0] = 1
+        #mask = self.__prepare_seg_mask(mask)
+        mask = copy.deepcopy(mask) # Work on the copy of the object - no reference
+        mask[mask > 0] = 1 # NOTE: Treating all the cells as the same class (not distinguish between the EVs and Cells)
 
         # Work with the boolean array to invert the original mask
         inverted_mask = ~mask.astype(bool)
@@ -65,7 +66,8 @@ class CellSegDataset(Dataset):
         
         # Obtain the borders directly by difference
         cell_border = dil_inverted_mask ^ inverted_mask
-        cell_border = np.expand_dims(cell_border, axis=2)
+        # NOTE: This now gives an error, the training executed before not - attention on the log file in case of anomaly, maybe updates of packages in colab
+        #cell_border = np.expand_dims(cell_border, axis=2)
         return cell_border.astype(mask.dtype)
 
 

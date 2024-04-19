@@ -335,10 +335,9 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             # Iterate over data
             for samples in dataloader[phase]:
 
-                # Get img_batch and label_batch and put them on GPU if available
-                #img_batch, border_label_batch, cell_label_batch, mask_label_batch, binary_border_batch = samples # Unpack always all 'labels'
-                samples_dict = samples
-                samples_dict = move_batches_to_device(samples_dict, device)
+                # Load always all 'labels'
+                #samples_dict = samples
+                samples_dict = move_batches_to_device(samples, device)
 
                 # Zero the parameter gradients
                 optimizer.zero_grad()
@@ -384,7 +383,6 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                 print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} - mask loss:  {:.5f} - binary border loss: {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
 
                 # NOTE: The update control just the total loss decrement, not the single ones.
-
                 if epoch_loss < best_loss:
                     print('Validation loss improved from {:.5f} to {:.5f}. Save model.'.format(best_loss, epoch_loss))
                     best_loss = epoch_loss

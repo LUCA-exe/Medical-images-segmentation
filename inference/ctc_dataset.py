@@ -41,8 +41,9 @@ class CTCDataSet(Dataset):
             single_channel_img = image[:, :, 0] # 0 is the EVs channel (Red)
             img = np.sum(image, axis=2) # Keep all object
         else:
-            # Flag for the other dataset
-            single_channel_img = None
+            # For single-channel dataset just load twice the image - being already on single-channel
+            single_channel_img = image
+            img = image
 
         sample = {'image': img,
 

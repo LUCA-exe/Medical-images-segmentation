@@ -83,7 +83,8 @@ def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int, emergency_
         
         print(f"Current batch is found with 0 pixel for the background: using {emergency_coefficent} number of 'fake' background pixels")
         num_bg_pixels = emergency_coefficent
-        #raise ValueError("`num_bg_pixels` must be a positive integer.")
+        # Console debug for easy visualization
+        print("`num_bg_pixels` must be a positive integer.")
 
     if not isinstance(num_cell_pixels, int) or num_cell_pixels <= 0:
         raise ValueError("`num_cell_pixels` must be a positive integer.")
@@ -125,10 +126,6 @@ class WeightedCELoss(nn.Module):
         if self.weight_func is not None:
             # Calculate class weights based on current batch
             class_weights = self.weight_func(target, device = self.device)
-
-            # Ensure class weights have the correct shape
-            '''if target.dim() > 2 and class_weights.dim() == 1:
-                class_weights = class_weights.unsqueeze(1).expand_as(target)  # Expand for consistency'''
 
             # Apply weights in forward pass
             loss = nn.CrossEntropyLoss(weight=class_weights)
@@ -179,20 +176,21 @@ class CrossEntropyDiceLoss(nn.Module):
             raise ValueError(f"The provided weight function for the cross-entropy loss is not valid!")
 
         
-    def _dice_loss(self, inputs, targets, smooth=1):
+    def _dice_loss(self, inputs, targets):
         # Not parallelized - simple loop along the batch of predicted images and targets
 
         # Aggregated dice coefficent for all the classes
         batch_size = inputs.size(0)
         num_classes = inputs.size(1)
         dice_loss = 0
-        # Cycle over the batch
+
+        # Cycle over the batch - not efficent for now but can allow the analysis of the experiment
         for i in range(batch_size):
 
             # Single coeff. for the multilabel targets
             dice_coeff = 0
             # Fetch the 'i' target to convert to one_hot encoding
-            current_one_hot_target = F.one_hot(targets[i, :, :], num_classes=num_classes)
+            current_one_hot_target = F.one_hot(targets[i, :, :], num_classes = num_classes)
             current_inputs = inputs[i, :, :, :]
 
             for channel in range(num_classes):
@@ -200,7 +198,7 @@ class CrossEntropyDiceLoss(nn.Module):
                 # Select correpsonding channel with the logits
                 dice_coeff -= self._single_class_dice_coeff(current_inputs[channel, :, :], current_one_hot_target[:, :, channel])
  
-            # Convert Dice coefficient to Dice loss for the current image depedning on the number of classes
+            # Convert Dice coefficient to Dice loss for the current image depending on the number of classes
             dice_loss += (1 * num_classes) + dice_coeff
         
         # Average the loss along the batch
@@ -208,14 +206,14 @@ class CrossEntropyDiceLoss(nn.Module):
         return dice_loss
 
 
-    def _single_class_dice_coeff(self, input, target, smooth = 1e-7):
+    def _single_class_dice_coeff(self, input, target, smooth = 1):
         # Single binary class dice coefficent computation
         
         intersection = torch.sum(input * target)
         union = torch.sum(input) + torch.sum(target)
 
         # Return the final coeff. for the current binary class
-        return (2 * intersection) / (union + smooth)
+        return (2 * intersection + smooth) / (union + smooth)
 
 
 # NOTE: Work in progress - to test the values and the efficacy in training
