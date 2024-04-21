@@ -139,22 +139,22 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
         elif arch_name == "original-dual-unet":
             prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
+
             # NOTE: The selection of the "padded" dim has to comprhend all the channels in case of binary prediction
             prediction_mask_batch = prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
             prediction_binary_border_batch = prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
-            #prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
-            #prediction_binary_border_batch = prediction_binary_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         elif arch_name == "triple-unet":
-            prediction_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
-            prediction_mask_batch = prediction_mask_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
-            prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
+
+            # Moving the predicted results to cpu - should be created a function for this
+            prediction_mask_batch = prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+            prediction_binary_border_batch = prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         log.debug(f".. predicted batch {idx} ..")
 
         # Get rid of pads
         prediction_cell_batch = prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
-        #prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         # Save also some raw predictions (not all since float32 --> needs lot of memory)
         save_ids = [0, len(ctc_dataset) // 8, len(ctc_dataset) // 4, 3 * len(ctc_dataset) // 8, len(ctc_dataset) // 2,

@@ -335,13 +335,16 @@ def get_loss(config, device):
         if config["classification_loss"] == "weighted-cross-entropy":
             mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
 
+        elif config["classification_loss"] == "cross-entropy-dice":
+            mask_criterion = CrossEntropyDiceLoss(weight_func=get_weights_tensor, device = device)
+
         elif config["classification_loss"] == "cross-entropy":
             mask_criterion = nn.CrossEntropyLoss()
 
         else:
             raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
 
-        criterion = {'border': border_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
+        criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
 
     elif config['architecture'][0] == 'original-dual-unet':
         

@@ -793,7 +793,7 @@ class TUNet(nn.Module):
             
         self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
         
-        # Fusion layers - applied after concatenate the two output
+        # Fusion layers - applied after concatenate the two output (followed the architecture of the Original Dual U-net)
         self.fusionConv.append(FusionConvBlock(ch_in=3,
                                           ch_out=64,
                                           act_fun=act_fun,
@@ -832,7 +832,7 @@ class TUNet(nn.Module):
         x_temp = list(reversed(x_temp))
 
         # Decoder 1 (binary borders branch)
-        for i in range(len(self.decoder1Conv) - 1):
+        for i in range(len(self.decoder1Conv) - 2):
             if i == 0:
                 x1 = self.decoder1Upconv[i](x)
             else:
