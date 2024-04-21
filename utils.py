@@ -378,7 +378,7 @@ class train_arg_du(a_train_arg_class):
 
 
 class train_arg_tu(a_train_arg_class):
-    """Specific argument training class for my implementation of the Dual U-net."""
+    """Specific argument training class for my Triple-Unet."""
 
     def __init__(self, args):
 
@@ -386,7 +386,7 @@ class train_arg_tu(a_train_arg_class):
         self.act_fun = args[1]
         self.batch_size = args[2]
         self.filters = args[3]
-        self.detach_fusion_layers = args[4]
+        self.detach_fusion_layers = args[4] # NOTE: In this case is used to detach just the regressive branch from the fusion layers
         self.iterations = args[5]
         self.loss = args[6]
         self.norm_method = args[7]
@@ -409,7 +409,7 @@ class train_arg_tu(a_train_arg_class):
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"train_args for Dual U-net of KIT-GE({attributes})"
+        return f"train_args for Triple U-net ({attributes})"
 
 
 class train_arg_odu(a_train_arg_class):

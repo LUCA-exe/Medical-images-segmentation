@@ -47,7 +47,8 @@ def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_
                          act_fun=act_fun,
                          normalization=normalization)
 
-    elif unet_type == 'triple-unet':  # U-Net with two decoder paths and one single channel outputs (e.g., cell + neighbor dist used in the fusion layers) | triple-unet
+    # My version of the original dual Unet - triple Unet
+    elif unet_type == 'triple-unet':  
         model = TUNet(ch_in=ch_in,
                       ch_out=ch_out,
                       pool_method=pool_method,
@@ -697,9 +698,9 @@ class AutoUNet(nn.Module):
         return x
 
 
-# NOTE: "Tiple-unet" inspired by the original work of "Dual U-Net for segmentation of overlapping glioma nuclei"
+# NOTE: "Triple U-net" inspired by the original work of "Dual U-Net for segmentation of overlapping glioma nuclei"
 class TUNet(nn.Module):
-    """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
+    """ U-net with two decoder paths (one regression and one classification) and on final fusion path (fusion layers for the segmentation path) """
 
     def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), detach_fusion_layers = False, softmax_layer = False):
         """
@@ -782,12 +783,18 @@ class TUNet(nn.Module):
                                                normalization=normalization))
             n_featuremaps //= 2
 
-        # Last 1x1 convolutions (2nd path has always 1 channel: binary or dist)
-        self.decoder1Conv.append(nn.Conv2d(n_featuremaps, ch_out, kernel_size=1, stride=1, padding=0))
+        
+        # Last 1x1 convolutions for the two branches
+        self.decoder1Conv.append(nn.Conv2d(n_featuremaps, 2, kernel_size=1, stride=1, padding=0))
+        if self.softmax_layer:
+            self.decoder1Conv.append(nn.Softmax(dim=1))
+        else:
+            self.decoder1Conv.append(nn.Sigmoid())
+            
         self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
         
         # Fusion layers - applied after concatenate the two output
-        self.fusionConv.append(FusionConvBlock(ch_in=2,
+        self.fusionConv.append(FusionConvBlock(ch_in=3,
                                           ch_out=64,
                                           act_fun=act_fun,
                                           normalization=normalization))
@@ -824,7 +831,7 @@ class TUNet(nn.Module):
         # Intermediate results for concatenation
         x_temp = list(reversed(x_temp))
 
-        # Decoder 1 (borders + seeds)
+        # Decoder 1 (binary borders branch)
         for i in range(len(self.decoder1Conv) - 1):
             if i == 0:
                 x1 = self.decoder1Upconv[i](x)
@@ -832,6 +839,7 @@ class TUNet(nn.Module):
                 x1 = self.decoder1Upconv[i](x1)
             x1 = torch.cat([x1, x_temp[i]], 1)
             x1 = self.decoder1Conv[i](x1)
+        x1 = self.decoder1Conv[-2](x1)
         x1 = self.decoder1Conv[-1](x1)
 
         # Decoder 2 (cells)
@@ -844,13 +852,12 @@ class TUNet(nn.Module):
             x2 = self.decoder2Conv[i](x2)
         x2 = self.decoder2Conv[-1](x2)
         
-        # Concatenation
-        if self.detach_fusion_layers: # Check if the 'detach' is requested.
-            x3 = torch.cat([x1, x2], dim=1).detach()
-        else:
-            x3 = torch.cat([x1, x2], dim=1)
-
-        # Final fusion layers - Convolutional layers 3
+        # Detach the 'regressive' branch if requested
+        if self.detach_fusion_layers: 
+            x2 = x2.detach()
+ 
+        # Final fusion (binary mask as output) layers for the final segmentation mask
+        x3 = torch.cat([x1, x2], dim=1)
         x3 = self.fusionConv[0](x3)
         x3 = self.fusionConv[1](x3)
         x3 = self.fusionConv[2](x3)
@@ -948,6 +955,7 @@ class ODUNet(nn.Module):
             self.decoder1Conv.append(nn.Softmax(dim=1))
         else:
             self.decoder1Conv.append(nn.Sigmoid())
+
         self.decoder2Conv.append(nn.Conv2d(n_featuremaps, 1, kernel_size=1, stride=1, padding=0))
         
         # Fusion layers - applied after concatenate the two output

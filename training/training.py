@@ -49,20 +49,25 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
         if phase == "val":
             sample_plot_during_validation([batches_dict["image"], border_pred_batch, cell_pred_batch], val_phase_counter, binary_pred = False)
 
+
     if arch_name == 'triple-unet':
-        border_pred_batch, cell_pred_batch, mask_pred_batch = net(batches_dict["image"])
-        loss_border = criterion['border'](border_pred_batch, batches_dict["border_label"])
-        loss_cell = criterion['cell'](cell_pred_batch, batches_dict["cell_label"])
+        binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(batches_dict["image"])
 
-        if config["classification_loss"] == "weighted-cross-entropy":
-            target = batches_dict["mask_label"]
-        else:
-            # NOTE: Attention to the shape of the "target" of the cross entropy loss.
-            target = batches_dict["mask_label"][:, 0, :, :]
+        # Prepare dict. of predicted batches
+        pred_batches = {"binary_border_pred": binary_border_pred_batch, "cell_pred": cell_pred_batch,  "mask_pred":  mask_pred_batch}
 
-        loss_mask = criterion['mask'](mask_pred_batch, target)
-        loss = loss_border + loss_cell + loss_mask
-        losses_list = [loss_border.item(), loss_cell.item(), loss_mask.item()]
+        if config["classification_loss"] == "cross-entropy-dice":
+            loss, losses_list = compute_weighted_cross_entropy(pred_batches, batches_dict, criterion)
+
+        elif config["classification_loss"] == "weighted-cross-entropy":
+            loss, losses_list = compute_weighted_cross_entropy(pred_batches, batches_dict, criterion)
+
+        # Qualitative plotting in the validation phase
+        if phase == "val":
+
+            # NOTE: Used both inspecting validation prediction for this network
+            sample_plot_during_validation([batches_dict["image"], pred_batches["binary_border_pred"],  pred_batches["mask_pred"]], val_phase_counter)
+            sample_plot_during_validation([batches_dict["image"], pred_batches["cell_pred"]], val_phase_counter,  binary_pred = False)
 
     if arch_name == 'original-dual-unet':
 
@@ -87,6 +92,7 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
         if phase == "val":
             # NOTE: Plot all binary prediction or all floating prediction
             sample_plot_during_validation([batches_dict["image"], pred_batches["binary_border_pred"],  pred_batches["mask_pred"]], val_phase_counter)
+
     return loss, losses_list
 
 
@@ -155,7 +161,7 @@ def set_up_optimizer_and_scheduler(config, net, best_loss):
             raise Exception('Optimizer not known')
 
     # Config from thei original paper
-    elif config["architecture"][0] == "original-dual-unet":
+    elif config["architecture"][0] == "original-dual-unet" or config["architecture"][0] == "triple-unet":
 
         optimizer = optim.Adam(net.parameters(),
                                 betas=(0.9, 0.99),
@@ -201,7 +207,7 @@ def get_max_epochs(n_samples, config):
     # NOTE: Temporary fix - following the original paper
     if config["architecture"][0] == "dual-unet":
         max_epochs = 200
-    elif config["architecture"][0] == "original-dual-unet":
+    elif config["architecture"][0] == "original-dual-unet" or config["architecture"][0] == "triple-unet":
          max_epochs = 40
     return max_epochs
 
@@ -336,7 +342,6 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
             for samples in dataloader[phase]:
 
                 # Load always all 'labels'
-                #samples_dict = samples
                 samples_dict = move_batches_to_device(samples, device)
 
                 # Zero the parameter gradients
@@ -359,12 +364,11 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
                 if config['architecture'][0] == 'dual-unet':
                     running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, samples_dict["image"].size(0))
 
-                # TO TEST
                 if config['architecture'][0] == 'original-dual-unet':
                     running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
 
                 if config['architecture'][0] == 'triple-unet':
-                    running_loss_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
+                    running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
 
             # Compute average epoch losses
             epoch_loss = running_loss / len(datasets[phase])

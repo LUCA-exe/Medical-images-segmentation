@@ -88,28 +88,6 @@ def get_model_config(log, train_args, num_gpus):
     return model_config
 
 
-'''# NOTE: Moved in the net_utils.utils
-def create_model_architecture(log, pre_train, model_config, device, num_gpus):
-    # Given the parsed training arguments, create the U-Net architecture
-    
-    if pre_train:
-        unet_type = 'AutoU' # Get CNN (U-Net without skip connections)
-    else:
-        unet_type = model_config['architecture'][0]
-
-    net = unets.build_unet(log, unet_type=unet_type, 
-                                act_fun=model_config['architecture'][2],
-                                pool_method=model_config['architecture'][1],
-                                normalization=model_config['architecture'][3],
-                                device=device,
-                                num_gpus=num_gpus,
-                                ch_in=1,
-                                ch_out=1,
-                                filters=model_config['architecture'][4],
-                                detach_fusion_layers=model_config['architecture'][5],
-                                softmax_layer=model_config['architecture'][6])
-    return net'''
-
 def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):
     # Loop to iterate over the different trained/re-trained architectures.
 
@@ -219,7 +197,6 @@ def set_up_training():
 
     # Instantiate the training factory class
     factory = train_factory()
-    '''train_args, model_config = parse_training_args(log, args, num_gpus)'''
 
     # Parse the training arguments and settings for the specific model pipeline
     train_args = get_training_args_class(log, args, factory)
