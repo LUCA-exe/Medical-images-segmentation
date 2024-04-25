@@ -97,6 +97,121 @@ def save_current_model_state(config, net, path_models):
     return None
     
 
+def save_current_branch_state(config, net, path_models, device):
+    # Util function to upgrade just'part' of the neural-network by upgrading certain tensors
+
+    current_model_name = config['run_name'] + '.pth'
+    weights_path = str(path_models / current_model_name)
+
+    # Read the saved dict. from the previous loops
+    old_weights_dict = read_weights_dict(weights_path, device)
+
+    # Fetch the current model weights depending on the number of GPU in usage
+    current_weights_dict = read_model_state(config, net)
+
+    # NOTE: For now the only branch to update is in the 'triple-unet' config.
+    upgraded_weights_dict = upgrade_weights_dict(old_weights_dict, current_weights_dict, ["decoder", "2"])
+    try:
+        if config['num_gpus'] > 1:
+            torch.save(upgraded_weights_dict, weights_path)
+        else:
+            torch.save(upgraded_weights_dict, weights_path)
+        print(f".. current model state correctly upgraded !")
+        
+    except Exception as e:
+        raise Exception(f"Unexpected error: {e}")
+    return None
+
+
+def read_weights_dict(file_path: str, device: torch.device) -> dict:
+    """
+    Reads a model weights dictionary from a file path and maps it to the specified device.
+
+    This function loads the weights dictionary from the provided `file_path` (assumed to be a PyTorch model file)
+    and maps the loaded tensors to the specified `device` (CPU or GPU).
+
+    Args:
+        file_path (str): The path to the model weights file.
+        device (torch.device): The device (CPU or GPU) to which the tensors should be mapped.
+
+    Returns:
+        dict: The loaded model weights dictionary with tensors mapped to the specified device.
+
+    Raises:
+        FileNotFoundError: If the model file is not found.
+        RuntimeError: If there's an error loading the model (potentially due to file corruption).
+    """
+
+    try:
+        # Load weights dictionary and map tensors to the device
+        return torch.load(file_path, map_location=device)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Model file '{file_path}' not found.") from e
+    except RuntimeError as e:
+        raise RuntimeError(f"Error loading model from '{file_path}': {e}") from e
+
+
+def read_model_state(config: dict, net) -> dict:
+    """
+    Reads the model state dictionary considering potential data parallelism.
+
+    Args:
+        config (dict): The configuration dictionary (assumed to contain a key 'num_gpus').
+        net (Any): The PyTorch model object.
+
+    Returns:
+        dict: The retrieved model state dictionary.
+
+    Raises:
+        ValueError: If the `config` dictionary doesn't contain the key 'num_gpus'.
+    """
+
+    # Validate configuration key existence
+    if 'num_gpus' not in config:
+        raise ValueError("Configuration dictionary must contain the key 'num_gpus'.")
+
+    # Access state dictionary based on number of GPUs
+    if config['num_gpus'] > 1:
+        try:
+            # Access state dictionary from wrapped module for data parallelism
+            return net.module.state_dict()
+        except AttributeError:
+            raise ValueError("Data parallelism structure not found in the model.")
+    else:
+        return net.state_dict()
+
+
+def upgrade_weights_dict(old_dict: dict, current_dict: dict, identifiers: list[str]) -> dict:
+
+    """
+    Upgrades weights in a dictionary based on layer names containing specific identifiers.
+
+    Args:
+        old_dict (dict): The dictionary containing the older weights to be potentially upgraded.
+        current_dict (dict): The dictionary containing the newer weights to be used for upgrades.
+        identifiers (list[str]): A list of strings (identifiers) to match within layer names for upgrades.
+
+    Returns:
+        dict: The modified `old_dict` with weights upgraded for matching layers.
+
+    Raises:
+        ValueError: If the `identifiers` list is empty or contains non-string elements.
+    """
+
+    if not identifiers:
+        raise ValueError("`identifiers` list cannot be empty.")
+
+    if not all(isinstance(identifier, str) for identifier in identifiers):
+        raise ValueError("`identifiers` list must contain only strings.")
+
+    for key, item in old_dict.items():
+        layer_name = key.split('.')[0]
+        if (identifiers[0] in layer_name) and (identifiers[1] in layer_name):
+            # Update the value (wieght tensor) just in the right keys
+            old_dict[key] = current_dict[key]
+    return old_dict
+
+
 def get_num_workers(device):
     # Called from training.py in train(...) to get the num workers for the dataloader 
 

@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from training.ranger2020 import Ranger
 from training.losses import get_loss, get_weights_tensor, WeightedCELoss, compute_cross_entropy, compute_weighted_cross_entropy, compute_j_cross_entropy
-from net_utils.utils import get_num_workers, save_current_model_state, save_training_loss, show_training_dataset_samples, save_image
+from net_utils.utils import get_num_workers, save_current_model_state, save_current_branch_state, save_training_loss, show_training_dataset_samples, save_image
 
 
 def sample_plot_during_validation(batches_list, val_phase_counter, binary_pred = True, binary_channel = 1):
@@ -317,8 +317,8 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     epochs_wo_improvement, train_loss, val_loss,  = 0, [], []
     since = time.time()
     arch_name = config['architecture'][0]
-    # Validation sample counter - index of what to plot in training phase
-    val_phase_counter = -1
+    # Validation sample counter - index of what to plot in training phase images
+    val_phase_counter = 0
     # Added single regressive branch loss in case using the 'triple u-net'
     regressive_best_loss = 0
 
@@ -393,27 +393,25 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
 
                 # NOTE: The update control just the total loss decrement, not the single ones.
                 if epoch_loss < best_loss:
-
                     print('Validation loss improved from {:.5f} to {:.5f}. Save model.'.format(best_loss, epoch_loss))
                     best_loss = epoch_loss
-                    # Special case for 'triple u-net' - update the 'best loss' in every case
-                    if config['architecture'][0] == 'triple-unet':
 
+                    # Special case for 'triple u-net' - update the 'best loss' of regression branch in every case
+                    if config['architecture'][0] == 'triple-unet':
                         regressive_best_loss = epoch_loss_cell
                     save_current_model_state(config, net, path_models)
                     epochs_wo_improvement = 0
 
-                # NOTE: Added 'hard-coded' condition just for my 'triple u-net' - not counted as 'improving' the loss but updated the weights of the neural networks.
+                # NOTE: Added 'hard-coded' condition just for my 'triple u-net' - not counted as 'improving' the loss but updated the weights of 'part' of the neural networks.
                 elif (config['architecture'][0] == 'triple-unet') and (epoch_loss_cell < regressive_best_loss):
-
+                    print('Cell validation loss improved from {:.5f} to {:.5f}. Save just the regression branch.'.format(regressive_best_loss, epoch_loss_cell))
                     regressive_best_loss = epoch_loss_cell
-                    print('Cell validation loss improved from {:.5f} to {:.5f}. Save model.'.format(regressive_best_loss), epoch_loss_cell)
-                    # NOTE: Temporary, the previous total loss could be greater than this total loss, but cause the specific loss the branch is updated anyway ..
-                    save_current_model_state(config, net, path_models)
-                else:
+                    save_current_branch_state(config, net, path_models, device)
 
+                else:
                     print('Validation loss did not improve.')
                     epochs_wo_improvement += 1
+
                 # Update learning rate differently
                 if config['optimizer'] == 'ranger' and second_run:
                     scheduler.step()
