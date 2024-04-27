@@ -208,7 +208,7 @@ def simple_binary_mask_post_processing(mask, original_image, args, denoise = Tru
 
     if denoise: # Controlled by function arg.
         # Added noise removal for the smaller areas - for now fixed area to remove
-        prediction_instance = remove_smaller_areas(prediction_instance, 10)
+        prediction_instance = remove_smaller_areas(prediction_instance, 30)
     
     #prediction_instance = measure.label(processed_mask)
     return np.squeeze(prediction_instance.astype(np.uint16))
