@@ -94,6 +94,8 @@ class images_processor:
                 stats = {} # Dict contatining 'id' and {'signal' : value} of masks of a single folder
                 if len(files_name) > self.considered_images: files_name = files_name[:self.considered_images] # Consider just a limited number of masks for current folders
                 
+                # NOTE: Temporary list for the final plot of average particales considering this folder
+                cells_counter = 0
                 for file_name in files_name:
                     current_mask_path = os.path.join(current_path, file_name)
                     image_name = fetch_image_path(current_mask_path, current_images_path) # For evey mask path, fetch the proper image path (images masks less than total of the images)
@@ -101,10 +103,13 @@ class images_processor:
 
                     # Ready to compute the signals for the coupled mask - image
                     self.log.debug(f".. working on {image_name} - {file_name} ..")
-                    stats[image_name] = self.__compute_signals(current_image_path, current_mask_path, perc_pixels, threshold) # Save the signals for every original image name
+                    stats[image_name], curr_number_of_annotated_cells = self.__compute_signals(current_image_path, current_mask_path, perc_pixels, threshold) # Save the signals for every original image name
 
+                    cells_counter += curr_number_of_annotated_cells
                     total_stats[name].append(deepcopy(stats[image_name])) # Store the image signals for the future aggregation of this dataset (copy, not the reference)
 
+                # NOTE: Temporary log console print
+                print(f"For this current directory the average number of annotated particles are: {int(cells_counter/len(files_name))}")
                 # Finished to gather data from the current folder - update the existing '*.json' (on the current folder)
                 update_signals_file(self.log, current_path, stats, name = signals_file_name)
 
@@ -199,7 +204,9 @@ class images_processor:
         signals_dict['stn'] = obj_pixels/tot_pixels # Signal to noise ratio
         signals_dict['ccd'] = abs(signals_dict['cc'] - mean_cells[0])/255 # Cells Contrast Difference: Ratio in avg. pixel values between beackground and segmented cells over the maximum pixel value.
         signals_dict['bh'] = np.std(background_patches) # Background homogeinity: Measure the homogeinity of the different patches considering the std. of the average pixel values. 
-        return signals_dict
+        
+        # Added final number of particles annotated minus the background
+        return signals_dict, len(obj_values) - 1
 
 
 class signalsVisualizator: # Object to plot signals of a single dataset (both aggregated/single mask folder): for now mantain this design - (To oeprate on multiple dataset just create a appropriate main script).
@@ -265,14 +272,14 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
         for key, lists in datasets_dict.items():
             # Creare i boxplots per ogni lista nella chiave corrente
-            plt.figure(figsize=(14, 10))
+            plt.figure(figsize=(18, 8))
 
             plt.boxplot(lists)
 
             # Impostare le etichette sull'asse x
-            plt.xticks(np.arange(1, len(dataset_list) + 1), dataset_list, rotation=45) # set the x ticks
+            plt.xticks(np.arange(1, len(dataset_list) + 1), dataset_list, rotation=20) # set the x ticks
 
-            plt.ylabel(f'{key}')
+            plt.ylabel(f'{key.upper()}')
             plt.title(f'Dataset comparison')
 
             plt.savefig(os.path.join(target_folder, f"{key}_boxplot"))

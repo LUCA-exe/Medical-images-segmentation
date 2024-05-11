@@ -37,6 +37,7 @@ def get_parser():
     # NOTE: My dataset has an avg of 4000 EVs dim in pixels - It depends on the resolution.
     parser.add_argument("--max_images", default = 15, type=int, help="Max. number of images to take for the gathering of signals (for every folder ('01', '02') separately)")
     parser.add_argument('--compare_signals', default=False, action="store_true", help='Aggregate and compare signals for all the dataset with computed signals.')
+    parser.add_argument('--compute_data_properties', default=False, action="store_true", help='Compute the signals of the indicated dataset or datasets')
     
    
     # Mixed pipelines parameters (pre-processing for training/models/post processing methods for evaluation)

@@ -3,7 +3,7 @@
 This is the main executable file for gather images properties and compare 
 signals among the images for dataset benchmarking.
 """
-from utils import create_logging
+from utils import create_logging, set_environment_paths_and_folders
 from parser import get_parser, get_processed_args
 from img_processing.main_img import * # Import gather and visualizator of images property
 from download_data import download_datasets
@@ -18,6 +18,8 @@ def main():
     """ Main function to call in order to run all the project classes and 
         functions about images download and properties gathering.
     """
+
+    set_environment_paths_and_folders() # Read .env file and set-up the temporary folders
     log = create_logging() # Set up 'logger' object 
 
     args = get_parser() # Set up dict arguments
@@ -30,16 +32,17 @@ def main():
     log.debug(f"Env varibles: {env}")
 
     log.info(f"--- Computing image characteristics ---")
-
-    # Process single folders signals and aggregate for the current dataset chosen by args.
-    for dataset in args.dataset:
-        if args.split_signals and dataset in DATASET:
-            print(f"*** Dataset {dataset} entered in the split signals")
-            processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, args.cell_dim], [args.cell_dim, MAX_CELL_DIM]], ['EVs', 'cells'])
-        else:
-            print(f"*** Dataset {dataset} entered in the all cells")
-            processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, MAX_CELL_DIM]], ['All cells']) # 'Processing' dataset with one type of cells.
-        processor.collect_signals()
+    
+    if args.compute_data_properties:
+        # Process single folders signals and aggregate for the current dataset chosen by args.
+        for dataset in args.dataset:
+            if args.split_signals and dataset in DATASET:
+                print(f"*** Dataset {dataset} entered in the split signals")
+                processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, args.cell_dim], [args.cell_dim, MAX_CELL_DIM]], ['EVs', 'cells'])
+            else:
+                print(f"*** Dataset {dataset} entered in the all cells")
+                processor = images_processor(env, args, dataset, [[MIN_CELL_DIM, MAX_CELL_DIM]], ['All cells']) # 'Processing' dataset with one type of cells.
+            processor.collect_signals()
 
     if args.compare_signals:
         visualizator = signalsVisualizator(env, args)
