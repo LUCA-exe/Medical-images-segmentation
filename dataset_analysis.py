@@ -10,7 +10,7 @@ from download_data import download_datasets
 
 
 # My datasets
-DATASET = ['Fluo-E2DV-train', 'Fluo-E2DV-test']
+DATASET = ['Fluo-E2DV-train', 'Fluo-E2DV-test', 'Fluo-M2DL-train+']
 MAX_CELL_DIM = 4000000 # Fixed as 4 million of pixels.
 MIN_CELL_DIM = -1 # Fake 'value' used as lower bound.
 
