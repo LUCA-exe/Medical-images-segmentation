@@ -265,6 +265,9 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
         log.info(f"The graphs will be saved in '{target_folder}'")
         signalsVisualizator.__box_plots(log, datasets_dict, dataset_list, target_folder)
         signalsVisualizator.__line_plots(log, datasets_dict, dataset_list, target_folder)
+
+        # Print at console the actual values as median/average for clarity
+        signalsVisualizator._calculate_and_print_dataset_stats(log, datasets_dict, dataset_list)
         return None
     
     @staticmethod
@@ -304,3 +307,39 @@ class signalsVisualizator: # Object to plot signals of a single dataset (both ag
 
                 plt.savefig(os.path.join(target_folder, f"{key}_lineplot"))
             plt.close() # Close the picture of this metric
+
+    
+    @staticmethod
+    def _calculate_and_print_dataset_stats(log: object, datasets_statistics: dict[str, list], dataset_labels: list) -> None:
+        """
+        Calculates and prints mean values for each dataset statistic.
+
+        This function iterates through a dictionary `datasets_statistics` containing lists of values
+        associated with different metrics for each dataset. It calculates the mean for each list and
+        prints the dataset label, metric name (key), and mean value.
+
+        Args:
+            log (object): An object for logging messages (optional).
+            datasets_statistics (dict[str, list]): A dictionary where keys are metric names (strings)
+                                                    and values are lists of corresponding values for each dataset.
+            dataset_labels (list): A list containing labels for each dataset in the same order as the values
+                                    in `datasets_statistics`.
+
+        Returns:
+            None
+        """
+
+        for metric_name, values in datasets_statistics.items():
+            # Validate dataset_labels length
+            if len(dataset_labels) != len(values):
+                raise ValueError("Length of dataset_labels must match the number of datasets in statistics.")
+
+            # Calculate and print mean for each dataset
+            for idx, value in enumerate(values):
+                dataset_label = dataset_labels[idx]
+                mean = sum(value) / len(value)
+                print(f"Dataset: {dataset_label}, Metric: {metric_name}, Mean: {mean}")
+                # Additional log for the statistic
+                if log:
+                    log.info(f"Dataset: {dataset_label}, Metric: {metric_name}, Mean: {mean}")
+        return None
