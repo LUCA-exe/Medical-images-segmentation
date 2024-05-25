@@ -45,79 +45,8 @@ def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..
     return mask
 
 
-def remove_smaller_areas(seeds, area_threshold):
-    """
-    Removes connected components in a 2D array with areas smaller than a given threshold.
-
-    Args:
-        seeds (np.ndarray): A 2D NumPy array of connected components (labeled).
-        area_threshold (int): The minimum area allowed for a component to remain.
-
-    Returns:
-        np.ndarray: The modified 3D array with smaller components removed.
-
-    Raises:
-        ValueError: If seeds is empty or area_threshold is negative.
-    """
-
-    if not seeds.size:
-        raise ValueError("seeds cannot be empty")
-
-    if area_threshold < 0:
-        raise ValueError("area_threshold must be a non-negative integer")
-
-    # Extract properties of each component
-    props = measure.regionprops(seeds)
-
-    # Filter and remove components based on area
-    filtered_seeds = seeds.copy()
-    for prop in props:
-        if prop.area <= area_threshold:
-            filtered_seeds[filtered_seeds == prop.label] = 0
-
-    # Re-label the remaining components
-    return measure.label(filtered_seeds, background=0)
-
-
-def get_minimum_area_to_remove(connected_components, percentage=0.1):
-  """
-  Calculates the minimum area allowed in an array of connected components,
-  based on a percentage of the average area, and removes smaller components.
-
-  Args:
-    connected_components: A NumPy array of connected components.
-    percentage: A percentage of the average area to use as the minimum threshold
-               (default: 0.1).
-
-  Returns:
-    The minimum area allowed in the array.
-
-  Raises:
-    ValueError: If connected_components is empty.
-  """
-
-  if not connected_components.size:
-    raise ValueError("connected_components cannot be empty")
-
-  # Calculate areas of all components
-  areas = np.array([prop.area for prop in measure.regionprops(connected_components)])
-
-  # Calculate minimum area based on percentage of average area
-  if np.any(areas):
-    min_area = percentage * np.mean(areas)
-  else:
-    min_area = 0
-
-  # Set a minimum threshold
-  min_area = np.maximum(min_area, 4)
-
-  # NOTE: Just override the min area component in case of my dataset for the firt testing
-  min_area = 30
-  return min_area
-
-
 def border_cell_post_processing(border_prediction, cell_prediction, args):
-    """ Post-processing WT for distance label (cell + neighbor distances continuos tensors) prediction.
+    """ Post-processing WT for distance label (cell distance + neighbor distance continuos tensors - KIT-GE solution) prediction.
 
     :param border_prediction: Neighbor distance prediction.
         :type border_prediction:
@@ -188,6 +117,43 @@ def border_cell_post_processing(border_prediction, cell_prediction, args):
     return np.squeeze(prediction_instance.astype(np.uint16)), np.squeeze(borders)
 
 
+def get_minimum_area_to_remove(connected_components, percentage=0.1):
+    """
+    Calculates the minimum area allowed in an array of connected components,
+    based on a percentage of the average area, and removes smaller components.
+
+    Args:
+        connected_components: A NumPy array of connected components.
+        percentage: A percentage of the average area to use as the minimum threshold
+                (default: 0.1).
+
+    Returns:
+        The minimum area allowed in the array.
+
+    Raises:
+        ValueError: If connected_components is empty.
+    """
+
+    if not connected_components.size:
+        raise ValueError("connected_components cannot be empty")
+
+    # Calculate areas of all components
+    areas = np.array([prop.area for prop in measure.regionprops(connected_components)])
+
+    # Calculate minimum area based on percentage of average area
+    if np.any(areas):
+        min_area = percentage * np.mean(areas)
+    else:
+        min_area = 0
+
+    # Set a minimum threshold
+    min_area = np.maximum(min_area, 4)
+
+    # NOTE: Just override the min area component in case of my dataset for the first testing with a fixed value
+    min_area = 30
+    return min_area
+
+
 def simple_binary_mask_post_processing(mask, original_image, args, denoise = True):
     """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
 
@@ -214,11 +180,23 @@ def simple_binary_mask_post_processing(mask, original_image, args, denoise = Tru
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
-# NOTE: Finish testing
-def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, original_image,  args):
+# NOTE: Finish prototype (refactoring/creation of new object) - throw away code and fill documentation
+def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, original_image, args):
     """ 
-        Assignining different IDs in the final segmentation mask prediction using a complex watershed algorithm.
+    Assignining different IDs in the final segmentation mask prediction using a complex watershed algorithm (enahcned solution respect to the base thresholding).
     """
+    # Adapting the data structure
+    binary_channel = 1
+    mask = np.squeeze(mask[binary_channel, :, :])
+    binary_border = np.squeeze(binary_border[binary_channel, :, :])
+    original_image = np.squeeze(original_image)
+
+    save_image(mask, "./tmp", f"Sigmoid layer ouput for mask")
+    save_image(binary_border, "./tmp", f"Sigmoid layer ouput for binary border")
+    save_image(cell_prediction, "./tmp", f"Sigmoid layer ouput for cell distance")
+    save_image(original_image, "./tmp", f"Original input image")
+    # DEBUG     
+    exit(1)
 
     # Simple parameters to control the thresholdings of markers and mask
     th_mask, th_seeds, sigma_cell = 0.2, 0.3, 0.5
@@ -234,6 +212,40 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     prediction_instance = watershed(image=-np.squeeze(cell_prediction), markers=seeds, mask=processed_mask, watershed_line=False)
     prediction_instance = measure.label(prediction_instance)
     return np.squeeze(prediction_instance.astype(np.uint16))
+
+
+def remove_smaller_areas(seeds, area_threshold):
+    """
+    Removes connected components in a 2D array with areas smaller than a given threshold.
+
+    Args:
+        seeds (np.ndarray): A 2D NumPy array of connected components (labeled).
+        area_threshold (int): The minimum area allowed for a component to remain.
+
+    Returns:
+        np.ndarray: The modified 3D array with smaller components removed.
+
+    Raises:
+        ValueError: If seeds is empty or area_threshold is negative.
+    """
+
+    if not seeds.size:
+        raise ValueError("seeds cannot be empty")
+
+    if area_threshold < 0:
+        raise ValueError("area_threshold must be a non-negative integer")
+
+    # Extract properties of each component
+    props = measure.regionprops(seeds)
+
+    # Filter and remove components based on area
+    filtered_seeds = seeds.copy()
+    for prop in props:
+        if prop.area <= area_threshold:
+            filtered_seeds[filtered_seeds == prop.label] = 0
+
+    # Re-label the remaining components
+    return measure.label(filtered_seeds, background=0)
 
 
 def remove_false_positive_by_overlapping(prediction, single_channel_prediction, min_cell_area = 4000):
