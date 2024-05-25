@@ -185,32 +185,44 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     """ 
     Assignining different IDs in the final segmentation mask prediction using a complex watershed algorithm (enahcned solution respect to the base thresholding).
     """
+
     # Adapting the data structure
     binary_channel = 1
     mask = np.squeeze(mask[binary_channel, :, :])
     binary_border = np.squeeze(binary_border[binary_channel, :, :])
+    cell_prediction = np.squeeze(cell_prediction)
     original_image = np.squeeze(original_image)
 
     save_image(mask, "./tmp", f"Sigmoid layer ouput for mask")
     save_image(binary_border, "./tmp", f"Sigmoid layer ouput for binary border")
     save_image(cell_prediction, "./tmp", f"Sigmoid layer ouput for cell distance")
     save_image(original_image, "./tmp", f"Original input image")
-    # DEBUG     
-    exit(1)
 
-    # Simple parameters to control the thresholdings of markers and mask
-    th_mask, th_seeds, sigma_cell = 0.2, 0.3, 0.5
-    # Increased smoothness on the regressed image   
-    cell_prediction = gaussian_filter(cell_prediction, sigma = sigma_cell)
-    binary_channel = 1
+    # NOTE: Refine borders - unusued for now
+    th_borders = 0.1
+    binary_border[binary_border < th_borders] = 0
+
+    # Increased smoothness on the regressed image  
+    sigma_cell = 0.5
+    smoothed_cell_prediction = gaussian_filter(cell_prediction, sigma = sigma_cell)
 
     # Processing the binary mask with simple thresholding
-    processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
-    seeds = np.squeeze(cell_prediction > th_seeds)
+    th_mask = 0.2
+    processed_mask = mask > th_mask
+    
+    # More strict contraint for the seed
+    th_seed = th_mask + 0.5
+    seeds = mask > th_seed
+    seeds = measure.label(seeds, background = 0)
+    seeds = remove_smaller_areas(seeds, 30)
 
     # Apply watershed
-    prediction_instance = watershed(image=-np.squeeze(cell_prediction), markers=seeds, mask=processed_mask, watershed_line=False)
-    prediction_instance = measure.label(prediction_instance)
+    prediction_instance = watershed(image=-smoothed_cell_prediction, markers=seeds, mask=processed_mask, watershed_line=False)
+    
+    # NOTE: Unnecessary operation
+    #prediction_instance = measure.label(prediction_instance)
+
+    save_image(prediction_instance, "./tmp", f"Final output")
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
