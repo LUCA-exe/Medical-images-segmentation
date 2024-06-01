@@ -193,6 +193,7 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     cell_prediction = np.squeeze(cell_prediction)
     original_image = np.squeeze(original_image)
 
+    # NOTE: Temporary debug prints
     save_image(mask, "./tmp", f"Sigmoid layer ouput for mask")
     save_image(binary_border, "./tmp", f"Sigmoid layer ouput for binary border")
     save_image(cell_prediction, "./tmp", f"Sigmoid layer ouput for cell distance")
@@ -219,11 +220,43 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     # Apply watershed
     prediction_instance = watershed(image=-smoothed_cell_prediction, markers=seeds, mask=processed_mask, watershed_line=False)
     
-    # NOTE: Unnecessary operation
-    #prediction_instance = measure.label(prediction_instance)
-
     save_image(prediction_instance, "./tmp", f"Final output")
     return np.squeeze(prediction_instance.astype(np.uint16))
+
+
+# NOTE: Finish implementing as first function prototype
+def fusion_post_processing(prediction_dict, sc_prediction_dict, args, just_evs=True):
+    """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channel prediction.    
+    :return: Instance segmentation mask.
+    """
+    binary_channel = 1
+    # Unpack the dictionary
+    original_image, sc_original_image = prediction_dict["original_image"], sc_prediction_dict["original_image"]
+    original_image = np.squeeze(original_image)
+    sc_original_image = np.squeeze(sc_original_image)
+
+    mask, sc_mask = prediction_dict["mask"], sc_prediction_dict["mask"]
+    mask = np.squeeze(mask[binary_channel, :, :])
+    sc_mask = np.squeeze(sc_mask[binary_channel, :, :])
+
+    save_image(original_image, "./tmp", f"Original input image")
+    save_image(sc_original_image, "./tmp", f"Original sc input image")
+
+    save_image(mask, "./tmp", f"Sigmoid layer ouput for mask")
+    save_image(sc_mask, "./tmp", f"Sigmoid layer ouput for sc mask")
+
+    # DEBUG
+    exit(1)
+    
+
+    prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
+
+    if just_evs == True:
+        sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
+        processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
+        refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
+
+    return refined_evs_prediction, None
 
 
 def remove_smaller_areas(seeds, area_threshold):
@@ -409,24 +442,3 @@ def filter_regions_by_size(mask, min_dim = 1, max_dim = 3000):
             filtered_mask[mask == labels[idx]] = labels[idx]
     return filtered_mask
 
-
-# WORK IN PROGRESS: This function can be seen as wrapper and feature fusion functions
-def sc_border_cell_post_processing(border_prediction, cell_prediction, sc_border_prediction, sc_cell_prediction, args, just_evs=True):
-    """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channgel prediction.
-
-    :param border_prediction: Neighbor distance prediction.
-        :type border_prediction:
-    :param cell_prediction: Cell distance prediction.
-        :type cell_prediction:
-    :param args: Post-processing settings (th_cell, th_seed, n_splitting, fuse_z_seeds).
-        :type args:
-    :return: Instance segmentation mask.
-    """
-    prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
-
-    if just_evs == True:
-        sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
-        processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
-        refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
-
-    return refined_evs_prediction, None

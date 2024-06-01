@@ -96,20 +96,9 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     # Predict images (iterate over images/files)
     for idx, sample in enumerate(dataloader):
 
-        # Pack a dict. for readibility/simplicity
-        
+        # Pack a dict. for readibility
         sample = move_batches_to_device(sample, device)
-        #img_batch, ids_batch, pad_batch, img_size = sample
-        #img_batch = img_batch.to(device)
-
-        # DEBUG
-        '''print(sample.keys())
-        print(sample["image"].shape)
-        save_image(np.squeeze(sample["image"][0].cpu().detach().numpy()[0, :, :]), "./tmp", f"First image")
-        save_image(np.squeeze(sample["single_channel_image"][0].cpu().detach().numpy()[0, :, :]), "./tmp", f"First image single channel")
-        save_image(np.squeeze(sample["image"][1].cpu().detach().numpy()[0, :, :]), "./tmp", f"Second image")        
-        exit(1)'''
-
+        
         if batchsize > 1:  # all images in a batch have same dimensions and pads
             pad_batch = [sample["pads"][i][0] for i in range(len(sample["pads"]))]
             img_size = [sample['original_size'][i][0] for i in range(len(sample['original_size']))]
@@ -138,6 +127,18 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                 prediction_border_batch = prediction_border_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
         elif arch_name == "original-dual-unet":
+
+            # NOTE: temporary fix for fusion post-processing pipeline
+            if args.post_pipeline == "fusion-dual-unet":
+
+                # Additional prediction for the single channel images
+                sc_prediction_binary_border_batch, sc_prediction_cell_batch, sc_prediction_mask_batch = net(sample["single_channel_image"])
+                
+                # Adjust batch pads on the additional inferred images
+                sc_prediction_binary_border_batch = sc_prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+                sc_prediction_cell_batch = sc_prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+                sc_prediction_mask_batch = sc_prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+
             prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
 
             # NOTE: The selection of the "padded" dim has to comprhend all the channels in case of binary prediction
@@ -185,10 +186,15 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
             if args.post_pipeline == 'fusion-dual-unet':
                 
-                prediction_instance, border = sc_border_cell_post_processing(border_prediction=prediction_border_batch[h],
-                                                                    cell_prediction=prediction_cell_batch[h],
-                                                                    sc_border_prediction=sc_prediction_border_batch[h],
-                                                                    sc_cell_prediction=sc_prediction_cell_batch[h],
+                # Pack a data structures
+                original_image = sample["image"][h].cpu().numpy()
+                sc_original_image = sample["single_channel_image"][h].cpu().numpy()
+                sc_predictions_dict = {"binary_border_prediction": sc_prediction_binary_border_batch[h], "cell_batch": sc_prediction_cell_batch[h], "mask":  sc_prediction_mask_batch[h], "original_image": sc_original_image}
+                predictions_dict = {"binary_border_prediction": prediction_binary_border_batch[h], "cell_batch": prediction_cell_batch[h], "mask":  prediction_mask_batch[h], "original_image": original_image}
+
+                # NOTE: Finish implementing for first round of tests
+                prediction_instance, border = fusion_post_processing(predictions_dict,
+                                                                    sc_predictions_dict,
                                                                     args=args)
             
             # TO FINISH TEST
