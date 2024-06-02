@@ -5,6 +5,9 @@ from skimage.segmentation import watershed
 from skimage import measure
 from skimage.feature import peak_local_max, canny
 from skimage.morphology import binary_closing
+from skimage.measure import label
+from skimage.morphology import square
+from skimage.morphology import dilation
 import torch
 import copy
 
@@ -255,13 +258,9 @@ def fusion_post_processing(prediction_dict, sc_prediction_dict, args, just_evs=T
     if just_evs == True:
         sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
         save_image(sc_prediction_instance, "./tmp", f"Clean prediction for single-channel image")
-
+        processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)        
         # NOTE: Work in progress
-        processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)
-        return processed_prediction, None
-        
-
-        refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
+        refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
     return refined_evs_prediction, None
 
 
@@ -332,69 +331,177 @@ def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=4000)
     for region_prop in measure.regionprops(refined_image):
         # Check if the area is less than the threshold
         if region_prop.area < max_cell_area:
-        # Get the mask for the current connected component
-        current_label_mask = refined_image == region_prop.label
+            # Get the mask for the current connected component
+            current_label_mask = refined_image == region_prop.label
 
-        # Calculate the overlap mask between the component and refiner
-        overlap_mask = current_label_mask * refiner_mask
+            # Calculate the overlap mask between the component and refiner
+            overlap_mask = current_label_mask * refiner_mask
 
-        # Check if there's any overlap
-        if np.any(overlap_mask):
-            # If there's overlap, keep only the overlapped region
-            refined_image[current_label_mask] = 0
-            refined_image[overlap_mask] = region_prop.label
-        else:
-            # If no overlap, remove the small object
-            refined_image[current_label_mask] = 0
-
+            # Check if there's any overlap
+            if np.any(overlap_mask):
+                # If there's overlap, keep only the overlapped region
+                refined_image[current_label_mask] = 0
+                refined_image[overlap_mask] = region_prop.label
+            else:
+                # If no overlap, remove the small object
+                refined_image[current_label_mask] = 0
     return refined_image
 
 
-def add_positive_label_by_overlapping(prediction, single_channel_prediction,  cells_overlap = 0.7, min_cell_area = 2000):
-    # All the entity present in the single channel image are added to the original prediction
+def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 0.95, min_cell_area = 4000):
+    """
+    Adds objects from a single-channel image to a base image based on overlap conditions.
+
+    This function takes a base image containing labeled connected components and
+    a single-channel image representing potential objects. It adds objects from
+    the single-channel image to the base image if they meet certain overlap
+    criteria.
+
+    Args:
+        base_image (numpy.ndarray): The base image containing labeled connected
+            components (assumed to be a 2D array).
+        single_channel_image (numpy.ndarray): The single-channel image representing
+            potential objects (assumed to be a 2D array).
+        cells_overlap (float, optional): The minimum overlap ratio between an
+            object and a connected component in the base image to be considered
+            overlapping (defaults to 0.95).
+        min_cell_area (int, optional): The minimum area (in pixels) for a connected
+            component in the base image to be considered a cell (defaults to 4000).
+
+    Returns:
+        numpy.ndarray: The modified base image with objects from the single-channel
+            image added based on overlap conditions. The output has the same shape
+            and data type as the base image.
+    """
+
 
     # Deep copy the original prediction
-    prediction = copy.deepcopy(prediction)
+    image = copy.deepcopy(base_image)
+    image_mask = image > 0
+    mask = image > 0
+    
+    save_image(mask, "./tmp", f"Mask of true-false of the base prediction")
+
     # Get the next label from the already used ones
-    next_usable_label = np.max(np.unique(prediction)) + 1
+    next_usable_label = get_maximum_label(base_image) + 1
 
-    sc_mask = single_channel_prediction > 0
-    # Loop over every area in the original input images
-    for reg_prop in measure.regionprops(prediction):
-
-        # Get mask for the current position of the "predicted" EVs
-        curr_mask = prediction == reg_prop.label 
-        # Check if there's any overlap with objects in the single-channel image and the current mask
-        overlap_mask = curr_mask * sc_mask
+    for reg_prop in measure.regionprops(single_channel_image):
+        
+        # take the overlap etween a region and the mask of the orignial image
+        current_mask = single_channel_image == reg_prop.label
+        overlap_mask = current_mask & mask
 
         if np.any(overlap_mask):
-            
-            # Take the entire region that is overlapping with a cells or evs on my original prediction
-            sc_evs_mask = get_partially_covered_regions(sc_mask, overlap_mask)
-            # Dimension of the overlapped shape
-            total_overlapped_pixel = np.sum(overlap_mask)
-            current_evs_area = np.sum(sc_evs_mask)
-              
-            # If the overlapped pixel are greater than the percentage fuse the two elements
-            if total_overlapped_pixel > cells_overlap * (current_evs_area/100):
-                
-                if reg_prop.area > min_cell_area:
-                    # Add the EVs to the cells (probably overlapping on the cells entity)
+            # Manage overlap with connected components in the base image
+            component_label, component_mask, overlap_ratio = get_overlapping_components(image, current_mask)
 
-                    # Add just the EVs on the original image (over the cells) and increment the label
-                    #TODO: ADD binary erosion to create a gap between the cells and the new added EVs
-                    prediction[sc_evs_mask] = next_usable_label
-                    next_usable_label += 1
-                
-                if reg_prop.area < min_cell_area:
-                    # if the two EVs masks overlap then keep just the overlapped part in the original image as refining process of the EVs
+            if overlap_ratio <= 0.95:
+                # Add the Evs on the cells, contrary doesn't add the EVs in the cells
 
-                    # Remove the EVs region in the original image and replace it
-                    prediction[curr_mask] = 0
-                    # Use the original EVs label from the sc_prediction (should be the 'refined' one)
-                    prediction[overlap_mask] = next_usable_label
-                    next_usable_label += 1
-    return prediction
+                save_image(current_mask, "./tmp", f"Current EVs in the single_image")
+                save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
+
+                # Dilate the current mask to separate the future object fromt he connected components overalpped
+                dilated_current_mask = dilation(current_mask.astype(int), square(3))
+                image[component_mask] = 0
+                # Ensure the not toruching regions before adding the current component
+                component_mask = component_mask ^ dilated_current_mask
+                image[component_mask] = component_label
+                image[current_mask] =  next_usable_label
+                next_usable_label += 1
+                
+                save_image(image, "./tmp", f"Current image updated")
+                
+        else:
+            # The current object is not present nor overlapped iwth the connected componesnts in the base image
+            image[current_mask] = next_usable_label
+            next_usable_label += 1 # udaprte the label fopr next insertion
+
+    image = measure.label(image, background=0)
+    return image
+
+    
+def get_maximum_label(image):
+    """
+    Calculates the maximum label value present in a labeled image.
+
+    This function takes a labeled image (assumed to be a 2D NumPy array) and
+    returns the maximum label value (plus 1) found in the image. This is useful
+    when working with connected component analysis where labels are assigned
+    to each connected component.
+
+    Args:
+        image (numpy.ndarray): The labeled image. Assumed to be a 2D array
+            where each pixel value represents the label of the corresponding
+            connected component.
+
+    Returns:
+        int: The maximum label value present in the image.
+            This value can be used for creating new unique labels during image
+            processing tasks.
+    """
+
+    # Get the unique label values in the image
+    unique_labels = np.unique(image)
+    # Calculate the maximum label value
+    max_label = np.max(unique_labels)
+    return max_label
+
+
+def get_overlapping_components(original_image, marker):
+    """
+    Extracts labeled connected components that overlap a marker mask.
+
+    This function takes an original image containing labeled connected components,
+    a marker mask representing a small object, and an optional overlap threshold
+    (defaults to 1.0 for complete overlap). It returns the label and mask of
+    connected components in the original image that have a certain level of overlap
+    with the marker mask.
+
+    Args:
+        original_image (numpy.ndarray): The original image containing labeled
+            connected components (assumed to be a 2D array where each pixel value
+            represents the label of the corresponding connected component).
+        marker (numpy.ndarray): The marker mask representing the small object
+            (assumed to be a 2D binary mask where non-zero pixels indicate the
+            presence of the marker).
+        overlap_threshold (float, optional): The minimum overlap ratio between
+            the marker and a connected component to consider it overlapping.
+            Defaults to 1.0 (complete overlap).
+
+    Returns:
+        tuple: A tuple containing two elements:
+            - int: The label for the overlapping connected component.
+            - numpy.ndarray: A mask of the searched connected component.
+            The mask has the same shape as the original image and is a boolean 
+            NumPy array.
+
+    Raises:
+        ValueError: If the marker is not a NumPy array of booleans.
+"""
+
+    # Ensure marker has boolean data type (efficient overlap calculation)
+    if marker.dtype != bool:
+        raise ValueError("Mask of the marker has to be boolean.")
+
+    # Label connected components in the original image
+    labels = label(original_image)
+    # Get unique labels present in the image
+    unique_labels = np.unique(labels)
+
+    # Loop through unique labels
+    for label_value in unique_labels:
+        if label_value == 0:  # Skip background label
+            continue
+
+        # Create mask for the current label
+        current_mask = (labels == label_value)
+
+        # Calculate the overlap ratio between the marker and the current component
+        overlap_ratio = np.sum(current_mask & marker) / np.sum(marker)
+        return label_value, current_mask, overlap_ratio
+
+    return None, None, None
 
 
 def get_partially_covered_regions(labeled_image, mask):   
@@ -473,4 +580,3 @@ def filter_regions_by_size(mask, min_dim = 1, max_dim = 3000):
         if val == True:
             filtered_mask[mask == labels[idx]] = labels[idx]
     return filtered_mask
-
