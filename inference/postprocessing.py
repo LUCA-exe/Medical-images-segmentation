@@ -154,29 +154,43 @@ def get_minimum_area_to_remove(connected_components, percentage=0.1):
     return min_area
 
 
-def simple_binary_mask_post_processing(mask, original_image, args, denoise = True):
-    """ Assignining different IDs in the final segmentation mask prediction just thresholded without watershed.
+def simple_binary_mask_post_processing(mask, original_image, args, denoise=True):
+    """Performs simple post-processing on a binary mask prediction.
 
-    :param mask: Binary mask prediction.
+    This function takes a binary mask prediction, post-processes it using a
+    threshold and optional noise removal, and returns an instance segmentation mask.
 
-    :param args: Post-processing settings.
-        :type args:
-    :return: Instance segmentation mask.
+    Args:
+        mask (numpy.ndarray): The binary mask prediction, typically with a shape of
+            (C, H, W) where C is the number of channels, H is the height, and W is
+            the width. It's assumed the binary mask is in the first channel (C=1).
+        original_image (numpy.ndarray): The original image that the mask corresponds to.
+            This is not used in this function but might be useful for other
+            post-processing steps in the future.
+        args (object): Additional arguments for post-processing configuration.
+            The specific contents of this argument might depend on the implementation
+            details but could include the threshold value or noise removal parameters.
+        denoise (bool, optional): Flag indicating whether to perform noise removal on
+            small objects in the mask. Defaults to True.
+
+    Returns:
+        numpy.ndarray: The instance segmentation mask with integer labels for each
+            object. The mask has the same shape (H, W) as the original binary mask.
     """
 
-    # Fixed parameters
-    th_mask = 0.4 # NOTE: Can be fine-tuned
-    binary_channel = 1
+    # Fixed parameters (consider moving these to the args dictionary for flexibility)
+    threshold = 0.4  # Threshold value for binarization (can be fine-tuned)
+    binary_ch = 1 # Binary channel used in the further processing
 
-    # Processing the binary mask with simple thresholding (fine-tunable)
-    processed_mask = np.squeeze(mask[binary_channel, :, :] > th_mask)
-    prediction_instance = measure.label(processed_mask, background = 0)
+    # Process the binary mask
+    processed_mask = np.squeeze(mask[binary_ch, :, :] > threshold)
+    prediction_instance = measure.label(processed_mask, background=0)
 
-    if denoise: # Controlled by function arg.
-        # Added noise removal for the smaller areas - for now fixed area to remove
+    if denoise:
+        # Remove small objects (area less than 30 pixels) for noise reduction
         prediction_instance = remove_smaller_areas(prediction_instance, 30)
-    
-    #prediction_instance = measure.label(processed_mask)
+
+    # Convert to uint16 for memory efficiency (assuming instance IDs fit in 16 bits)
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
@@ -224,38 +238,30 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
-# NOTE: Finish implementing as first function prototype
 def fusion_post_processing(prediction_dict, sc_prediction_dict, args, just_evs=True):
     """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channel prediction.    
     :return: Instance segmentation mask.
     """
+    # Choose predefined channel when working with prediciton from sigomid layers
     binary_channel = 1
+
     # Unpack the dictionary
     original_image, sc_original_image = prediction_dict["original_image"], sc_prediction_dict["original_image"]
-    original_image = np.squeeze(original_image)
-    sc_original_image = np.squeeze(sc_original_image)
-
     mask, sc_mask = prediction_dict["mask"], sc_prediction_dict["mask"]
-    mask = np.squeeze(mask[binary_channel, :, :])
-    sc_mask = np.squeeze(sc_mask[binary_channel, :, :])
 
-    save_image(original_image, "./tmp", f"Original input image")
-    save_image(sc_original_image, "./tmp", f"Original sc input image")
-
-    save_image(mask, "./tmp", f"Sigmoid layer ouput for mask")
-    save_image(sc_mask, "./tmp", f"Sigmoid layer ouput for sc mask")
-
-    # DEBUG
-    exit(1)
-    
-
-    prediction_instance, borders = border_cell_post_processing(border_prediction, cell_prediction, args)
+    prediction_instance = simple_binary_mask_post_processing(mask, original_image, args)
+    save_image(prediction_instance, "./tmp", f"Clean prediction for multi-channel image")
 
     if just_evs == True:
-        sc_prediction_instance, sc_borders = border_cell_post_processing(sc_border_prediction, sc_cell_prediction, args)
-        processed_prediction = remove_false_positive_by_overlapping(prediction_instance, sc_prediction_instance)
-        refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
+        sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
+        save_image(sc_prediction_instance, "./tmp", f"Clean prediction for single-channel image")
 
+        # NOTE: Work in progress
+        processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)
+        return processed_prediction, None
+        
+
+        refined_evs_prediction = add_positive_label_by_overlapping(processed_prediction, sc_prediction_instance, args.fusion_overlap)
     return refined_evs_prediction, None
 
 
@@ -293,29 +299,55 @@ def remove_smaller_areas(seeds, area_threshold):
     return measure.label(filtered_seeds, background=0)
 
 
-def remove_false_positive_by_overlapping(prediction, single_channel_prediction, min_cell_area = 4000):
-    # Take two images as numpy array and use one the "clean" the others
+def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=4000):
+    """
+    Refines a segmentation mask based on overlap with another segmentation mask.
 
-    # Deep copy the original prediction
-    new_prediction = copy.deepcopy(prediction)
+    This function refines a base segmentation mask (`base_image`) by considering
+    overlaps with a refiner segmentation mask (`refiner_image`). It removes small
+    objects (less than `max_cell_area`) from the base image unless they overlap
+    with the refiner image.
 
-    sc_mask = single_channel_prediction > 0
-    # Loop over every area in the original input images
-    for reg_prop in measure.regionprops(new_prediction):
+    Args:
+        base_image (numpy.ndarray): The base segmentation mask to be refined.
+            Assumed to be a 2D array where each pixel value represents the
+            corresponding object label.
+        refiner_image (numpy.ndarray): The refiner segmentation mask used for
+            overlap analysis. Assumed to be a 2D binary mask where non-zero
+            pixels indicate the presence of an object.
+        max_cell_area (int, optional): The maximum allowed area (in pixels) for a
+            connected component in the base image to be kept. Defaults to 4000.
 
-        if reg_prop.area < min_cell_area:
-            # It is usually an EVs
-            
-            # Get mask for the current position of the "predicted" EVs
-            curr_mask = new_prediction == reg_prop.label 
+    Returns:
+        numpy.ndarray: The refined segmentation mask where small objects in the
+            base image are removed unless they overlap with the refiner image. The
+            output has the same shape and data type as the base image.
+    """
+    # Deep copy the base image to avoid modifying the original
+    refined_image = base_image.copy()
+    # Create a mask for non-zero pixels in the refiner image
+    refiner_mask = refiner_image > 0
 
-            # Check if there's any overlap with objects in image2
-            overlap = np.any(curr_mask * sc_mask)
+    # Loop over connected components in the base image
+    for region_prop in measure.regionprops(refined_image):
+        # Check if the area is less than the threshold
+        if region_prop.area < max_cell_area:
+        # Get the mask for the current connected component
+        current_label_mask = refined_image == region_prop.label
 
-            # Update the prediction if not overlap is present
-            if not overlap:
-                new_prediction[curr_mask] = 0  # Remove the region in the predicted image in the predicted image
-    return new_prediction
+        # Calculate the overlap mask between the component and refiner
+        overlap_mask = current_label_mask * refiner_mask
+
+        # Check if there's any overlap
+        if np.any(overlap_mask):
+            # If there's overlap, keep only the overlapped region
+            refined_image[current_label_mask] = 0
+            refined_image[overlap_mask] = region_prop.label
+        else:
+            # If no overlap, remove the small object
+            refined_image[current_label_mask] = 0
+
+    return refined_image
 
 
 def add_positive_label_by_overlapping(prediction, single_channel_prediction,  cells_overlap = 0.7, min_cell_area = 2000):
