@@ -349,7 +349,7 @@ def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=4000)
     return refined_image
 
 
-def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 0.95, min_cell_area = 4000):
+def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 0.99, min_cell_area = 4000):
     """
     Adds objects from a single-channel image to a base image based on overlap conditions.
 
@@ -391,25 +391,32 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
         if overlap_mask.sum(axis = None) > 0:            
             # Manage overlap with connected components in the base image
             component_label, component_mask, overlap_ratio = get_overlapping_components(image, current_mask, cells_overlap)
-        
+
+            if component_mask is None:
+                continue
+
+            save_image(current_mask, "./tmp", f"Current EVs in the single channel image")
+            save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
+            print(f"Current object dimension: {np.sum(component_mask, axis = None)}")
+
             # Redundant control
             print(f"Overlap ratio found: {overlap_ratio}")
-            if overlap_ratio <= 0.95 and overlap_ratio >= 0:
-                # Add the Evs on the cells, contrary doesn't add the EVs in the cells
-                save_image(current_mask, "./tmp", f"Current EVs in the single channel image")
-                save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
+        
+            if np.sum(component_mask, axis = None) >= min_cell_area:
+                # In this way, overlapping EVs are not considered, just overlapping cells.
+
+                print(f"Current cell dimension: {np.sum(component_mask, axis = None)}")
                 
                 # Dilate the current mask to separate the future object fromt he connected components overalpped
                 dilated_current_mask = dilation(current_mask.astype(int), square(3))
                 image[component_mask] = 0
                 # Ensure the not toruching regions before adding the current component
-                print(f"Current cell dimension: {len(component_mask)}")
+                # ADD DEBUG PRINT HERE
                 component_mask = component_mask ^ dilated_current_mask
-                print(f"Reduced cell dimension: {len(component_mask)}")
                 image[component_mask] = component_label
                 image[current_mask] =  next_usable_label
                 next_usable_label += 1
-                
+                save_image(image > 0, "./tmp", f"Current overlapped image plus the EVs")
                 exit(1)
                 
         else:
@@ -500,7 +507,7 @@ def get_overlapping_components(original_image, marker, maximum_cells_overlap):
 
         # Calculate the overlap ratio between the marker and the current component
         overlap_ratio = np.sum(current_mask & marker) / np.sum(marker)
-        if overlap_ratio >= 0 and overlap_ratio <= maximum_cells_overlap:
+        if overlap_ratio > 0 and overlap_ratio <= maximum_cells_overlap:
             return label_value, current_mask, overlap_ratio
 
     # Temporary place holder value for no overlapping
