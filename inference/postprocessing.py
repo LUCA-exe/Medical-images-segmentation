@@ -253,11 +253,12 @@ def fusion_post_processing(prediction_dict, sc_prediction_dict, args, just_evs=T
     mask, sc_mask = prediction_dict["mask"], sc_prediction_dict["mask"]
 
     prediction_instance = simple_binary_mask_post_processing(mask, original_image, args)
-    save_image(prediction_instance, "./tmp", f"Clean prediction for multi-channel image")
+    np.save("original_prediction_instance.npy", np.squeeze(prediction_instance))
 
     if just_evs == True:
         sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
-        save_image(sc_prediction_instance, "./tmp", f"Clean prediction for single-channel image")
+        np.save("single_channel_prediction_instance.npy", np.squeeze(sc_prediction_instance))
+
         processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)        
         # NOTE: Work in progress
         refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
@@ -374,14 +375,10 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             and data type as the base image.
     """
 
-
     # Deep copy the original prediction
     image = copy.deepcopy(base_image)
-    image_mask = image > 0
     mask = image > 0
     
-    save_image(mask, "./tmp", f"Mask of true-false of the base prediction")
-
     # Get the next label from the already used ones
     next_usable_label = get_maximum_label(base_image) + 1
 
@@ -390,27 +387,30 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
         # take the overlap etween a region and the mask of the orignial image
         current_mask = single_channel_image == reg_prop.label
         overlap_mask = current_mask & mask
-
-        if np.any(overlap_mask):
+        
+        if overlap_mask.sum(axis = None) > 0:            
             # Manage overlap with connected components in the base image
-            component_label, component_mask, overlap_ratio = get_overlapping_components(image, current_mask)
-
-            if overlap_ratio <= 0.95:
+            component_label, component_mask, overlap_ratio = get_overlapping_components(image, current_mask, cells_overlap)
+        
+            # Redundant control
+            print(f"Overlap ratio found: {overlap_ratio}")
+            if overlap_ratio <= 0.95 and overlap_ratio >= 0:
                 # Add the Evs on the cells, contrary doesn't add the EVs in the cells
-
-                save_image(current_mask, "./tmp", f"Current EVs in the single_image")
+                save_image(current_mask, "./tmp", f"Current EVs in the single channel image")
                 save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
-
+                
                 # Dilate the current mask to separate the future object fromt he connected components overalpped
                 dilated_current_mask = dilation(current_mask.astype(int), square(3))
                 image[component_mask] = 0
                 # Ensure the not toruching regions before adding the current component
+                print(f"Current cell dimension: {len(component_mask)}")
                 component_mask = component_mask ^ dilated_current_mask
+                print(f"Reduced cell dimension: {len(component_mask)}")
                 image[component_mask] = component_label
                 image[current_mask] =  next_usable_label
                 next_usable_label += 1
                 
-                save_image(image, "./tmp", f"Current image updated")
+                exit(1)
                 
         else:
             # The current object is not present nor overlapped iwth the connected componesnts in the base image
@@ -418,6 +418,7 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             next_usable_label += 1 # udaprte the label fopr next insertion
 
     image = measure.label(image, background=0)
+    save_image(image > 0, "./tmp", f"Final image")
     return image
 
     
@@ -448,7 +449,7 @@ def get_maximum_label(image):
     return max_label
 
 
-def get_overlapping_components(original_image, marker):
+def get_overlapping_components(original_image, marker, maximum_cells_overlap):
     """
     Extracts labeled connected components that overlap a marker mask.
 
@@ -478,7 +479,7 @@ def get_overlapping_components(original_image, marker):
 
     Raises:
         ValueError: If the marker is not a NumPy array of booleans.
-"""
+    """
 
     # Ensure marker has boolean data type (efficient overlap calculation)
     if marker.dtype != bool:
@@ -499,8 +500,10 @@ def get_overlapping_components(original_image, marker):
 
         # Calculate the overlap ratio between the marker and the current component
         overlap_ratio = np.sum(current_mask & marker) / np.sum(marker)
-        return label_value, current_mask, overlap_ratio
+        if overlap_ratio >= 0 and overlap_ratio <= maximum_cells_overlap:
+            return label_value, current_mask, overlap_ratio
 
+    # Temporary place holder value for no overlapping
     return None, None, None
 
 

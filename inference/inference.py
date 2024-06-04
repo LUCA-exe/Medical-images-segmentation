@@ -188,10 +188,12 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                 
                 # Pack a data structures
                 original_image = sample["image"][h].cpu().numpy()
+                np.save("original_image.npy", np.squeeze(original_image))
                 sc_original_image = sample["single_channel_image"][h].cpu().numpy()
-                sc_predictions_dict = {"binary_border_prediction": sc_prediction_binary_border_batch[h], "cell_batch": sc_prediction_cell_batch[h], "mask":  sc_prediction_mask_batch[h], "original_image": sc_original_image}
-                predictions_dict = {"binary_border_prediction": prediction_binary_border_batch[h], "cell_batch": prediction_cell_batch[h], "mask":  prediction_mask_batch[h], "original_image": original_image}
+                np.save("original_image_EVs.npy", np.squeeze(sc_original_image))
 
+                predictions_dict = {"binary_border_prediction": prediction_binary_border_batch[h], "cell_batch": prediction_cell_batch[h], "mask":  prediction_mask_batch[h], "original_image": original_image}
+                sc_predictions_dict = {"binary_border_prediction": sc_prediction_binary_border_batch[h], "cell_batch": sc_prediction_cell_batch[h], "mask":  sc_prediction_mask_batch[h], "original_image": sc_original_image}
                 # NOTE: Finish implementing for first round of tests
                 prediction_instance, border = fusion_post_processing(predictions_dict,
                                                                     sc_predictions_dict,
@@ -202,7 +204,6 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
 
                 prediction_instance = seg_mask_post_processing(mask = prediction_mask_batch[h], args = args)
             
-
             if args.post_pipeline == 'original-dual-unet':
 
                 original_image = sample["image"][h].cpu().numpy()
