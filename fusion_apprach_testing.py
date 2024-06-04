@@ -42,7 +42,7 @@ def load_npy_arrays_by_label(folder_path: Union[str, Path]) -> Dict[str, np.ndar
         try:
             label = file.stem  # Get filename without extension
             array = np.load(file)
-            arrays[label] = array
+            arrays[label] = array.astype(np.uint16)
         except (IOError, OSError) as e:
             print(f"Error loading NumPy file: {file} ({e})")
     return arrays

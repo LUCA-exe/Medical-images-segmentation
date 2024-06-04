@@ -392,6 +392,7 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             # Manage overlap with connected components in the base image
             component_label, component_mask, overlap_ratio = get_overlapping_components(image, current_mask, cells_overlap)
 
+            # Temporary fix
             if component_mask is None:
                 continue
 
@@ -409,23 +410,24 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
                 
                 # Dilate the current mask to separate the future object fromt he connected components overalpped
                 dilated_current_mask = dilation(current_mask.astype(int), square(3))
-                image[component_mask] = 0
+                image[dilated_current_mask] = 0
                 # Ensure the not toruching regions before adding the current component
-                # ADD DEBUG PRINT HERE
-                component_mask = component_mask ^ dilated_current_mask
-                image[component_mask] = component_label
-                image[current_mask] =  next_usable_label
+                save_image(component_mask, "./tmp", f"Current overlapped cells before dilation")
+                #component_mask = component_mask ^ dilated_current_mask
+                #image[component_mask] = component_label
+                #image[current_mask] = next_usable_label
+                image[current_mask] = next_usable_label
                 next_usable_label += 1
+                save_image(component_mask, "./tmp", f"Current overlapped cells")
                 save_image(image > 0, "./tmp", f"Current overlapped image plus the EVs")
-                exit(1)
-                
+                save_image(image, "./tmp", f"Current labeled image plus the EVs")
         else:
             # The current object is not present nor overlapped iwth the connected componesnts in the base image
             image[current_mask] = next_usable_label
             next_usable_label += 1 # udaprte the label fopr next insertion
 
     image = measure.label(image, background=0)
-    save_image(image > 0, "./tmp", f"Final image")
+    save_image(image, "./tmp", f"Final labeled image")
     return image
 
     
@@ -494,8 +496,8 @@ def get_overlapping_components(original_image, marker, maximum_cells_overlap):
 
     # Label connected components in the original image
     labels = label(original_image)
-    # Get unique labels present in the image
-    unique_labels = np.unique(labels)
+    # Get unique labels present in the image - convert the type to be compatible with the labeled image
+    unique_labels = np.unique(labels).astype(np.uint16)
 
     # Loop through unique labels
     for label_value in unique_labels:
