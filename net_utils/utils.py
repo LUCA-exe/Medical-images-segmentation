@@ -671,6 +671,28 @@ def save_image(img, path, title, use_cmap = False):
     return None
 
 
+def save_segmentation_image(img, path, title, use_cmap = False):
+    
+    # Additional settings for mask plotting
+    cmap_mask = plt.get_cmap("prism")
+    cmap_mask.set_bad(color="k")
+    mask = np.ma.masked_array(img, img==0)
+
+    # Ensure the folder exists
+    os.makedirs(path, exist_ok=True)
+    
+    # Create the full path for saving the image
+    image_path = os.path.join(path, f"{title}.png")
+
+    # Plot the image using matplotlib
+    plt.imshow(mask, cmap=cmap_mask if use_cmap else None)
+    plt.title(title)
+    plt.axis('off')  # Turn off axis labels
+    plt.savefig(image_path, bbox_inches='tight', pad_inches=0.1)
+    plt.close()  # Close the plot to free up resources
+    return None
+
+
 def log_final_images_properties(log, image):
     # util function to debug the final instance prediction
 

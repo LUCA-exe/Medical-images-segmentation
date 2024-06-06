@@ -207,8 +207,8 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             if args.post_pipeline == 'original-dual-unet':
 
                 original_image = sample["image"][h].cpu().numpy()
-                #prediction_instance = simple_binary_mask_post_processing(mask = prediction_mask_batch[h], original_image = original_image, args = args)
-                prediction_instance = complex_binary_mask_post_processing(mask = prediction_mask_batch[h], binary_border=prediction_binary_border_batch[h], cell_prediction=prediction_cell_batch[h], original_image = original_image, args = args)
+                prediction_instance = simple_binary_mask_post_processing(mask = prediction_mask_batch[h], original_image = original_image, args = args)
+                #prediction_instance = complex_binary_mask_post_processing(mask = prediction_mask_batch[h], binary_border=prediction_binary_border_batch[h], cell_prediction=prediction_cell_batch[h], original_image = original_image, args = args)
             
             if args.scale < 1:
                 prediction_instance = resize(prediction_instance,

@@ -11,7 +11,7 @@ from skimage.morphology import dilation
 import torch
 import copy
 
-from net_utils.utils import get_nucleus_ids, save_image
+from net_utils.utils import get_nucleus_ids, save_image, save_segmentation_image
 
 
 def foi_correction(mask, cell_type): # TODO: Implement option for my dataset ..
@@ -182,7 +182,7 @@ def simple_binary_mask_post_processing(mask, original_image, args, denoise=True)
     """
 
     # Fixed parameters (consider moving these to the args dictionary for flexibility)
-    threshold = 0.4  # Threshold value for binarization (can be fine-tuned)
+    threshold = 0.2  # Threshold value for binarization (can be fine-tuned)
     binary_ch = 1 # Binary channel used in the further processing
 
     # Process the binary mask
@@ -262,7 +262,7 @@ def fusion_post_processing(prediction_dict, sc_prediction_dict, args, just_evs=T
         processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)        
         # NOTE: Work in progress
         refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
-    return refined_evs_prediction, None
+    return refined_evs_prediction.astype(np.uint16), refined_evs_prediction.astype(np.uint16)
 
 
 def remove_smaller_areas(seeds, area_threshold):
@@ -396,30 +396,28 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             if component_mask is None:
                 continue
 
-            save_image(current_mask, "./tmp", f"Current EVs in the single channel image")
-            save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
-            print(f"Current object dimension: {np.sum(component_mask, axis = None)}")
+            #save_image(current_mask, "./tmp", f"Current EVs in the single channel image")
+            #save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
+            #print(f"Current object dimension: {np.sum(component_mask, axis = None)}")
 
             # Redundant control
-            print(f"Overlap ratio found: {overlap_ratio}")
+            #print(f"Overlap ratio found: {overlap_ratio}")
         
             if np.sum(component_mask, axis = None) >= min_cell_area:
                 # In this way, overlapping EVs are not considered, just overlapping cells.
 
-                print(f"Current cell dimension: {np.sum(component_mask, axis = None)}")
+                #print(f"Current cell dimension: {np.sum(component_mask, axis = None)}")
                 
                 # Dilate the current mask to separate the future object fromt he connected components overalpped
-                dilated_current_mask = dilation(current_mask.astype(int), square(3))
+                dilated_current_mask = dilation(current_mask.astype(int), square(9))
                 image[dilated_current_mask] = 0
+                
                 # Ensure the not toruching regions before adding the current component
-                save_image(component_mask, "./tmp", f"Current overlapped cells before dilation")
-                #component_mask = component_mask ^ dilated_current_mask
-                #image[component_mask] = component_label
-                #image[current_mask] = next_usable_label
+                #save_image(component_mask, "./tmp", f"Current overlapped cells before dilation")
                 image[current_mask] = next_usable_label
                 next_usable_label += 1
-                save_image(component_mask, "./tmp", f"Current overlapped cells")
-                save_image(image > 0, "./tmp", f"Current overlapped image plus the EVs")
+                #save_image(component_mask, "./tmp", f"Current overlapped cells")
+                #save_image(image > 0, "./tmp", f"Current overlapped image plus the EVs")
                 save_image(image, "./tmp", f"Current labeled image plus the EVs")
         else:
             # The current object is not present nor overlapped iwth the connected componesnts in the base image
@@ -427,7 +425,9 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             next_usable_label += 1 # udaprte the label fopr next insertion
 
     image = measure.label(image, background=0)
+    # Double print for qualitative assessment
     save_image(image, "./tmp", f"Final labeled image")
+    save_segmentation_image(image, "./tmp", f"Final labeled image (prism)", use_cmap=True)
     return image
 
     
