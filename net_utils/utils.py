@@ -679,8 +679,10 @@ def log_final_images_properties(log, image):
     return None
 
 
-def show_training_dataset_samples(log, dataset, samples = 10):
+def show_training_dataset_samples(log, dataset, samples = 60):
     # Visual debug for the images used in the training set.
+
+    count_neighbor_distance = 0
 
     log.debug(f"Visually inspect the first {samples} samples of images from the training Dataset")
     folder = os.getenv("TEMPORARY_PATH")
@@ -690,6 +692,13 @@ def show_training_dataset_samples(log, dataset, samples = 10):
         for pos, (key, image) in enumerate(image_dict.items()):
 
             curr_title = "Sample " + str(idx) + f" type ({key})"
-            save_image(np.squeeze(image), folder, curr_title)
+            save_image(np.squeeze(image), folder, curr_title, use_cmap=True)
+
+            # Keep track of not-blank neighbor tranform
+            if key == "border_label" and np.squeeze(image).sum(axis = None) > 0:
+                count_neighbor_distance += 1
+
+
+    print(f"Between the shown example, the {round(count_neighbor_distance/samples, 2)}% of distance tranform are not-blanck!")
     log.debug(f"Images correctly saved in {folder} before the training phase!")
     return True
