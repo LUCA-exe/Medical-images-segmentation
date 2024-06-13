@@ -719,8 +719,23 @@ def show_training_dataset_samples(log, dataset, samples = 60):
             # Keep track of not-blank neighbor tranform
             if key == "border_label" and np.squeeze(image).sum(axis = None) > 0:
                 count_neighbor_distance += 1
-
-
     print(f"Between the shown example, the {round(count_neighbor_distance/samples, 2)}% of distance tranform are not-blanck!")
     log.debug(f"Images correctly saved in {folder} before the training phase!")
+    return True
+
+
+def show_inference_dataset_samples(log, dataset, samples = 3):
+    # Visual debug for the images used in the inference phase.
+
+    log.debug(f"Visually inspect the first {samples} samples of images from the inference CTC Dataset")
+    folder = os.getenv("TEMPORARY_PATH")
+    for idx in range(samples):
+
+        image_dict = dataset[idx]
+        for pos, (key, image) in enumerate(image_dict.items()):
+
+            if key in ["image", "single_channel_image", "nuclei_channel_image"]:
+                curr_title = "Sample " + str(idx) + f" type ({key})"
+                save_image(np.squeeze(image), folder, curr_title, use_cmap=True)
+    log.debug(f"Images correctly saved in {folder} before the inference phase!")
     return True

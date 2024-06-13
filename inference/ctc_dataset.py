@@ -17,7 +17,7 @@ from net_utils.utils import zero_pad_model_input
 class CTCDataSet(Dataset):
     """ Pytorch data set for Cell Tracking Challenge format data. """
 
-    def __init__(self, data_dir, transform=lambda x: x):
+    def __init__(self, data_dir, transform = lambda x: x):
         """
 
         :param data_dir: Directory with the Cell Tracking Challenge images to predict (e.g., t001.tif)
@@ -37,18 +37,18 @@ class CTCDataSet(Dataset):
 
         # Processing in case of RGB images as my dataset
         if len(image.shape) > 2:
-
-            single_channel_img = image[:, :, 0] # 0 is the EVs channel (Red)
-            img = np.sum(image, axis=2) # Keep all object
+            # Taking the EVs and nuclei specifics channel for single-channel inference
+            single_channel_img = image[:, :, 0] # NOTE: EVs channel (Red)
+            nuclei_channel_img = image[:, :, 2] # NOTE: Nuclei channel (blue)
+            img = np.sum(image, axis=2) # Keep all particles
         else:
             # For single-channel dataset just load twice the image - being already on single-channel
             single_channel_img = image
             img = image
 
         sample = {'image': img,
-
-                # AD-HOC for my dataset
                 'single_channel_image': single_channel_img,
+                'nuclei_channel_image': nuclei_channel_img,
                 'id': img_id.stem}
         sample = self.transform(sample)
         return sample
@@ -93,6 +93,11 @@ class ContrastEnhancement(object):
                 img = equalize_adapthist(np.squeeze(img), clip_limit=0.01)
                 img = (65535 * img).astype(np.uint16)
                 sample["single_channel_image"] = img
+
+                img = sample["nuclei_channel_image"]
+                img = equalize_adapthist(np.squeeze(img), clip_limit=0.01)
+                img = (65535 * img).astype(np.uint16)
+                sample["nuclei_channel_image"] = img
         return sample
 
 
@@ -109,6 +114,10 @@ class Normalization(object):
             img = sample["single_channel_image"]
             img = 2 * (img.astype(np.float32) - img.min()) / (img.max() - img.min()) - 1
             sample["single_channel_image"] = img
+
+            img = sample["nuclei_channel_image"]
+            img = 2 * (img.astype(np.float32) - img.min()) / (img.max() - img.min()) - 1
+            sample["nuclei_channel_image"] = img
         return sample
 
 
@@ -126,6 +135,10 @@ class Padding(object):
             img = sample["single_channel_image"]
             img, _ = zero_pad_model_input(img=img, pad_val=np.min(img))
             sample["single_channel_image"] = img
+
+            img = sample["nuclei_channel_image"]
+            img, _ = zero_pad_model_input(img=img, pad_val=np.min(img))
+            sample["nuclei_channel_image"] = img
         return sample
 
 
@@ -144,7 +157,6 @@ class Scaling(object):
             if len(img.shape) == 3:
                 img = rescale(img, (1, self.scale, self.scale), order=2, preserve_range=True).astype(img.dtype)
             else:
-
                 img = rescale(img, (self.scale, self.scale), order=2, preserve_range=True).astype(img.dtype)
                 
                 # Additional processing on the single channel if not None
@@ -153,6 +165,9 @@ class Scaling(object):
                     single_channel_img = rescale(single_channel_img, (self.scale, self.scale), order=2, preserve_range=True).astype(single_channel_img.dtype)
                     sample['single_channel_image'] = single_channel_img
 
+                    single_channel_img = sample['nuclei_channel_image']
+                    single_channel_img = rescale(single_channel_img, (self.scale, self.scale), order=2, preserve_range=True).astype(single_channel_img.dtype)
+                    sample['nuclei_channel_image'] = single_channel_img
             sample['image'] = img
         return sample
 
@@ -173,7 +188,10 @@ class ToTensor(object):
                 single_channel_image = torch.from_numpy(single_channel_image).to(torch.float)
                 sample["single_channel_image"] = single_channel_image
 
+                single_channel_image = sample["nuclei_channel_image"]
+                single_channel_image = single_channel_image[None, :, :]
+                single_channel_image = torch.from_numpy(single_channel_image).to(torch.float)
+                sample["nuclei_channel_image"] = single_channel_image
         img = torch.from_numpy(img).to(torch.float)
         sample["image"] = img
-        #return img, sample['id'], sample['pads'], sample['original_size']
         return sample # Directly return the dict. of the batches

@@ -241,21 +241,30 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
-def fusion_post_processing(prediction_dict, sc_prediction_dict, args, just_evs=True):
+def fusion_post_processing(prediction_dict, sc_prediction_dict, nuclei_prediction_dict, args, just_evs=True):
     """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channel prediction.    
     :return: Instance segmentation mask.
     """
     # Choose predefined channel when working with prediciton from sigomid layers
     binary_channel = 1
 
-    # Unpack the dictionary
-    original_image, sc_original_image = prediction_dict["original_image"], sc_prediction_dict["original_image"]
-    mask, sc_mask = prediction_dict["mask"], sc_prediction_dict["mask"]
+    # Unpack the hash-map
+    original_image, sc_original_image, nuclei_original_image = prediction_dict["original_image"], sc_prediction_dict["original_image"], nuclei_prediction_dict["original_image"]
+    mask, sc_mask, nuclei_mask = prediction_dict["mask"], sc_prediction_dict["mask"], nuclei_prediction_dict["mask"]
 
     prediction_instance = simple_binary_mask_post_processing(mask, original_image, args)
-    np.save("original_prediction_instance.npy", np.squeeze(prediction_instance))
+    np.save("prediction.npy", np.squeeze(prediction_instance))
 
     if just_evs == True:
+        sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
+        np.save("single_channel_prediction_EVs.npy", np.squeeze(sc_prediction_instance))
+
+        nuclei_prediction_instance = simple_binary_mask_post_processing(nuclei_mask, nuclei_original_image, args)
+        np.save("single_channel_prediction_nuclei.npy", np.squeeze(nuclei_prediction_instance))
+
+        # DEBUG
+        exit(1)
+
         sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
         np.save("single_channel_prediction_instance.npy", np.squeeze(sc_prediction_instance))
 

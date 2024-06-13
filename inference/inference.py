@@ -15,7 +15,7 @@ from skimage.transform import resize
 from inference.ctc_dataset import CTCDataSet, pre_processing_transforms
 from inference.postprocessing import *
 from net_utils.unets import build_unet
-from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, save_image, log_final_images_properties
+from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, save_image, log_final_images_properties, show_inference_dataset_samples
 
 
 def load_and_get_architecture(log, model_path, device, num_gpus):
@@ -43,7 +43,7 @@ def load_and_get_architecture(log, model_path, device, num_gpus):
     return net, model_settings
 
 
-def move_batches_to_device(samples_dict, device, keys_to_move = ["image", "single_channel_image"]):
+def move_batches_to_device(samples_dict, device, keys_to_move = ["image", "single_channel_image", "nuclei_channel_image"]):
     # util function to get the dict. batch from the dataloader and move to the correct device
 
     # Un-pack the dict.
@@ -83,6 +83,8 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     # Get images to predict
     ctc_dataset = CTCDataSet(data_dir=data_path,
                              transform=pre_processing_transforms(apply_clahe=args.apply_clahe, scale_factor=args.scale))
+    # Assert that the datasets has been created correctly before the loop over the images - visual debugs for single channel images batch
+    show_inference_dataset_samples(log, ctc_dataset)
     log.info(f"Inference dataset correctly set")
 
     num_workers = get_num_workers(device)
@@ -131,6 +133,12 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
             # NOTE: temporary fix for fusion post-processing pipeline
             if args.post_pipeline == "fusion-dual-unet":
 
+                # DEBUG
+                print(f"{type(sample['single_channel_image'])}")
+                print(f"{sample['single_channel_image'].shape}")
+                print(f"{type(sample['nuclei_channel_image'])}")
+                print(f"{sample['nuclei_channel_image'].shape}")
+
                 # Additional prediction for the single channel images
                 sc_prediction_binary_border_batch, sc_prediction_cell_batch, sc_prediction_mask_batch = net(sample["single_channel_image"])
                 
@@ -138,6 +146,14 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                 sc_prediction_binary_border_batch = sc_prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
                 sc_prediction_cell_batch = sc_prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
                 sc_prediction_mask_batch = sc_prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+
+                # Additional prediction for the single channel images
+                nuclei_prediction_binary_border_batch, nuclei_prediction_cell_batch, nuclei_prediction_mask_batch = net(sample["nuclei_channel_image"])
+                
+                # Adjust batch pads on the additional inferred images
+                nuclei_prediction_binary_border_batch = nuclei_prediction_binary_border_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+                nuclei_prediction_cell_batch = nuclei_prediction_cell_batch[:, 0, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
+                nuclei_prediction_mask_batch = nuclei_prediction_mask_batch[:, :, pad_batch[0]:, pad_batch[1]:, None].cpu().numpy()
 
             prediction_binary_border_batch, prediction_cell_batch, prediction_mask_batch = net(sample["image"])
 
@@ -189,14 +205,21 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
                 # Pack a data structures
                 original_image = sample["image"][h].cpu().numpy()
                 np.save("original_image.npy", np.squeeze(original_image))
+
                 sc_original_image = sample["single_channel_image"][h].cpu().numpy()
                 np.save("original_image_EVs.npy", np.squeeze(sc_original_image))
 
+                nuclei_original_image = sample["nuclei_channel_image"][h].cpu().numpy()
+                np.save("original_image_nuclei.npy", np.squeeze(nuclei_original_image))
+
                 predictions_dict = {"binary_border_prediction": prediction_binary_border_batch[h], "cell_batch": prediction_cell_batch[h], "mask":  prediction_mask_batch[h], "original_image": original_image}
                 sc_predictions_dict = {"binary_border_prediction": sc_prediction_binary_border_batch[h], "cell_batch": sc_prediction_cell_batch[h], "mask":  sc_prediction_mask_batch[h], "original_image": sc_original_image}
+                nuclei_predictions_dict = {"binary_border_prediction": nuclei_prediction_binary_border_batch[h], "cell_batch": nuclei_prediction_cell_batch[h], "mask":  nuclei_prediction_mask_batch[h], "original_image": nuclei_original_image}
+                
                 # NOTE: Finish implementing for first round of tests
                 prediction_instance, border = fusion_post_processing(predictions_dict,
                                                                     sc_predictions_dict,
+                                                                    nuclei_predictions_dict,
                                                                     args=args)
             
             # TO FINISH TEST
