@@ -242,27 +242,50 @@ def complex_binary_mask_post_processing(mask, binary_border, cell_prediction, or
     return np.squeeze(prediction_instance.astype(np.uint16))
 
 
-def fusion_post_processing(prediction_dict, sc_prediction_dict, nuclei_prediction_dict, args, just_evs=True):
-    """ Post-processing WT enhanced with Fusion prediction for distance label (cell + neighbor distances continuos tensors) plus single-channel prediction.    
-    :return: Instance segmentation mask.
+def fusion_post_processing(prediction_dict: dict, sc_prediction_dict: dict, nuclei_prediction_dict: dict, args: dict, just_evs: bool = True) -> tuple[np.ndarray, np.ndarray]:
     """
-    # Choose predefined channel when working with prediciton from sigomid layers
+    Performs post-processing on WT predictions enhanced with Fusion predictions.
+
+    This function combines predictions from multiple sources (WT, single-channel, distance labels)
+    for cell instance segmentation. It includes:
+
+    - Selecting a predefined channel for sigmoid layer predictions.
+    - Unpacking image and mask data from dictionaries.
+    - Applying simple binary mask post-processing on each prediction.
+    - Conditionally performing additional processing on single-channel and distance label predictions:
+        - Removing noise from nuclei predictions.
+        - Adding objects from single-channel and distance label predictions to the WT segmentation.
+        - Refining objects based on overlapping regions.
+
+    Args:
+        prediction_dict: Dictionary containing WT prediction data ("original_image", "mask").
+        sc_prediction_dict: Dictionary containing single-channel prediction data ("original_image", "mask").
+        nuclei_prediction_dict: Dictionary containing nuclei prediction data ("original_image", "mask").
+        args: Dictionary containing additional processing arguments.
+        just_evs: Boolean flag indicating whether to process only enhanced predictions (default: True).
+
+    Returns:
+        A tuple containing the refined segmentation mask (uint16) and a copy for further processing (uint16).
+    """
+    # Choose predefined channel when working with predictions from sigmoid layers
     binary_channel = 1
 
-    # Unpack the hash-map
-    original_image, sc_original_image, nuclei_original_image = prediction_dict["original_image"], sc_prediction_dict["original_image"], nuclei_prediction_dict["original_image"]
-    mask, sc_mask, nuclei_mask = prediction_dict["mask"], sc_prediction_dict["mask"], nuclei_prediction_dict["mask"]
-
+    # Unpack the dictionaries for clarity
+    original_image, sc_original_image, nuclei_original_image = (
+        prediction_dict["original_image"], sc_prediction_dict["original_image"], nuclei_prediction_dict["original_image"]
+    )
+    mask, sc_mask, nuclei_mask = (prediction_dict["mask"], sc_prediction_dict["mask"], nuclei_prediction_dict["mask"])
     prediction_instance = simple_binary_mask_post_processing(mask, original_image, args)
 
-    if just_evs == True:
+    if just_evs:
+        # Process single-channel and distance label predictions (if applicable)
         sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
-
         nuclei_prediction_instance = simple_binary_mask_post_processing(nuclei_mask, nuclei_original_image, args)
-        # Remove noise around the actual nuclei before adding the connected_components to the original image
-        nuclei_prediction_instance = remove_smaller_areas(nuclei_prediction_instance, area_threshold = 1000) 
-        
-        # Adding objects fomr the single-channel image to the segmentation results
+
+        # Remove noise from nuclei prediction
+        nuclei_prediction_instance = remove_smaller_areas(nuclei_prediction_instance, area_threshold=1000)
+
+        # Combine predictions
         prediction_instance = add_nuclei_by_overlapping(prediction_instance, nuclei_prediction_instance)
         processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)
         refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
