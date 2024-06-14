@@ -10,6 +10,7 @@ from skimage.morphology import square
 from skimage.morphology import dilation
 import torch
 import copy
+from typing import Optional, Dict, Union
 
 from net_utils.utils import get_nucleus_ids, save_image, save_segmentation_image
 
@@ -253,24 +254,19 @@ def fusion_post_processing(prediction_dict, sc_prediction_dict, nuclei_predictio
     mask, sc_mask, nuclei_mask = prediction_dict["mask"], sc_prediction_dict["mask"], nuclei_prediction_dict["mask"]
 
     prediction_instance = simple_binary_mask_post_processing(mask, original_image, args)
-    np.save("prediction.npy", np.squeeze(prediction_instance))
 
     if just_evs == True:
         sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
-        np.save("single_channel_prediction_EVs.npy", np.squeeze(sc_prediction_instance))
 
         nuclei_prediction_instance = simple_binary_mask_post_processing(nuclei_mask, nuclei_original_image, args)
-        np.save("single_channel_prediction_nuclei.npy", np.squeeze(nuclei_prediction_instance))
-
-        # DEBUG
-        exit(1)
-
-        sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
-        np.save("single_channel_prediction_instance.npy", np.squeeze(sc_prediction_instance))
-
-        processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)        
-        # NOTE: Work in progress
+        # Remove noise around the actual nuclei before adding the connected_components to the original image
+        nuclei_prediction_instance = remove_smaller_areas(nuclei_prediction_instance, area_threshold = 1000) 
+        
+        # Adding objects fomr the single-channel image to the segmentation results
+        prediction_instance = add_nuclei_by_overlapping(prediction_instance, nuclei_prediction_instance)
+        processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)
         refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
+
     return refined_evs_prediction.astype(np.uint16), refined_evs_prediction.astype(np.uint16)
 
 
@@ -308,7 +304,7 @@ def remove_smaller_areas(seeds, area_threshold):
     return measure.label(filtered_seeds, background=0)
 
 
-def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=4000):
+def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=1000):
     """
     Refines a segmentation mask based on overlap with another segmentation mask.
 
@@ -358,7 +354,7 @@ def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=4000)
     return refined_image
 
 
-def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 0.99, min_cell_area = 4000):
+def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 0.99, min_cell_area = 1000):
     """
     Adds objects from a single-channel image to a base image based on overlap conditions.
 
@@ -383,12 +379,10 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             image added based on overlap conditions. The output has the same shape
             and data type as the base image.
     """
-
-    # Deep copy the original prediction
     image = copy.deepcopy(base_image)
     mask = image > 0
     
-    # Get the next label from the already used ones
+    # Get the next usable label
     next_usable_label = get_maximum_label(base_image) + 1
 
     for reg_prop in measure.regionprops(single_channel_image):
@@ -401,33 +395,22 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
             # Manage overlap with connected components in the base image
             component_label, component_mask, overlap_ratio = get_overlapping_components(image, current_mask, cells_overlap)
 
-            # Temporary fix
+            # Temporary fix - is it useful?
             if component_mask is None:
                 continue
-
-            #save_image(current_mask, "./tmp", f"Current EVs in the single channel image")
-            #save_image(component_mask, "./tmp", f"Current cells overlapped in the original_image")
-            #print(f"Current object dimension: {np.sum(component_mask, axis = None)}")
-
-            # Redundant control
-            #print(f"Overlap ratio found: {overlap_ratio}")
         
             if np.sum(component_mask, axis = None) >= min_cell_area:
                 # In this way, overlapping EVs are not considered, just overlapping cells.
-
-                #print(f"Current cell dimension: {np.sum(component_mask, axis = None)}")
                 
                 # Dilate the current mask to separate the future object fromt he connected components overalpped
                 dilated_current_mask = dilation(current_mask.astype(int), square(9))
                 image[dilated_current_mask] = 0
-                
-                # Ensure the not toruching regions before adding the current component
-                #save_image(component_mask, "./tmp", f"Current overlapped cells before dilation")
                 image[current_mask] = next_usable_label
                 next_usable_label += 1
-                #save_image(component_mask, "./tmp", f"Current overlapped cells")
-                #save_image(image > 0, "./tmp", f"Current overlapped image plus the EVs")
                 save_image(image, "./tmp", f"Current labeled image plus the EVs")
+            else:
+                # Picked an object overlapped with an EVs, not taking action
+                continue
         else:
             # The current object is not present nor overlapped iwth the connected componesnts in the base image
             image[current_mask] = next_usable_label
@@ -437,6 +420,48 @@ def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap =
     # Double print for qualitative assessment
     save_image(image, "./tmp", f"Final labeled image")
     save_segmentation_image(image, "./tmp", f"Final labeled image (prism)", use_cmap=True)
+    return image
+
+
+def add_nuclei_by_overlapping(base_image, single_channel_image, cells_overlap = 100, min_cell_area = 1000):
+    """
+    Adds objects from a single-channel image (nuclei) to a base image based on overlap conditions.
+    ... to finish doc-string
+    """
+    image = copy.deepcopy(base_image)
+    mask = image > 0
+    
+    # Get the next usable label
+    next_usable_label = get_maximum_label(base_image) + 1
+    for reg_prop in measure.regionprops(single_channel_image):
+        
+        # Take the overlap etween a region and the mask of the orignial image
+        current_mask = single_channel_image == reg_prop.label
+        overlap_mask = current_mask & mask
+        
+        if overlap_mask.sum(axis = None) > 0:            
+            # Manage overlap with connected components in the base image
+            component_label, component_mask, overlap_ratio = get_nuclei_connected_components(image, current_mask, min_cell_area)
+        
+            if component_label is not None:
+                # In this way, overlapping EVs are not considered, just overlapping cells.
+
+                # NOTE: If not in this way, using jsut the current mask of the object even with the same label of the found overalpping connected componetns will results in different label values 
+                final_mask = np.logical_or(component_mask, current_mask)
+                image[final_mask] = component_label
+                save_image(image, "./tmp", f"Current labeled image plus the nuclei")
+            else:
+                # Picked an object overlapped with an EVs, not taking action
+                continue
+        else:
+            # The current object is not present nor overlapped iwth the connected componesnts in the base image
+            image[current_mask] = next_usable_label
+            next_usable_label += 1 # udaprte the label fopr next insertion
+        
+    image = measure.label(image, background=0)
+    # Double print for qualitative assessment
+    save_image(image, "./tmp", f"Final labeled image with nuclei")
+    save_segmentation_image(image, "./tmp", f"Final labeled image with nuclei (prism)", use_cmap=True)
     return image
 
     
@@ -467,7 +492,7 @@ def get_maximum_label(image):
     return max_label
 
 
-def get_overlapping_components(original_image, marker, maximum_cells_overlap):
+def get_overlapping_components(original_image, marker, maximum_cells_overlap) -> tuple[Optional[int], Optional[np.ndarray], Optional[float]]:
     """
     Extracts labeled connected components that overlap a marker mask.
 
@@ -505,23 +530,56 @@ def get_overlapping_components(original_image, marker, maximum_cells_overlap):
 
     # Label connected components in the original image
     labels = label(original_image)
-    # Get unique labels present in the image - convert the type to be compatible with the labeled image
+    # Convert the type to be compatible with the labeled image
     unique_labels = np.unique(labels).astype(np.uint16)
 
-    # Loop through unique labels
     for label_value in unique_labels:
         if label_value == 0:  # Skip background label
             continue
 
         # Create mask for the current label
-        current_mask = (labels == label_value)
+        current_image_mask = (labels == label_value)
 
         # Calculate the overlap ratio between the marker and the current component
-        overlap_ratio = np.sum(current_mask & marker) / np.sum(marker)
-        if overlap_ratio > 0 and overlap_ratio <= maximum_cells_overlap:
-            return label_value, current_mask, overlap_ratio
+        overlap_ratio = np.sum(current_image_mask & marker) / np.sum(marker)
+        # Temporary fix for the dimension of the current connected-components hard coded
+        if overlap_ratio > 0 and overlap_ratio <= maximum_cells_overlap and np.sum(current_image_mask) >= 4000:
+            return label_value, current_image_mask, overlap_ratio
 
-    # Temporary place holder value for no overlapping
+    # In case no overlapping object is found
+    print(f"No overlapping large object is found for EVs marker of dim. {np.sum(marker, axis = None)}")
+    return None, None, None
+
+
+def get_nuclei_connected_components(original_image, marker, minimum_component_dim) -> tuple[Optional[int], Optional[np.ndarray], Optional[float]]:
+    """
+    Extracts labeled connected components that overlap a marker mask - the connected component can be filtered by dimension to discard small objects.
+    ... finish the doc-string.
+    """
+
+    # Ensure marker has boolean data type (efficient overlap calculation)
+    if marker.dtype != bool:
+        raise ValueError("Mask of the marker has to be boolean.")
+
+    # Label connected components in the original image
+    labels = label(original_image)
+    # Convert the type to be compatible with the labeled image
+    unique_labels = np.unique(labels).astype(np.uint16)
+
+    for label_value in unique_labels:
+        if label_value == 0:  # Skip background label
+            continue
+
+        # Create mask for the current label
+        current_image_mask = (labels == label_value)
+
+        # Calculate the overlap ratio between the marker and the current component
+        overlap_ratio = np.sum(current_image_mask & marker) / np.sum(marker)
+        if overlap_ratio > 0 and np.sum(current_image_mask) >= minimum_component_dim:
+            return label_value, current_image_mask, overlap_ratio
+
+    # In case no overlapping object is found
+    print(f"No overlapping object is found for nucleo marker of dim. {np.sum(marker, axis = None)}")
     return None, None, None
 
 

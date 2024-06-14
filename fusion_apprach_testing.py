@@ -49,27 +49,48 @@ def load_npy_arrays_by_label(folder_path: Union[str, Path]) -> Dict[str, np.ndar
 
 
 def try_fusion_approach(images: dict) -> None:
-    # Call functions from the post processing technique for easy testing the results
+    # Call functions from the post-processing technique for easy testing the visual results
 
     # Parsing the orginal data structure
-    prediction_instance = images["original_prediction_instance"]
-    save_image(prediction_instance > 0, "./tmp", f"Original mask prediction")    
-    sc_prediction_instance = images["single_channel_prediction_instance"]
-    save_image(sc_prediction_instance > 0, "./tmp", f"Single-channel mask prediction")  
+    prediction_instance = images["prediction"]
+    save_image(prediction_instance > 0, "./tmp", f"All particles mask prediction")    
+    sc_prediction_instance = images["single_channel_prediction_EVs"]
+    save_image(sc_prediction_instance > 0, "./tmp", f"Single-channel mask EVs prediction")  
+    nuclei_prediction_instance = images["single_channel_prediction_nuclei"]
+    nuclei_prediction_instance = remove_smaller_areas(nuclei_prediction_instance, area_threshold = 1000) 
+    save_image(nuclei_prediction_instance > 0, "./tmp", f"Single-channel mask nuclei prediction")
+    
+    # Two different wrapper function to add nuclei and EVs from single channel prediciton
+    prediction_instance = add_nuclei_by_overlapping(prediction_instance, nuclei_prediction_instance)
 
-    # First method
+    # Refine/remove the connected-components
     processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)
     save_image(processed_prediction > 0, "./tmp", f"Refined mask overlapped image with EVs")        
 
     # NOTE: Work in progress
     refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
-    save_image(processed_prediction, "./tmp", f"Final image with additional EVs") 
+    save_image(refined_evs_prediction, "./tmp", f"Final image with additional objects") 
     return None
+
+
+def filter_images_by_name(images: dict[str, np.ndarray], excluding_value: str) -> dict[str, np.ndarray]:
+  """
+  Filters a dictionary of images based on a name exclusion pattern.
+
+  Args:
+      images: A dictionary where keys are image names (strings) and values are NumPy ndarrays.
+      excluding_value: A string pattern to exclude images from the output.
+
+  Returns:
+      A new dictionary containing only images whose names do not include the `excluding_value` pattern.
+  """
+  return {key: value for key, value in images.items() if excluding_value not in key}
 
 
 if __name__ == '__main__':
     images = load_npy_arrays_by_label(Path("./net_utils/images_sample"))
-    try_fusion_approach(images)
+    updated_images = filter_images_by_name(images, excluding_value = "E2DV")
+    try_fusion_approach(updated_images)
 
 
 
