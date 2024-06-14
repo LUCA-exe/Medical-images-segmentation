@@ -9,7 +9,6 @@ from PIL import Image  # Assuming PIL (Pillow) for image processing
 
 
 def load_npy_arrays_by_label(folder_path: Union[str, Path]) -> Dict[str, np.ndarray]:
-
     """
     Loads NumPy arrays from a folder into a dictionary with labels as keys.
 
@@ -74,17 +73,17 @@ def try_fusion_approach(images: dict) -> None:
 
 
 def filter_images_by_name(images: dict[str, np.ndarray], excluding_value: str) -> dict[str, np.ndarray]:
-  """
-  Filters a dictionary of images based on a name exclusion pattern.
+    """
+    Filters a dictionary of images based on a name exclusion pattern.
 
-  Args:
-      images: A dictionary where keys are image names (strings) and values are NumPy ndarrays.
-      excluding_value: A string pattern to exclude images from the output.
+    Args:
+        images: A dictionary where keys are image names (strings) and values are NumPy ndarrays.
+        excluding_value: A string pattern to exclude images from the output.
 
-  Returns:
-      A new dictionary containing only images whose names do not include the `excluding_value` pattern.
-  """
-  return {key: value for key, value in images.items() if excluding_value not in key}
+    Returns:
+        A new dictionary containing only images whose names do not include the `excluding_value` pattern.
+    """
+    return {key: value for key, value in images.items() if excluding_value not in key}
 
 
 if __name__ == '__main__':
