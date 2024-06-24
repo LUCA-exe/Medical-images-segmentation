@@ -12,76 +12,201 @@ to be adaptable to various cell counting algorithms and image processing pipelin
 - **TestResult:** A class to represent the outcome of a cell counting test case.
 """
 import numpy as np
-import os
-from glob import glob
-from skimage.io import imread
+from collections import defaultdict
+from skimage import measure
+from skimage.morphology import binary_dilation
+from copy import deepcopy
+
+from ext_modules.utils import *
+from net_utils.utils import save_image
 
 
-def load_masks(folder_path: str) -> list[np.ndarray]:
+def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 4000) -> dict:
     """
-    Loads mask images from a specified folder.
+    Calculates centroids for connected components in a single-channel image.
 
-    This function reads all TIFF (.tiff or .tif) image files from the given folder path and returns them as a list
-    of NumPy arrays. It adheres to best practices for:
+    This function takes a grayscale image (`image`) and a minimum size filter (`dim_filter`) as input. 
+    It performs the following steps:
 
-    - Error Handling:
-        - Raises `FileNotFoundError` if the folder path does not exist.
-        - Raises `ValueError` if no TIFF mask images are found in the folder.
-    - Data Validation:
-        - Validates input path as a string for clarity.
+    1. Binarizes the image using thresholding (assuming background is 0).
+    2. Identifies connected components (objects) in the binary image.
+    3. Filters out components smaller than the specified `dim_filter`.
+    4. Calculates the centroid (center of mass) for each remaining connected component.
+    5. Returns a dictionary where keys are unique IDs (incrementing integers)
+        and values are NumPy arrays representing the (row, col) coordinates of the centroids.
 
     Args:
-        folder_path (str): The path to the folder containing mask images.
+        image (np.ndarray): A single-channel labeled image (assumed to be 2D).
+        dim_filter (int, optional): Minimum size (number of pixels) for a connected component to be included. 
+                                    Defaults to 4000.
 
     Returns:
-        list[np.ndarray]: A list of loaded mask images as NumPy arrays, or an empty list if no masks are found.
+        dict: A dictionary containing centroids as key-value pairs. Keys are unique IDs (integers),
+                and values are NumPy arrays with shape (2,) representing (row, col) coordinates.
 
     Raises:
-        FileNotFoundError: If the folder path does not exist.
-        ValueError: If no TIFF mask images are found in the folder.
+        ValueError: If the input image is not a single-channel grayscale image.
     """
 
-    if not isinstance(folder_path, str):
-        raise ValueError("folder_path must be a string")
+    # NOTE: Temporary fixed list of possible types
+    if len(labeled_image.shape) != 2 or labeled_image.dtype not in [np.uint16]:
+        raise ValueError("Input image must be a single-channel grayscale image (2D).")
 
-    # Check if folder exists
-    if not os.path.exists(folder_path):
-        raise FileNotFoundError(f"Folder not found: {folder_path}")
+    # Binarize the image (assuming background is 0)
+    #binary_image = image > 0
 
-    # Find all TIFF mask images
-    mask_files = glob(os.path.join(folder_path, "*.tif"))
-    mask_files.extend(glob(os.path.join(folder_path, "*.tiff")))  # Include both .tif and .tiff extensions
+    # Identify connected components and filter by size
+    #labeled_image = measure.label(binary_image, connectivity=2)  # 8-connected neighborhood
+    region_props = measure.regionprops(labeled_image)
 
-    if not mask_files:
-        raise ValueError(f"No TIFF mask images found in folder: {folder_path}")
+    # Extract centroids and store in dictionary
+    centroids_map = {}
+    for prop in region_props:
 
-    # Load mask images using skimage.io.imread for flexibility
-    masks = [imread(mask_file) for mask_file in mask_files]
-    return masks
+        # Just take the Cells
+        if prop['area'] > dim_filter:
+            centroid = prop['centroid']
 
-# assert type of loaded masks (form tiff extension)
+            # Store the tuple with the original id of the connected components
+            centroids_map[prop['label']] = centroid
+    return centroids_map
 
-def get_centroids_map(image: np.ndarray) -> dict:
-    # Get a single-channle image and computed centroids coord: label and rerturn as hashmap
+
+def get_nearer_centroid(labeled_centroids: dict[int, tuple], centroid_coord: tuple) -> int:
+    """
+    Finds the label of the nearest centroid from a given reference point.
+
+    This function takes a dictionary of labeled centroids (`labeled_centroids`) and a reference coordinate 
+    (`centroid_coord`) as input. It iterates through the centroids in the dictionary and calculates the 
+    Euclidean distance between each centroid and the reference point. It then returns the label (key) 
+    associated with the nearest centroid.
+
+    Args:
+        labeled_centroids (dict[int, tuple]): A dictionary where keys are integer labels and values are 
+                                                tuples representing centroid coordinates (row, col).
+        centroid_coord (tuple): A tuple representing the reference coordinate (row, col) for distance calculation.
+
+    Returns:
+        int: The label (key) of the nearest centroid in the dictionary.
+
+    Raises:
+        ValueError: If the labeled_centroids dictionary is empty.
+    """
+
+    if not labeled_centroids:
+        raise ValueError("labeled_centroids dictionary cannot be empty")
+
+    nearest_label = None
+    min_distance = np.inf  # Initialize minimum distance to positive infinity
+
+    for label, centroid in labeled_centroids.items():
+        # Calculate Euclidean distance between reference point and current centroid
+        distance = np.linalg.norm(np.array(centroid_coord) - np.array(centroid))
+        if distance < min_distance:
+            min_distance = distance
+            nearest_label = label
+    return nearest_label
 
 
-    pass
+def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value: float, dim_filter: int) -> int:
+    """
+    Counts the number of connected components within a dilated masked area.
+
+    This function takes a binary mask image (`masked_image`), a labeled image (`labeled_image`), and an expansion 
+    value (`expand_value`) as input. It performs the following steps:
+
+    1. Creates a dilated mask by applying binary dilation with the specified `expand_value`.
+    2. Filters the labeled image by selecting only the connected components that overlap with the dilated mask.
+    3. Returns the number of unique labels (connected components) in the filtered labeled image.
+
+    Args:
+        masked_image (np.ndarray): A binary mask image (boolean NumPy array).
+        labeled_image (np.ndarray): A labeled image containing connected components (uint16).
+        expand_value (float): The dilation factor (positive value) to expand the masked area.
+
+    Returns:
+        int: The number of connected components within the dilated masked area.
+
+    Raises:
+        ValueError: 
+            - If the masked image is not a binary NumPy array.
+            - If the labeled image data type is not uint16.
+            - If the expansion value is non-positive.
+    """
+
+    if not masked_image.dtype == bool:
+        raise ValueError("masked_image must be a binary NumPy array (boolean).")
+    if labeled_image.dtype != np.uint16:
+        raise ValueError("labeled_image data type must be uint16.")
+    if expand_value <= 0:
+        raise ValueError("Expansion value must be a positive float.")
+
+    # Dilate the mask to capture components in the vicinity
+    dilated_mask = binary_dilation(masked_image, footprint=np.ones((expand_value, expand_value)))
+
+    save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account")  
+
+    # Filter labeled image based on overlap with dilated mask
+    filtered_labeled_image = labeled_image[dilated_mask]
+
+    # Count unique labels (connected components)
+    num_evs = np.unique(filtered_labeled_image.flat)
+    # NOTE: Exclude the background '0' value
+    print(len(num_evs) - 1)
+    exit(1)
+
+    # Count unique labels (connected components)
+    return total_evs
+
 
 if __name__ == '__main__':
-    # Testing new functions
      
+    # Temporary path
     masks_path = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-test/01_GT/SEG"
+    cells_area = 5000
+    expanding_val = 150
     gt_masks = load_masks(masks_path)
-    print(gt_masks)
 
+    # Get centroids from a chosen frame - for now the first frame is taken as truth
+    centroids_map = get_centroids_map(gt_masks[0], dim_filter = cells_area)
+    print(f"Current identified centroids: {centroids_map}")
 
+    id_evs_map = defaultdict(list)
+    for idx, mask in enumerate(gt_masks):
+        # Iterate over all the images
+        print(f".. Analyzing mask {idx} ..")
+        
+        # Keep just the EVs for the current mask
+        evs_labeled_image = deepcopy(mask)
 
-    # FIRST MASK AS CENTROIDS COORD SET-up
+        for reg in measure.regionprops(evs_labeled_image):
+            if reg["area"] > cells_area:
 
-    # ITERATE OVER THE MAPS
+                # Remove the current label
+                current_cell_mask = evs_labeled_image == reg["label"]
+                evs_labeled_image[current_cell_mask] = 0
 
-    # For every maps, recompute centroids, assignt he neanrest label with the gorund truth  centroids, fill the dict (label: EVs as ordere tuple)
+        # Debug
+        save_image(evs_labeled_image > 0, "./tmp", f"Current labeled evs mask of mask {idx}") 
 
+        for label, centroid in centroids_map.items():
+            # Iterate over all the centroids in the earlier computation
+
+            current_centroids_map = get_centroids_map(mask)
+            # Take label of the current centroids nearer to the original centroids
+            current_cell_label = get_nearer_centroid(current_centroids_map, centroid)
+
+            # Take the mask of the current cell
+            current_cell_mask = mask == current_cell_label
+            
+            # Debug plot
+            save_image(current_cell_mask > 0, "./tmp", f"Current label referenced: {current_cell_label}") 
+
+            current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area) 
+            id_evs_map[label].append(current_evs)
+
+        print(id_evs_map)
+ 
 
 
 
