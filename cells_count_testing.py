@@ -20,6 +20,8 @@ from copy import deepcopy
 from ext_modules.utils import *
 from net_utils.utils import save_image
 
+# TODO: Move to typeVerifierObject - avoid constants
+MASK_IMAGES_SUPPORTED_TYPE = [np.uint16]
 
 def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 4000) -> dict:
     """
@@ -49,14 +51,8 @@ def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 4000) -> dict
     """
 
     # NOTE: Temporary fixed list of possible types
-    if len(labeled_image.shape) != 2 or labeled_image.dtype not in [np.uint16]:
+    if len(labeled_image.shape) != 2 or labeled_image.dtype not in MASK_IMAGES_SUPPORTED_TYPE:
         raise ValueError("Input image must be a single-channel grayscale image (2D).")
-
-    # Binarize the image (assuming background is 0)
-    #binary_image = image > 0
-
-    # Identify connected components and filter by size
-    #labeled_image = measure.label(binary_image, connectivity=2)  # 8-connected neighborhood
     region_props = measure.regionprops(labeled_image)
 
     # Extract centroids and store in dictionary
@@ -159,9 +155,14 @@ def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value:
     return total_evs
 
 
+"""Visualization function
+Additional visualization functions (figure saves in the ./tmp folder as visualization for debugging purpose)
+""" 
+
+
 if __name__ == '__main__':
      
-    # Temporary path
+    # TODO: Testing the features
     masks_path = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-test/01_GT/SEG"
     cells_area = 5000
     expanding_val = 150
@@ -170,6 +171,8 @@ if __name__ == '__main__':
     # Get centroids from a chosen frame - for now the first frame is taken as truth
     centroids_map = get_centroids_map(gt_masks[0], dim_filter = cells_area)
     print(f"Current identified centroids: {centroids_map}")
+
+    exit(1)
 
     id_evs_map = defaultdict(list)
     for idx, mask in enumerate(gt_masks):
