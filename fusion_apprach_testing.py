@@ -87,6 +87,7 @@ def filter_images_by_name(images: dict[str, np.ndarray], excluding_value: str) -
 
 
 if __name__ == '__main__':
+    
     images = load_npy_arrays_by_label(Path("./net_utils/images_sample"))
     updated_images = filter_images_by_name(images, excluding_value = "E2DV")
     try_fusion_approach(updated_images)

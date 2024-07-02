@@ -158,7 +158,7 @@ def get_minimum_area_to_remove(connected_components, percentage=0.1):
     return min_area
 
 
-def simple_binary_mask_post_processing(mask, original_image, args, denoise=True):
+def simple_binary_mask_post_processing(mask, original_image, args, denoise=True, areas_to_remove = 30):
     """Performs simple post-processing on a binary mask prediction.
 
     This function takes a binary mask prediction, post-processes it using a
@@ -192,7 +192,7 @@ def simple_binary_mask_post_processing(mask, original_image, args, denoise=True)
 
     if denoise:
         # Remove small objects (area less than 30 pixels) for noise reduction
-        prediction_instance = remove_smaller_areas(prediction_instance, 30)
+        prediction_instance = remove_smaller_areas(prediction_instance, areas_to_remove)
 
     # Convert to uint16 for memory efficiency (assuming instance IDs fit in 16 bits)
     return np.squeeze(prediction_instance.astype(np.uint16))
@@ -280,10 +280,7 @@ def fusion_post_processing(prediction_dict: dict, sc_prediction_dict: dict, nucl
     if just_evs:
         # Process single-channel and distance label predictions (if applicable)
         sc_prediction_instance = simple_binary_mask_post_processing(sc_mask, sc_original_image, args)
-        nuclei_prediction_instance = simple_binary_mask_post_processing(nuclei_mask, nuclei_original_image, args)
-
-        # Remove noise from nuclei prediction
-        nuclei_prediction_instance = remove_smaller_areas(nuclei_prediction_instance, area_threshold=1000)
+        nuclei_prediction_instance = simple_binary_mask_post_processing(nuclei_mask, nuclei_original_image, args, areas_to_remove = 1000)
 
         # Combine predictions
         prediction_instance = add_nuclei_by_overlapping(prediction_instance, nuclei_prediction_instance)
