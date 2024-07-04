@@ -41,11 +41,17 @@ def load_masks(folder_path: str) -> list[np.ndarray]:
     mask_files = glob(os.path.join(folder_path, "*.tif"))
     mask_files.extend(glob(os.path.join(folder_path, "*.tiff")))  # Include both .tif and .tiff extensions
 
+    # In-place sorting
+    mask_files.sort()
+    
     if not mask_files:
         raise ValueError(f"No TIFF mask images found in folder: {folder_path}")
 
     # Load mask images using skimage.io.imread for flexibility
     masks = [imread(mask_file) for mask_file in mask_files]
+
+    # NOTE: Atemption to the memory consumption
+    masks = [mask[:1200, :1200] for mask in masks]
     return masks
 
 # TODO: assert type of the loaded masks - single channel and unsidegned int 16

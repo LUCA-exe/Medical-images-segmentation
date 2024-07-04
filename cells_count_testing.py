@@ -29,7 +29,7 @@ from net_utils.utils import save_image
 MASK_IMAGES_SUPPORTED_TYPE = [np.uint16]
 
 # Const to filter out unwanted cells for the counting
-CONSIDERED_LABEL = [1]
+CONSIDERED_LABEL = [5]
 
 def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 5000) -> dict:
     """
@@ -157,8 +157,8 @@ def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value:
         eroded_mask = binary_erosion(dilated_mask, footprint=np.ones((6, 6)))
         delimiting_area = dilated_mask & (~eroded_mask)
 
-        save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account") 
-        save_image(delimiting_area > 0, "./tmp", f"Current delimiting area") 
+        #save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account") 
+        #save_image(delimiting_area > 0, "./tmp", f"Current delimiting area") 
         rgb_line = plot_rgb_image_from_mask(delimiting_area > 0, idx)
         overlap_images(rgb_image, rgb_line, f'./tmp/overlapped_line_{idx}.png')
 
@@ -274,7 +274,7 @@ def overlap_images(image1: np.ndarray, image2, output_path: str):
 
 
 ### Wrapper function ###
-def count_small_connected_components(masks_path: str, cells_area: int, expanding_val: float, rgb_image) -> dict:
+def count_small_connected_components(rgb_images_paths, masks_path: str, cells_area: int, expanding_val: float) -> dict:
 
     """
     Counts small connected components (EVs) around identified cells in labeled masks.
@@ -299,6 +299,7 @@ def count_small_connected_components(masks_path: str, cells_area: int, expanding
 
     # Load all masks from the folder
     gt_masks = load_masks(masks_path)
+    rgb_images = load_masks(rgb_images_paths)
 
     # Ensure debug folder exists (optional)
     debug_folder_path = os.path.join(os.getcwd(), "tmp")  # Use current working directory for debug folder
@@ -309,8 +310,9 @@ def count_small_connected_components(masks_path: str, cells_area: int, expanding
     print(f"Current identified centroids: {centroids_map}")
 
     # Visualize centroids (taken from mask) on the first original image (optional)
-    centroids_list = centroids_map.values()
-    plot_image_with_dots(rgb_image, centroids_list, os.path.join(debug_folder_path, "first_frame_example"))
+    #centroids_list = centroids_map[14].values()
+    current_centroid = centroids_map[5]
+    plot_image_with_dots(rgb_images[0], [current_centroid], os.path.join(debug_folder_path, "first_frame_example"))
 
     # Initialize dictionary to store cell labels and corresponding EV counts
     id_evs_map = defaultdict(list)
@@ -349,7 +351,7 @@ def count_small_connected_components(masks_path: str, cells_area: int, expanding
                 #save_image(current_cell_mask > 0, "./tmp", f"Current label referenced: {current_cell_label} - frame: {idx}") 
                 
                 # Make two times the count of EVs using different expansion values
-                current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_image, idx = idx )
+                current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_images[idx], idx = idx )
                 id_evs_map[label].append(current_evs)
     return id_evs_map
  
@@ -357,15 +359,16 @@ def count_small_connected_components(masks_path: str, cells_area: int, expanding
 if __name__ == '__main__':
      
     # TODO: Testing the features
-    masks_path = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-test/01_GT/SEG"
+    masks_path = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-count/01_RES_Fluo-E2DV-train_GT_01_320_kit-ge_original-dual-unet_02_0.02_0.01"
+    # NOTE: Temorary position
+    rgb_images_paths = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-count/01"
+
+    # Add original path to load the original RGB image for delinneation
     cells_area = 5000
     # NOTE: Soft and hard expanding values are use to count EVs - two values to provide more information about circultaing EVs
-    expanding_val = 100
+    expanding_val = 200
 
-    # NOTE: Temorary position
-    rgb_image = imread("/content/Medical-images-segmentation/training_data/Fluo-E2DV-train/01/t000.tif")
-
-    evs_counter = count_small_connected_components(masks_path, cells_area, expanding_val, rgb_image)
+    evs_counter = count_small_connected_components(rgb_images_paths, masks_path, cells_area, expanding_val)
     print(evs_counter)
     # Save teh dict in a jsopn format for clarity - add utils function in this module
 
