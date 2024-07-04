@@ -11,20 +11,25 @@ to be adaptable to various cell counting algorithms and image processing pipelin
 - **TestResult:** A class to represent the outcome of a cell counting test case.
 """
 import numpy as np
-from typing import Union
+from typing import Union, Optional
 from collections import defaultdict
 from skimage import measure
-from skimage.morphology import binary_dilation
+from skimage.morphology import binary_dilation, binary_erosion
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
+from skimage.io import imread
+from PIL import Image
 
 from ext_modules.utils import *
 from net_utils.utils import save_image
 
 # TODO: Move to typeVerifierObject - avoid constants
 MASK_IMAGES_SUPPORTED_TYPE = [np.uint16]
+
+# Const to filter out unwanted cells for the counting
+CONSIDERED_LABEL = [1]
 
 def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 5000) -> dict:
     """
@@ -109,7 +114,7 @@ def get_nearer_centroid_label(labeled_centroids: dict[int, tuple], centroid_coor
     return nearest_label
 
 
-def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value: float, dim_filter: int) -> int:
+def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value: float, dim_filter: int, rgb_image: Union[None, np.ndarray], idx: int) -> int:
     """
     Counts the number of connected components within a dilated masked area.
 
@@ -145,7 +150,21 @@ def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value:
     # Dilate the mask to capture components in the vicinity
     dilated_mask = binary_dilation(masked_image, footprint=np.ones((expand_value, expand_value)))
 
-    save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account")  
+    # NOTE: Requested the debug images for the technical report during the counting
+    if not rgb_image is None:
+
+        # Additional operations just for the debug print
+        eroded_mask = binary_erosion(dilated_mask, footprint=np.ones((6, 6)))
+        delimiting_area = dilated_mask & (~eroded_mask)
+
+        save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account") 
+        save_image(delimiting_area > 0, "./tmp", f"Current delimiting area") 
+        rgb_line = plot_rgb_image_from_mask(delimiting_area > 0, idx)
+        overlap_images(rgb_image, rgb_line, f'./tmp/overlapped_line_{idx}.png')
+
+        #plot_image_with_highlighted_mask(image = rgb_image, mask = delimiting_area, idx = idx)
+
+    #save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account")  
 
     # Filter labeled image based on overlap with dilated mask
     filtered_labeled_image = labeled_image[dilated_mask]
@@ -179,8 +198,8 @@ def plot_image_with_dots(image: np.ndarray, dots: list[tuple], file_path: str) -
         ValueError: If the input image is not a single-channel grayscale image.
     """
 
-    if len(image.shape) != 2 or image.dtype not in MASK_IMAGES_SUPPORTED_TYPE:
-        raise ValueError("Input image must be a single-channel grayscale image (2D).")
+    #if len(image.shape) != 2 or image.dtype not in MASK_IMAGES_SUPPORTED_TYPE:
+        #raise ValueError("Input image must be a single-channel grayscale image (2D).")
 
     # Plot the grayscale image
     plt.imshow(image)
@@ -194,12 +213,68 @@ def plot_image_with_dots(image: np.ndarray, dots: list[tuple], file_path: str) -
     plt.axis('off')  # Hide axes
     plt.tight_layout()
     plt.savefig(file_path)
-    plt.show()
     plt.close()
 
 
-def count_small_connected_components(masks_path: str, cells_area: int, hard_expanding_val: float,
-                                     soft_expanding_val: float) -> dict:
+def plot_rgb_image_from_mask(mask, idx, resolution=(2048, 2048)):
+
+    # Ensure the mask is of the correct resolution
+    if mask.shape != resolution:
+        raise ValueError(f"Mask must be of shape {resolution}")
+
+    # Create a blank RGB image with all pixels set to black
+    image = np.zeros((resolution[0], resolution[1], 3), dtype=np.uint8)
+
+    # Set the pixels to red where the mask is True
+    image[mask] = [255, 0, 0]
+
+    # Plot and save the image
+    plt.imshow(image)
+    plt.axis('off')  # Turn off the axis
+    plt.savefig(f'./tmp/delimiting_line_{idx}.png', bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    # Return the value
+    return image
+
+
+def overlap_images(image1: np.ndarray, image2, output_path: str):
+    """
+    Overlap two RGB images and save the result.
+    
+    Parameters:
+    image1 (np.ndarray): First image as a 3D numpy array.
+    image2_path (str): Path to the second image.
+    output_path (str): Path where the output image will be saved.
+    """
+    # Load the second image
+    #image2 = Image.open(image2_path)
+    
+    # Ensure the second image is in RGB mode
+    #if image2.mode != 'RGB':
+        #image2 = image2.convert('RGB')
+    #image2 = imread(image2_path)
+    
+    # Convert the second image to a numpy array
+    #image2 = np.array(image2)
+    
+    # Ensure both images have the same dimensions
+    if image1.shape != image2.shape:
+        raise ValueError("The two images must have the same dimensions.")
+    
+    # Blend the images (simple average here, can be adjusted)
+    blended_image = image1.astype(np.float32) + image2.astype(np.float32)
+    blended_image = blended_image.astype(np.uint8)  # Convert back to uint8
+    
+    # Convert the blended image to a PIL Image
+    blended_image_pil = Image.fromarray(blended_image)
+    
+    # Save the result
+    blended_image_pil.save(output_path)
+
+
+### Wrapper function ###
+def count_small_connected_components(masks_path: str, cells_area: int, expanding_val: float, rgb_image) -> dict:
 
     """
     Counts small connected components (EVs) around identified cells in labeled masks.
@@ -222,9 +297,6 @@ def count_small_connected_components(masks_path: str, cells_area: int, hard_expa
         ValueError: If `hard_expanding_val` is greater than or equal to `soft_expanding_val`.
     """
 
-    if hard_expanding_val >= soft_expanding_val:
-        raise ValueError("The hard margin to count EVs (hard_expanding_val) must be lower than the soft value (soft_expanding_val)!")
-
     # Load all masks from the folder
     gt_masks = load_masks(masks_path)
 
@@ -236,9 +308,9 @@ def count_small_connected_components(masks_path: str, cells_area: int, hard_expa
     centroids_map = get_centroids_map(gt_masks[0], dim_filter=cells_area)
     print(f"Current identified centroids: {centroids_map}")
 
-    # Visualize centroids on the first mask (optional)
+    # Visualize centroids (taken from mask) on the first original image (optional)
     centroids_list = centroids_map.values()
-    plot_image_with_dots(gt_masks[0], centroids_list, os.path.join(debug_folder_path, "first_frame_example"))
+    plot_image_with_dots(rgb_image, centroids_list, os.path.join(debug_folder_path, "first_frame_example"))
 
     # Initialize dictionary to store cell labels and corresponding EV counts
     id_evs_map = defaultdict(list)
@@ -250,10 +322,10 @@ def count_small_connected_components(masks_path: str, cells_area: int, hard_expa
         # Keep only small components (potential EVs)
         evs_labeled_image = mask.copy()  # Avoid modifying the original mask
         for reg in measure.regionprops(evs_labeled_image):
-        if reg["area"] > cells_area:
-            # Remove regions exceeding the cell area threshold
-            current_cell_mask = evs_labeled_image == reg["label"]
-            evs_labeled_image[current_cell_mask] = 0
+            if reg["area"] > cells_area:
+                # Remove regions exceeding the cell area threshold
+                current_cell_mask = evs_labeled_image == reg["label"]
+                evs_labeled_image[current_cell_mask] = 0
 
         # Visualize mask with EVs (optional)
         save_image(evs_labeled_image > 0, debug_folder_path, f"Current labeled EVs mask of mask {idx}")
@@ -263,19 +335,23 @@ def count_small_connected_components(masks_path: str, cells_area: int, hard_expa
 
         # Iterate over centroids from the first mask
         for label, centroid in centroids_map.items():
-            
-            # Take label of the current centroid nearer the original centroids
-            current_cell_label = get_nearer_centroid_label(current_centroids_map, centroid)
 
-            # Take the mask of the current cell label
-            current_cell_mask = mask == current_cell_label
+            # Filter out unwanted cells
+            if label in CONSIDERED_LABEL:
             
-            # Debug plot
-            save_image(current_cell_mask > 0, "./tmp", f"Current label referenced: {current_cell_label}") 
-            
-            # Make two times the count of EVs using different expansion values
-            current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = hard_expanding_val, dim_filter = cells_area)
-            id_evs_map[label].append(soft_current_evs)
+                # Take label of the current centroid nearer the original centroids
+                current_cell_label = get_nearer_centroid_label(current_centroids_map, centroid)
+
+                # Take the mask of the current cell label
+                current_cell_mask = mask == current_cell_label
+                
+                # Debug plot
+                #save_image(current_cell_mask > 0, "./tmp", f"Current label referenced: {current_cell_label} - frame: {idx}") 
+                
+                # Make two times the count of EVs using different expansion values
+                current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_image, idx = idx )
+                id_evs_map[label].append(current_evs)
+    return id_evs_map
  
 
 if __name__ == '__main__':
@@ -286,7 +362,11 @@ if __name__ == '__main__':
     # NOTE: Soft and hard expanding values are use to count EVs - two values to provide more information about circultaing EVs
     expanding_val = 100
 
-    _ = count_small_connected_components(masks_path, cells_area, expanding_val)
+    # NOTE: Temorary position
+    rgb_image = imread("/content/Medical-images-segmentation/training_data/Fluo-E2DV-train/01/t000.tif")
+
+    evs_counter = count_small_connected_components(masks_path, cells_area, expanding_val, rgb_image)
+    print(evs_counter)
     # Save teh dict in a jsopn format for clarity - add utils function in this module
 
 
