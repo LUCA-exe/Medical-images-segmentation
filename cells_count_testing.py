@@ -29,7 +29,7 @@ from net_utils.utils import save_image
 MASK_IMAGES_SUPPORTED_TYPE = [np.uint16]
 
 # Const to filter out unwanted cells for the counting
-CONSIDERED_LABEL = [5]
+CONSIDERED_LABEL = [12]
 
 def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 5000) -> dict:
     """
@@ -159,7 +159,7 @@ def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value:
 
         #save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account") 
         #save_image(delimiting_area > 0, "./tmp", f"Current delimiting area") 
-        rgb_line = plot_rgb_image_from_mask(delimiting_area > 0, idx)
+        rgb_line = plot_rgb_image_from_mask(delimiting_area > 0, idx, (masked_image.shape[0], masked_image.shape[1]))
         overlap_images(rgb_image, rgb_line, f'./tmp/overlapped_line_{idx}.png')
 
         #plot_image_with_highlighted_mask(image = rgb_image, mask = delimiting_area, idx = idx)
@@ -311,7 +311,7 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
 
     # Visualize centroids (taken from mask) on the first original image (optional)
     #centroids_list = centroids_map[14].values()
-    current_centroid = centroids_map[5]
+    current_centroid = centroids_map[12]
     plot_image_with_dots(rgb_images[0], [current_centroid], os.path.join(debug_folder_path, "first_frame_example"))
 
     # Initialize dictionary to store cell labels and corresponding EV counts
@@ -351,7 +351,7 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
                 #save_image(current_cell_mask > 0, "./tmp", f"Current label referenced: {current_cell_label} - frame: {idx}") 
                 
                 # Make two times the count of EVs using different expansion values
-                current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_images[idx], idx = idx )
+                current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_images[idx], idx = idx)
                 id_evs_map[label].append(current_evs)
     return id_evs_map
  
@@ -359,14 +359,14 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
 if __name__ == '__main__':
      
     # TODO: Testing the features
-    masks_path = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-count/01_RES_Fluo-E2DV-train_GT_01_320_kit-ge_original-dual-unet_02_0.02_0.01"
+    masks_path = "/content/Medical-images-segmentation/training_data/Fluo-O2DV-count/01_RES_Fluo-E2DV-train_GT_01_320_kit-ge_original-dual-unet_02_0.02_0.01"
     # NOTE: Temorary position
-    rgb_images_paths = "/content/Medical-images-segmentation/training_data/Fluo-E2DV-count/01"
+    rgb_images_paths = "/content/Medical-images-segmentation/training_data/Fluo-O2DV-count/01"
 
     # Add original path to load the original RGB image for delinneation
     cells_area = 5000
     # NOTE: Soft and hard expanding values are use to count EVs - two values to provide more information about circultaing EVs
-    expanding_val = 200
+    expanding_val = 60
 
     evs_counter = count_small_connected_components(rgb_images_paths, masks_path, cells_area, expanding_val)
     print(evs_counter)
