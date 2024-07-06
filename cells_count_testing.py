@@ -150,6 +150,15 @@ def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value:
     # Dilate the mask to capture components in the vicinity
     dilated_mask = binary_dilation(masked_image, footprint=np.ones((expand_value, expand_value)))
 
+    # NOTE: Temporary solution in case of wrong segmentation of the cell - EXTREMELY UNSTABLE
+    if len(np.unique(dilated_mask)) == 1:
+        with open(f'./tmp/dilated_mask_{idx - 1}.npy', 'rb') as f:
+            dilated_mask = np.load(f)
+    
+    # NOTE: Save this dilated mask in case of future wrong segmentation label along this run
+    with open(f'./tmp/dilated_mask_{idx}.npy', 'wb') as f:
+        np.save(f, dilated_mask)
+
     # NOTE: Requested the debug images for the technical report during the counting
     if not rgb_image is None:
 
@@ -366,7 +375,7 @@ if __name__ == '__main__':
     # Add original path to load the original RGB image for delinneation
     cells_area = 5000
     # NOTE: Soft and hard expanding values are use to count EVs - two values to provide more information about circultaing EVs
-    expanding_val = 60
+    expanding_val = 30
 
     evs_counter = count_small_connected_components(rgb_images_paths, masks_path, cells_area, expanding_val)
     print(evs_counter)
