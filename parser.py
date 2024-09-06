@@ -15,7 +15,7 @@ def get_parser():
 
     # Path arguments use trhoughout the repository
 
-    parser.add_argument("--train_images_path",default="training_data/", type=str, help="Path to the train images dataset")
+    parser.add_argument("--train_images_path", default="training_data/", type=str, help="Path to the train images dataset")
     parser.add_argument("--test_images_path", default="test_data/", type=str, help="Path to the test images dataset")
     # Default parameter is my traind dataset (Experiment 01 annotation 02)
     parser.add_argument("--dataset", default="Fluo-E2DV-train", nargs='+', type=str, help="Which dataset folder to access (ca be multiple)")
@@ -122,14 +122,3 @@ def get_processed_args(args):
     if args.pre_train and args.retrain:
         raise Exception('Use either the pre-train option --pre_train or the retrain option --retrain')
     return args
-
-
-
-
-
-
-
-
-
-
-

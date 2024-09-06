@@ -182,7 +182,7 @@ def set_up_training():
     path_models = Path(args.models_folder) # Train all models found here.
     
     # TODO: Make modular - for now just take the first dataset available indicated by the parameter.
-    args.dataset = args.dataset[0] # TODO: To fix.
+    args.dataset = args.dataset[0] # TODO: To fix the temporary 'work around'.
     cell_type = Path(args.dataset)
     
     # Double check if both the training data folder and the specific dataset exist

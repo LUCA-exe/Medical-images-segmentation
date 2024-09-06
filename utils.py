@@ -12,6 +12,7 @@ from os.path import join, exists
 import logging
 from datetime import datetime
 import json
+from typing import Any, Dict, Tuple
 import requests
 import zipfile
 import tifffile as tiff
@@ -21,7 +22,7 @@ from abc import ABC, abstractmethod
 from img_processing.imageUtils import *
 
 
-# TODO: Move this to a 'config file' inside the repository.
+# TODO: Move this to a 'config file' inside the repository - '*.json file'.
 # TODO: If my dataset will become public, manage the download from this script as additional option.
 DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "Fluo-C2DL-MSC", "Fluo-N2DH-GOWT1", "Fluo-N2DL-HeLa",
             "PhC-C2DH-U373", "PhC-C2DL-PSC", "Fluo-N2DH-SIM+"]
@@ -29,9 +30,82 @@ DATASETS = ["BF-C2DL-HSC", "BF-C2DL-MuSC", "DIC-C2DH-HeLa", "Fluo-C2DL-Huh7", "F
 GT_FOLDERS = ['SEG', 'TRA'] # Folders expected in the annotated time lapses (e.g. '01_GT')
 TRAINING_FOLDER = "training_data"
 
+def load_environment_variables(env_file_path: str = "./.env") -> None:
+    """
+    Loads environment variables from a .env file into the OS environment.
 
+    Parameters:
+        env_file_path : The path to the .env file.
+
+    Returns:
+        None
+    """
+    # Load the .env file
+    load_dotenv(dotenv_path = env_file_path)
+
+def set_current_run_folders() -> None:
+    """
+    Initialize the temporary folders for the current run.
+
+    If it present a temporary folder, It will be overwrote.
+    """
+    clear_folder(os.getenv('TEMPORARY_PATH', None))
+    os.makedirs(os.getenv('TEMPORARY_PATH', None), exist_ok=True)
+
+def clear_folder(folder_path) -> None:
+    """
+    Clears all files from the specified folder.
+
+    Args:
+        folder_path: The path to the folder to clear.
+
+    Raises:
+        IOError: If an error occurs during file deletion.
+    """
+    if os.path.isdir(folder_path):
+        for file in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file)
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError as e:
+                    raise IOError(f"Error deleting file: {file_path}") from e
+
+def read_json_file(file_path: str) -> Dict[str, Any]:
+    """
+    Reads a JSON file and returns its contents as a Python dictionary.
+
+    This function opens a JSON file, deserializes its contents, and returns
+    them as a Python dictionary. It handles common errors such as file not
+    found, permission issues, and invalid JSON format.
+
+    Args:
+        file_path: The path to the JSON file.
+
+    Returns:
+        A dictionary containing the contents of the JSON file.
+
+    Raises:
+    FileNotFoundError: If the specified file does not exist.
+    PermissionError:  If the file cannot be accessed due to permission issues.
+    json.JSONDecodeError: If the file contains invalid JSON and cannot be parsed.
+    """
+    try:
+        # Open and read the JSON file
+        with open(file_path, 'r') as json_file:
+            return json.load(json_file)
+
+    except FileNotFoundError as fnf_error:
+        raise FileNotFoundError(f"File not found: {file_path}. Error: {fnf_error}")
+    except PermissionError as perm_error:
+        raise PermissionError(f"Permission denied: {file_path}. Error: {perm_error}")
+    except json.JSONDecodeError as json_error:
+        raise json.JSONDecodeError(f"Failed to parse JSON. Error in file {file_path}: {json_error}", json_error.doc, json_error.pos)
+
+# TODO: Test in the overall pipeline the possibility to not returning the logger obj.
 def create_logging():
-  """ Function to set up the 'INFO' and 'DEBUG' log file
+  """ 
+  Function to set up separately the 'INFO' and 'DEBUG' log files.
   """ 
   os.makedirs(os.getenv('LOGS_PATH', None), exist_ok=True)
 
@@ -75,12 +149,13 @@ def create_logging():
   logger.addHandler(debug_handler)
   return logger
 
+# NOTE: Reaname the function - It is confusing.
+def set_device() -> Tuple[torch.device, int]:
+    """
+    It will check for the devices available - for now uses 
+    a single GPU for train and test
+    """
 
-# NOTE: For now the repository is implemented for single-gpu usage.
-def set_device():
-    # Set device for using CPU or GPU
-
-    #num_gpus = torch.cuda.device_count() - not implemented multi-gpu.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if str(device) == 'cuda':
 
@@ -91,8 +166,26 @@ def set_device():
         num_gpus = 0
     return device, num_gpus
 
+def check_path(log: logging.Logger, path: str) -> bool:
+    """
+    Util function to check for critical folders/files for the 
+    current run.
 
-def set_environment_paths_and_folders():
+    Args:
+        log: Logger object initialized.
+        path: Path to check.
+
+    Raises:
+        FileNotFoundError: In case the provided path (file/folder to check is 
+        not existent).
+    """
+
+    if not exists(path):
+        log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
+        raise FileNotFoundError(f"The '{path}' provided is not existent!")
+    return True
+
+def set_environment_paths_and_folders() -> None:
 
     # Load the paths on the environment
     load_dotenv()
@@ -100,28 +193,6 @@ def set_environment_paths_and_folders():
     # Set-up folders
     clear_folder(os.getenv('TEMPORARY_PATH', None))
     os.makedirs(os.getenv('TEMPORARY_PATH', None), exist_ok=True)
-    return None
-
-
-def clear_folder(folder_path):
-
-    """Clears all files from the specified folder.
-
-    Args:
-        folder_path: The path to the folder to clear.
-
-    Raises:
-        IOError: If an error occurs during file deletion.
-    """
-    if os.path.isdir(folder_path):
-        for file in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, file)
-            if os.path.isfile(file_path):
-                try:
-                    os.remove(file_path)
-                except OSError as e:
-                    raise IOError(f"Error deleting file: {file_path}") from e
-
 
 def check_and_download_evaluation_software(log, software_path):
     # Check if eval. software is already downloaded: if not download it.
@@ -268,17 +339,6 @@ def download_datasets(log, args): # Main function to download the chosen dataset
             log.info(f"Dataset {args.download_dataset} not found in the available list!")
     log.info(f"Program terminated")
     return None
-
-
-def check_path(log, path):
-    # Util function to check for existing path - it will raise an Error.
-
-    if not exists(path):
-        log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
-        raise ValueError(f"The '{path}' provided is not existent")
-
-    return True
-
 
 class i_train_factory(ABC):
     """Interface for creating training arguments classes."""
