@@ -1,6 +1,8 @@
-''' ./net_utils/utils.py
-This file contains all the functions to store/save results (both models/metrics).
-'''
+"""
+This file provides additional util functions for both train/eval pipelines
+as laoding the model weights, save/overwrite the metrics and results.
+"""
+import logging
 import json
 import numpy as np
 import shutil
@@ -10,30 +12,40 @@ import tifffile as tiff
 import matplotlib.pyplot as plt
 from multiprocessing import cpu_count
 import torch
+from torch import nn
+from typing import Dict, Union
 import pandas as pd
 
 from net_utils import unets
 
 
-def create_model_architecture(log, model_config, device, num_gpus, pre_train = False):
-    # Given the parsed training arguments, create the U-Net architecture - used both by training and eval phases
+def create_model_architecture(log: logging.Logger, model_config: Dict[str, Union[str, int]], device: int, num_gpus: int, pre_train: bool = False) -> nn.Module:
+    """
+    Call the public method in the './unets.py' module to return the correct
+    NN class.
+
+    Returns:
+        Custom neural networks builded inheriting from the 'nn.Module'
+        and using 'nn.layers/functionals'. 
+    """
     
     if pre_train:
         unet_type = 'AutoU' # Get CNN (U-Net without skip connections)
     else:
         unet_type = model_config['architecture'][0]
 
-    net = unets.build_unet(log, unet_type=unet_type, 
-                                act_fun=model_config['architecture'][2],
-                                pool_method=model_config['architecture'][1],
-                                normalization=model_config['architecture'][3],
-                                device=device,
-                                num_gpus=num_gpus,
-                                ch_in=1,
-                                ch_out=1,
-                                filters=model_config['architecture'][4],
-                                detach_fusion_layers=model_config['architecture'][5],
-                                softmax_layer=model_config['architecture'][6])
+    net = unets.build_unet(log, 
+                           unet_type = unet_type,
+                           act_fun = model_config['architecture'][2],
+                           pool_method = model_config['architecture'][1],
+                           normalization = model_config['architecture'][3],
+                           device = device,
+                           num_gpus = num_gpus,  # FIXME: Use the 'num_gpus' key-value pair in the 'model_config' dict.
+                           ch_in = 1,
+                           ch_out = 1,
+                           filters = model_config['architecture'][4],
+                           detach_fusion_layers = model_config['architecture'][5],
+                           softmax_layer = model_config['architecture'][6])
     return net
 
 

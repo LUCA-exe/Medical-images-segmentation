@@ -1,6 +1,11 @@
-'''
-This script builds the u-net for train/inference time.
-'''
+"""
+This module provides the core classes/methods to return the 
+bult NN objects.
+
+There are available differnt configurations, those are returned 
+based on the paramters/args passed to the public function 
+'build_unet'.
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

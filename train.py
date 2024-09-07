@@ -30,7 +30,6 @@ def set_up_args_and_folder():
     args = get_processed_args(args)
     return args, log
 
-
 def set_up_training_set(log, args, path_data, cell_type):
     # Pre-processing pipeline among the ones implemented to create the training set
 
@@ -41,7 +40,6 @@ def set_up_training_set(log, args, path_data, cell_type):
             create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images, crop_size = crop_size)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
-
 
 def get_training_args_class(log, args, train_factory):
     # Get training args class depending on the chosen model pipeline
@@ -68,7 +66,6 @@ def get_training_args_class(log, args, train_factory):
     # Training parameters used for all the iterations/crop options given.                         
     log.info(train_args)
     return train_args
-
 
 def get_model_config(log, train_args, num_gpus):
     # Get training settings

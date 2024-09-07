@@ -12,11 +12,12 @@ from os.path import join, exists
 import logging
 from datetime import datetime
 import json
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 import requests
 import zipfile
 import tifffile as tiff
 from dotenv import load_dotenv
+import abc
 from abc import ABC, abstractmethod
 
 from img_processing.imageUtils import *
@@ -340,13 +341,20 @@ def download_datasets(log, args): # Main function to download the chosen dataset
     log.info(f"Program terminated")
     return None
 
-class i_train_factory(ABC):
-    """Interface for creating training arguments classes."""
+class train_factory_interface(metaclass=abc.ABCMeta):
+    """
+    Interface for creating training arguments classes.
 
-    @abstractmethod
+    It provides the single method that a 'concrete' class
+    has to provide for instantiating the correct architecture
+    arguments class.
+    """
+
+    @abc.abstractmethod
     def create_argument_class(self, *args):
         """
-        Creates an training args. class based on the number of arguments.
+        Creates an training args. class based on the first
+        element in the *args tuple provided.
 
         Args:
             *args: Variable-length argument list containing input arguments.
@@ -355,16 +363,27 @@ class i_train_factory(ABC):
             EvalClass: An instance of an appropriate training argument class.
         """
 
-        raise NotImplementedError("create_train_class() must be implemented")
+        raise NotImplementedError
 
 
-class train_factory(i_train_factory):
+class train_factory(train_factory_interface):
+    """
+    Concrete factory for instantiating 'train_arg' classes based
+    on the first parameter passed as name of the architecture.
+    """
 
-    def create_argument_class(self, *args):
-        # First arg. is the chosen model pipeline
+    def create_arg_class(self, *args):
+        """
+        Override the interface method and 
+        intantiates the correct 'train_arg_*' class.
+
+        Args:
+            args (tuple): The arguments specific for the class to instantite.
+            Note the the class returned is chosen on the args[0] tuple value.
+        """
 
         if args[0] == "dual-unet":
-            return train_arg_du(args)
+            return train_arg_dual_unet(args)
 
         elif args[0] == "original-dual-unet":
             return train_arg_tu(args)
@@ -376,39 +395,45 @@ class train_factory(i_train_factory):
             raise ValueError(f"{args[0]} is an invalid model pipeline.")
 
 
-class a_train_arg_class(ABC):
-    """Abstract base class for evaluation arguments."""
+class train_arg_class_interface(metaclass=abc.ABCMeta):
+    """
+    Interface for the methods needed for parsing the correspondent
+    architecture parameters during the construction.
+    """
 
-  
-    @abstractmethod
+    @abc.abstractmethod
     def __str__(self):
         """
-        Abstract method to return in plain text the class attributes.
+        It returns in plain text the class attributes.
         """
-
+        raise NotImplementedError
 
     @abstractmethod
     def get_arch_args(self):
         """
-        Abstract method to return in tuple all the params regarding the architectures. 
+        It returns in tuple all the stored args regarding the core architecture
+        layers/configuration. 
+
+        Specifically, every concrete methods has to return the tuple of args
+        in the same expected order to use the model class.
         """
 
+    # FIXME: See if it is functional this method, or override anyway in the concrete classes
     def get_name(self):
         """
         Returns the name of the argument class.
-
-        Returns:
-            str: The name of the pipeline used in the training phase.
         """
-
         return self.__class__.__name__
 
 
-class train_arg_du(a_train_arg_class):
-    """Specific argument training class for the KIT-GE model implementation."""
+# FIXME: Instead of positional args (*args) use the **kwargs.
+class train_arg_dual_unet(train_arg_class_interface):
+    """
+    Specific argument training class for the KIT-GE model implementation taken from the paper
+    "https://arxiv.org/abs/2004.01486".
+    """
 
-    def __init__(self, args):
-
+    def __init__(self, args: tuple):
         self.arch = args[0]
         self.act_fun = args[1]
         self.batch_size = args[2]
@@ -426,18 +451,18 @@ class train_arg_du(a_train_arg_class):
         self.pre_processing_pipeline = args[15]
         self.classification_loss = False # NOTE: In this architecture is not present the classification branch
 
-
-    def get_arch_args(self):
-        # Return all the architecture args as tuple
-
+    def get_arch_args(self) -> Tuple[Union[str, bool]]:
+        """
+         Return all the architecture args as tuple
+         """
         return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False, False
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
-        return f"train_args for Dual U-net of KIT-GE({attributes})"
+        return f"train_args for Dual U-net implementation of KIT-GE({attributes})"
 
 
-class train_arg_tu(a_train_arg_class):
+class train_arg_tu(train_arg_class_interface):
     """Specific argument training class for my Triple-Unet."""
 
     def __init__(self, args):
@@ -472,7 +497,7 @@ class train_arg_tu(a_train_arg_class):
         return f"train_args for Triple U-net ({attributes})"
 
 
-class train_arg_odu(a_train_arg_class):
+class train_arg_odu(train_arg_class_interface):
     """Specific argument training class for the Dual U-net."""
 
     def __init__(self, args):
