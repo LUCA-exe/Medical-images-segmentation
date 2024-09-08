@@ -713,14 +713,27 @@ def log_final_images_properties(log, image):
     return None
 
 
-def show_training_dataset_samples(log, dataset, samples = 60):
-    # Visual debug for the images used in the training set.
+def show_training_dataset_samples(log, dataset: torch.utils.data.Dataset, n_sample: int = 10) -> None:
+    """
+    It plots a defined number of images to provide a sample of data from the group used
+    for the training.
+
+    Args:
+        dataset: A split ('train' or 'val') of type 'CellSegDataset'.
+        n_sample: Number of sample to show - every sample is all the different
+        format/transformation of the original image patch.   
+    """
+
+    # Pre-conditions
+    if n_sample > len(dataset):
+        log.debug(f"""The original {n_sample} sample requested are too much, the 
+                  current dataset contains {len(dataset)} samples""")
+        n_sample = len(dataset)
 
     count_neighbor_distance = 0
-
-    log.debug(f"Visually inspect the first {samples} samples of images from the training Dataset")
+    log.debug(f"Visually inspect the first {n_sample} samples of images from the training Dataset")
     folder = os.getenv("TEMPORARY_PATH")
-    for idx in range(samples):
+    for idx in range(n_sample):
 
         image_dict = dataset[idx]
         for pos, (key, image) in enumerate(image_dict.items()):
@@ -731,10 +744,8 @@ def show_training_dataset_samples(log, dataset, samples = 60):
             # Keep track of not-blank neighbor tranform
             if key == "border_label" and np.squeeze(image).sum(axis = None) > 0:
                 count_neighbor_distance += 1
-    print(f"Between the shown example, the {round(count_neighbor_distance/samples, 2)}% of distance tranform are not-blanck!")
+    print(f"Between the shown example, the {round(count_neighbor_distance/n_sample, 2)}% of distance tranform are not-blanck!")
     log.debug(f"Images correctly saved in {folder} before the training phase!")
-    return True
-
 
 def show_inference_dataset_samples(log, dataset, samples = 3):
     # Visual debug for the images used in the inference phase.

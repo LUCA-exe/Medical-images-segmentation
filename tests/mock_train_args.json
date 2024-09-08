@@ -6,5 +6,19 @@
     "crop_size": 320,
     "min_a_images": 30,
     "split": "01",
-    "mode": "GT"
+    "mode": "GT",
+    "act_fun": "relu",
+    "batch_size": 2,
+    "filters": [64, 1024],
+    "detach_fusion_layers": false,
+    "iterations": 1,
+    "loss": "smooth_l1",
+    "norm_method": "bn",
+    "optimizer": "adam",
+    "pool_method": "conv",
+    "pre_train": false,
+    "retrain": false,
+    "softmax_layer": false,
+    "classification_loss": "cross_entropy"
+
 }

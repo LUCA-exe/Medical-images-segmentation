@@ -85,6 +85,7 @@ def get_model_config(log, train_args, num_gpus):
     return model_config
 
 
+# NOTE: Refactoring in progress.
 def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):
     # Loop to iterate over the different trained/re-trained architectures.
 

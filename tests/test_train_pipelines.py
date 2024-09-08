@@ -81,12 +81,14 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
     It starts the parsing of the arguments to create the architecture and start the training
     loop if the dataset is craeted correctly in the previous steps.
     """
-
+    # FIXME: Adjust temporary the args to be 'iterables' (e.g 'crop_size).
+    args["crop_size"] = [args["crop_size"]]
+    
     # NOTE: it was originally a single function - adjust after first tests
-    train_args_cls = train_factory.create_argument_class(args["model_pipeline"],
+    train_args_cls = train_factory.create_arg_class(args["model_pipeline"],
                                                          args["act_fun"],
                                                          args["batch_size"],
-                                                         args["args.filters"],
+                                                         args["filters"],
                                                          args["detach_fusion_layers"],
                                                          args["iterations"],
                                                          args["loss"],
@@ -119,11 +121,8 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
     log.info(f"Model configuration: {model_config}")
     net = create_model_architecture(log, model_config, device, num_gpus)
 
-    # Adjust temporary the args to be 'iterables' (e.g 'crop_size).
-    args["crop_size"] = [args["crop_size"]]
-
     # Call the original methods - method to refactor.
-    set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
+    set_up_training_loops(log, train_args_cls, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
 
     
 def update_default_args(default_args: Dict, new_args: Dict) -> Dict[str, Any]:
@@ -234,7 +233,7 @@ class TestMockTrainPipelines:
                 assert images_integrity == True
 
     @pytest.mark.pipeline
-    def test_training_dataset_creation(self):
+    def test_training_loop(self):
         """
         Set environment folders, run the creation of the training dataset folder and 
         execute the training loop.
@@ -242,7 +241,8 @@ class TestMockTrainPipelines:
         
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320}
+            {"dataset": "Mock-E2DV-train", "crop_size": 320},
+            {"dataset": "Mock-E2DV-train", "crop_size": 480}
         ]
 
         for test_args in test_arguments:

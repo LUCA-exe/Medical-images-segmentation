@@ -351,7 +351,7 @@ class train_factory_interface(metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def create_argument_class(self, *args):
+    def create_arg_class(*args):
         """
         Creates an training args. class based on the first
         element in the *args tuple provided.
@@ -372,7 +372,8 @@ class train_factory(train_factory_interface):
     on the first parameter passed as name of the architecture.
     """
 
-    def create_arg_class(self, *args):
+    @staticmethod
+    def create_arg_class(*args):
         """
         Override the interface method and 
         intantiates the correct 'train_arg_*' class.
@@ -433,7 +434,7 @@ class train_arg_dual_unet(train_arg_class_interface):
     "https://arxiv.org/abs/2004.01486".
     """
 
-    def __init__(self, args: tuple):
+    def __init__(self, args: Tuple):
         self.arch = args[0]
         self.act_fun = args[1]
         self.batch_size = args[2]
