@@ -57,6 +57,26 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
     if check_path(log, path_data) and check_path(log, join(path_data, cell_type)):
         trainset_name = args["dataset"] # 'args.dataset' used as cell type
 
+    # FIXME: Duplicated for now - testing purposes.
+    train_args_cls = train_factory.create_arg_class(args["model_pipeline"],
+                                                         args["act_fun"],
+                                                         args["batch_size"],
+                                                         args["filters"],
+                                                         args["detach_fusion_layers"],
+                                                         args["iterations"],
+                                                         args["loss"],
+                                                         args["norm_method"],
+                                                         args["optimizer"],
+                                                         args["pool_method"],
+                                                         args["pre_train"],
+                                                         args["retrain"],
+                                                         args["split"],
+                                                         args["crop_size"],
+                                                         args["mode"],
+                                                         args["pre_processing_pipeline"],
+                                                         args["softmax_layer"],
+                                                         args["classification_loss"])
+
     # Originally in another function.
     if args["pre_processing_pipeline"] == 'kit-ge':
         log.info(f"Creation of the training dataset using {args['pre_processing_pipeline']} pipeline for {args['crop_size']} crops")
@@ -73,7 +93,6 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
     
     # FIXME: Temporary passing the 'logging.Logger()' object around
     return log, num_gpus, device, path_data, trainset_name, path_models
-
 
 def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, device: torch.device,
                                 path_data: str, trainset_name: str, path_models: str) -> None:
@@ -115,7 +134,8 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
                     'loss': train_args_cls.loss,
                     'classification_loss': train_args_cls.classification_loss,
                     'num_gpus': num_gpus,
-                    'optimizer': train_args_cls.optimizer
+                    'optimizer': train_args_cls.optimizer,
+                    'max_epochs': 1  # NOTE: Set to 1 for testing purposes 
                     }  # TODO: Add the device obj. directly inside the 'model_config' hashmap. 
     
     log.info(f"Model configuration: {model_config}")
@@ -150,7 +170,7 @@ def check_created_training_set_structure(folder_path: str, expected_folders: Lis
     prior to the training loops.
     """ 
     dir_list = os.listdir(folder_path)
-
+    
     # The expected folders/files structure is not respected
     if sorted(dir_list) != sorted(expected_files + expected_folders):
         return False 
@@ -178,7 +198,7 @@ def check_created_images(dataset_folder: str, folder_path: str, expected_image_p
     
     # For each group of images count the number of occurrences
     for prefix in expected_image_prefixes:
-        current_files = [file for file in dir_list if file.startswith(prefix)]
+        current_files = [file for file in dir_list if file.split(dataset_folder)[0] == prefix]
         if len(current_files) != expected_image_number:
             return False
     return True
@@ -199,10 +219,9 @@ class TestMockTrainPipelines:
         """
         expected_folders = ["A", "B", "train", "val"]
         expected_files = ["info.json"]
-        expected_images_prefix = ["dist_cell_", "dist_neighbor_", "img_", "mask_"]
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38]}
+            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38], "expected_images_prefix": ["dist_cell_", "dist_neighbor_", "img_", "mask_", "binary_border_label_", "mask_label_"]}
         ]
 
         for test_args in test_arguments:
@@ -228,9 +247,14 @@ class TestMockTrainPipelines:
                 current_folder_to_check = join(dataset_folder_path, folder)
                 images_integrity = check_created_images(test_args["dataset"],
                                      current_folder_to_check,
-                                     expected_images_prefix,
+                                     test_args["expected_images_prefix"],
                                      expected_image_number)
                 assert images_integrity == True
+
+                """
+                Test function corrently in use to support
+                the creation dataset module refactoring.
+                """
 
     @pytest.mark.pipeline
     def test_training_loop(self):
@@ -241,8 +265,7 @@ class TestMockTrainPipelines:
         
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320},
-            {"dataset": "Mock-E2DV-train", "crop_size": 480}
+            {"dataset": "Mock-E2DV-train", "crop_size": 640}
         ]
 
         for test_args in test_arguments:

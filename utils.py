@@ -12,7 +12,7 @@ from os.path import join, exists
 import logging
 from datetime import datetime
 import json
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union, List
 import requests
 import zipfile
 import tifffile as tiff
@@ -216,7 +216,6 @@ def check_and_download_evaluation_software(log, software_path):
     log.info(f"Evaluation software correctly set up")
     return None # Evaluation folder correctly set up
 
-
 def __download_data(log, url, target): 
     # Download from the provided url with a specific chunk size
 
@@ -235,7 +234,6 @@ def __download_data(log, url, target):
                 f.write(chunk)
     return local_filename
 
-
 def unzip_donwloaded_file(log, path, target = 'none'):
     # Unzip the file and remove the original zipped version.
 
@@ -250,7 +248,6 @@ def unzip_donwloaded_file(log, path, target = 'none'):
     log.info(f"The file {path + '.zip'} correctly removed")
     return True
 
-
 def check_downloaded_images(log, images_path):
     # As default will be used '01' ('01_GT/SEG' and '01_GT/TRA') with the respective first files - first check.
 
@@ -261,7 +258,6 @@ def check_downloaded_images(log, images_path):
     image = tiff.imread(os.path.join(images_path, images[0]))
     log_image_characteristics(log, image, images[0].split('.')[0]) # Log characteristics of images
     return None
-
 
 def __check_and_download_dataset(log, dataset_path, url): 
     # Check if It is alredy available, if not download it (function used both for test/train splits).
@@ -293,7 +289,6 @@ def __check_and_download_dataset(log, dataset_path, url):
     else:
         log.info(f"'{dataset_path}' exists already!")
     return None
-
 
 def download_datasets(log, args): # Main function to download the chosen datasets and set up their utilization
     """ Function to download the images in the path passed by arguments - dataset folder structure is fixed.
@@ -366,36 +361,6 @@ class train_factory_interface(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
-class train_factory(train_factory_interface):
-    """
-    Concrete factory for instantiating 'train_arg' classes based
-    on the first parameter passed as name of the architecture.
-    """
-
-    @staticmethod
-    def create_arg_class(*args):
-        """
-        Override the interface method and 
-        intantiates the correct 'train_arg_*' class.
-
-        Args:
-            args (tuple): The arguments specific for the class to instantite.
-            Note the the class returned is chosen on the args[0] tuple value.
-        """
-
-        if args[0] == "dual-unet":
-            return train_arg_dual_unet(args)
-
-        elif args[0] == "original-dual-unet":
-            return train_arg_tu(args)
-
-        elif args[0] == "triple-unet":
-            return train_arg_tu(args)
-
-        else:
-            raise ValueError(f"{args[0]} is an invalid model pipeline.")
-
-
 class train_arg_class_interface(metaclass=abc.ABCMeta):
     """
     Interface for the methods needed for parsing the correspondent
@@ -409,7 +374,7 @@ class train_arg_class_interface(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @abc.abstractmethod
     def get_arch_args(self):
         """
         It returns in tuple all the stored args regarding the core architecture
@@ -417,6 +382,14 @@ class train_arg_class_interface(metaclass=abc.ABCMeta):
 
         Specifically, every concrete methods has to return the tuple of args
         in the same expected order to use the model class.
+        """
+    
+    # NOTE: Work in progress.
+    @abc.abstractmethod
+    def get_requested_image_labels(self):
+        """
+        It returns a tuple with the requested label to generate for 
+        training the correspondent neural network.
         """
 
     # FIXME: See if it is functional this method, or override anyway in the concrete classes
@@ -452,11 +425,22 @@ class train_arg_dual_unet(train_arg_class_interface):
         self.pre_processing_pipeline = args[15]
         self.classification_loss = False # NOTE: In this architecture is not present the classification branch
 
+        # Internal attributes
+        # TODO: check againts a config.json file for the 'allowed' images to request.
+        self._ground_truth_labels = tuple("dist_cell_and_neighbor")
+
     def get_arch_args(self) -> Tuple[Union[str, bool]]:
         """
          Return all the architecture args as tuple
          """
         return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False, False
+
+    def get_requested_image_labels(self) -> Tuple[str]:
+        """
+        It returns a tuple with the requested label to generate for 
+        training the correspondent neural network.
+        """
+        return self._ground_truth_labels
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
@@ -531,6 +515,36 @@ class train_arg_odu(train_arg_class_interface):
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
         return f"train_args for the original Dual U-net ({attributes})"
+
+
+class train_factory(train_factory_interface):
+    """
+    Concrete factory for instantiating 'train_arg' classes based
+    on the first parameter passed as name of the architecture.
+    """
+
+    @staticmethod
+    def create_arg_class(*args) -> Union[train_arg_dual_unet, train_arg_odu, train_arg_tu]:
+        """
+        Override the interface method and 
+        intantiates the correct 'train_arg_*' class.
+
+        Args:
+            args (tuple): The arguments specific for the class to instantite.
+            Note the the class returned is chosen on the args[0] tuple value.
+        """
+
+        if args[0] == "dual-unet":
+            return train_arg_dual_unet(args)
+
+        elif args[0] == "original-dual-unet":
+            return train_arg_tu(args)
+
+        elif args[0] == "triple-unet":
+            return train_arg_tu(args)
+
+        else:
+            raise ValueError(f"{args[0]} is an invalid model pipeline.")
 
 
 class i_eval_factory(ABC):

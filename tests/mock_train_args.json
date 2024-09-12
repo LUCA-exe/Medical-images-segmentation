@@ -3,6 +3,7 @@
     "pre_processing_pipeline": "kit-ge",
     "model_pipeline": "dual-unet",
     "models_folder": "./models/all/",
+    "scale": 1,
     "crop_size": 320,
     "min_a_images": 30,
     "split": "01",

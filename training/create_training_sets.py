@@ -1,9 +1,10 @@
-import hashlib
 import json
 import math
 import numpy as np
 import os
 import tifffile as tiff
+import copy
+import scipy.ndimage as ndimage
 
 from pathlib import Path
 from random import shuffle, random
@@ -13,6 +14,7 @@ from skimage.measure import regionprops
 from skimage.morphology import binary_closing, binary_opening
 from skimage.transform import rescale
 
+from utils import train_arg_class_interface
 from training.train_data_representations import distance_label_2d
 from net_utils.utils import get_nucleus_ids, write_file
 
@@ -194,8 +196,11 @@ def foi_correction_train(cell_type, mode, *imgs):
     return img_corr
 
 
-def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame, path, crop_idx=0, slice_idx=None):
-    """ Calculate cell and neighbor distances and create crops.
+# TODO: Add the train_args class with the encapsulated 'needed' images.
+def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame, path, train_arg_class) -> None:
+    """ 
+    Calculate cell and neighbor distances - the saved images are already cropped when saved 
+    in this function.
 
     :param img: Image.
         :type img: numpy array
@@ -217,9 +222,8 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
         :type path: Pathlib Path object
     :crop_idx: Index to count generated crops and break the data generation if the maximum ammount is reached (for STs)
         :type crop_idx: int
-    :param slice_idx: Slice index (for 3D data).
+    :param slice_idx: DEPRECATED - Slice index (for 3D data).
         :type slice_idx: int
-    :return: None
     """
 
     # Calculate train data representations
@@ -242,17 +246,16 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
                                                                                             img, mask, cell_dist,
                                                                                             neighbor_dist, tra_gt)
             # Get crop name
-            if slice_idx is not None:
-                crop_name = '{}_{}_{}_{}_{:02d}_{:02d}_{:02d}.tif'.format(cell_type, mode, subset, frame, slice_idx, y, x)
-            else:
-                crop_name = '{}_{}_{}_{}_{:02d}_{:02d}.tif'.format(cell_type, mode, subset, frame, y, x)
+            crop_name = '{}_{}_{}_{}_{:02d}_{:02d}.tif'.format(cell_type, mode, subset, frame, y, x)
 
             # Check cell number TRA/SEG
             tr_ids, mask_ids = get_nucleus_ids(tra_gt_crop), get_nucleus_ids(mask_crop)
             if np.sum(mask_crop[10:-10, 10:-10, 0] > 0) < td_settings['min_area']:  # only cell parts / no cell
                 continue
+
             if len(mask_ids) == 1:  # neighbor may be cut from crop --> set dist to 0
                 neighbor_dist_crop = np.zeros_like(neighbor_dist_crop)
+
             if np.sum(img_crop == 0) > (0.66 * img_crop.shape[0] * img_crop.shape[1]):  # almost background
                 # For (e.g.) GOWT1 cells a lot of 0s are in the image
                 if np.min(img_crop[:100, :100, ...]) == 0:
@@ -260,10 +263,15 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
                         continue
                 else:
                     continue
+
             if np.max(cell_dist_crop) < 0.8:
                 continue
+                        
+            # Final transformations are done if the current 'crop' is deemed 'acceptable'
+            binary_border_label = extract_binary_border_labels(mask_crop)
+            mask_label = prepare_seg_mask(mask_crop)
 
-            # Remove only partially visible cells in mask for better comparison with tra_gt
+            # Don't count the partially visible cells in mask for better comparison with tra_gt
             props_crop, n_part = regionprops(mask_crop), 0
             for cell in props_crop:
                 if mode == 'GT' and cell.area <= 0.1 * td_settings['min_area'] and td_settings['scale'] == 1:  # needed since tra_gt seeds are smaller
@@ -275,14 +283,9 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
             else:
                 continue
 
-            # Save only needed crops for kit-sch-ge split
+            # NOTE: Deprecated - Save only needed crops for kit-sch-ge split.
             if td_settings['used_crops']:
-                if isinstance(slice_idx, int):
-                    if not ([subset, frame, '{:02d}'.format(slice_idx), '{:02d}'.format(y), '{:02d}'.format(x), 'train'] in td_settings['used_crops']) \
-                            and not ([subset, frame, '{:02d}'.format(slice_idx), '{:02d}'.format(y), '{:02d}'.format(x), 'val'] in td_settings['used_crops']):
-                        continue
-                else:
-                    if not ([subset, frame, '{:02d}'.format(y), '{:02d}'.format(x), 'train'] in td_settings['used_crops']) \
+                if not ([subset, frame, '{:02d}'.format(y), '{:02d}'.format(x), 'train'] in td_settings['used_crops']) \
                             and not ([subset, frame, '{:02d}'.format(y), '{:02d}'.format(x), 'val'] in td_settings['used_crops']):
                         continue
 
@@ -291,16 +294,60 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
             tiff.imsave(str(path / crop_quality / 'mask_{}'.format(crop_name)), mask_crop)
             tiff.imsave(str(path / crop_quality / 'dist_cell_{}'.format(crop_name)), cell_dist_crop)
             tiff.imsave(str(path / crop_quality / 'dist_neighbor_{}'.format(crop_name)), neighbor_dist_crop)
+            tiff.imsave(str(path / crop_quality / 'mask_label_{}'.format(crop_name)), mask_label)
+            tiff.imsave(str(path / crop_quality / 'binary_border_label_{}'.format(crop_name)), binary_border_label)
+            
+"""
+Adding utilities for creation of multiple images - finish to test.
+"""
+def extract_binary_border_labels(mask: np.ndarray, border_width: int = 4) -> np.ndarray:
+    """
+    Extracts binary borders of cells from a binary segmentation mask.
 
-            # Increase crop counter
-            crop_idx += 1
+    Args:
+        mask: Binary mask (2D Array of uint16 type) with cells represented as 1 and background as 0.
+        border_width: Width of the border to extract from the annotated particles.
 
-            if mode == 'ST' and crop_idx > td_settings['st_limit']:
-                # In the first release of this code, for 3D ST data all possible crops have been created and selected
-                # afterwards. So, there is a small discrepancy but the old version needed too much time.
-                return crop_idx
+    Returns:
+        np.ndarray: Mask with only cell borders remaining.
+    """
+    # pre-conditions - np.ndarray of uint16
+    if not mask.dtype == np.uint16:
+        raise ValueError(f"The current cropped mask passed is of a type class {mask.dtype}")
+    
+    mask = copy.copy(mask)
+    # NOTE: Currently reating all the cells as the same class (e.g. not distinguish between the EVs and Cells)
+    mask[mask > 0] = 1 
 
-    return crop_idx
+    # Work with the boolean array to invert the original mask
+    inverted_mask = ~mask.astype(bool)
+    inverted_mask = inverted_mask.astype(int)
+
+    # Dilate the mask to slightly enlarge the borders (handling very thin borders)
+    dil_inverted_mask = ndimage.binary_dilation(inverted_mask, iterations = border_width)
+    
+    # Obtain the borders directly by difference
+    cell_border = dil_inverted_mask ^ inverted_mask
+
+    # Post-conditions
+    cell_border = cell_border.astype(mask.dtype)
+    return cell_border
+
+def prepare_seg_mask(mask: np.ndarray) -> np.ndarray:
+        """
+        Prepare the segmentation mask for the binary cross entropy.
+
+        Args:
+            mask: Integer np.ndarray with every cell represented
+            by a different number
+
+        Returns:
+            Binary annotated mask - not distringuishing between different cell types.
+        """ 
+
+        mask_picture = copy.copy(mask) # Work on the copy of the object - no reference
+        mask_picture[mask_picture > 0] = 1 
+        return mask_picture
 
 
 def get_crop(x, y, crop_size, *imgs):
@@ -574,7 +621,7 @@ def remove_st_with_gt_annotation(st_ids, annotated_gt_frames):
 
 
 def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', crop_size=320, st_limit=280,
-                             n_max_train_gt_st=150, n_max_val_gt_st=30, min_a_images=30):
+                             min_a_images=30, train_arg_class: train_arg_class_interface = None) -> None:
     """ Create training sets for Cell Tracking Challenge data.
 
     In the new version of this code, 2 Fluo-C3DL-MDA231 crops and 1 Fluo-C3DH-H157 crop differ slightly from the
@@ -594,15 +641,8 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         :type split: str
     :param crop_size: Size of the generated crops (square).
         :type crop_size: int
-    :param st_limit: Maximum amount of ST crops to create (reduces computation time.
+    :param st_limit: DEPRECATED - Maximum amount of ST crops to create (reduces computation time.
         :type st_limit: int
-    :param n_max_train_gt_st: Maximum number of gold truths per cell type in the training sets of training datasets
-            consisting of multiple cell types.
-        :type n_max_train_gt_st: int
-    :param n_max_val_gt_st: Maximum number of gold truths per cell type in the validation sets of training datasets
-            consisting of multiple cell types.
-        :type n_max_val_gt_st: int
-    :return: None
     """
 
     if split == 'kit-sch-ge':
@@ -660,7 +700,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         if 'GT' in mode:
             tra_gt = tiff.imread(str(mask_id.parents[1] / 'TRA' / "man_track{}.tif".format(frame)))
         else:  # Do not use TRA GT to detect high quality STs (to be able to compare ST and GT results)
-            raise TypeError("For now just 'GT' is supported!")
+            raise NotImplementedError("For now just 'GT' is supported!")
 
         # FOI correction: followin the standard CTC requests for the pixels near the border.
         img, mask, tra_gt = foi_correction_train(cell_type, mode, img, mask, tra_gt)
@@ -671,13 +711,15 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
             mask = downscale(img=mask, scale=td_settings['scale'], order=0, aa=False)
             tra_gt = downscale(img=tra_gt, scale=td_settings['scale'], order=0, aa=False)
 
-        # Normalization: min-max normalize image to [0, 65535] - Can be automated optimized
+        # Normalization: min-max normalize image to [0, 65535] - Can be automated/optimized
         img = 65535 * (img.astype(np.float32) - img.min()) / (img.max() - img.min())
         img = np.clip(img, 0, 65535).astype(np.uint16) # Kept the requested type 'unsigned' integer 16 bits
 
         # Calculate distance transforms, crop and classify crops into 'A' (fully annotated) and 'B' (>80% annotated)
         _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=cell_type,
                                       mode=mode, subset=subset, frame=frame, path=path_trainset)
+        
+        # 
 
     td_settings.pop('used_crops')
     if mode == 'GT':
@@ -716,4 +758,3 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # NOTE: The original repository contained a beatiful method to merge multiple dataset/cell type patches avoiding a final 'unbalanced' train/val split
     log.info(f"Trainig dataset created correctly")
-    return None

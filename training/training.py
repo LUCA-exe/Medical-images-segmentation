@@ -279,8 +279,12 @@ def train(log, net, datasets, config, device, path_models, best_loss=1e4):
     # Assert that the datasets has been created correctly before the loop over the images
     show_training_dataset_samples(log, datasets["train"])
 
-    # Get number of training epochs depending on dataset size (just roughly to decrease training time):
-    config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']), config)
+    # NOTE: If it is not passed as arguments, set in this method.
+    if not "max_epochs" in config:
+        log.info(f"The 'max epochs' param is not set yet, it will be inferred now!")
+        # Get number of training epochs depending on dataset size (just roughly to decrease training time):
+        config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']), config)
+
     # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
     print(f"Number of epochs without improvement allowed {2 * config['max_epochs'] // 20 + 5}")
 

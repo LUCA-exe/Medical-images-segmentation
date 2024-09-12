@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from multiprocessing import cpu_count
 import torch
 from torch import nn
-from typing import Dict, Union
+from typing import Dict, Union, List
 import pandas as pd
 
 from net_utils import unets
@@ -49,8 +49,35 @@ def create_model_architecture(log: logging.Logger, model_config: Dict[str, Union
     return net
 
 
-def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_models, config, tot_time, tot_epochs):
-    # Get the training loss and save it in a formatted '*.txt' file.
+def save_training_loss(loss_labels: List[str], 
+                       train_loss: List[List[float]], 
+                       val_loss: List[List[float]], 
+                       second_run: bool, 
+                       path_models: Path, 
+                       config: Dict, 
+                       tot_time: float, 
+                       tot_epochs: int):
+    """
+    Get the training loss and save it in a formatted '*.txt' file.
+    In this function key-value are added to the 'config' dict. containig the 
+    current specifics of the model/trainig phase.
+
+    Args:
+        loss_labels: List of columns correspondent to the loss values passed.
+        train_loss: Every i-th entry of this list correspond to the value of 
+        that i-th epochs of the total losses gathered during training.
+        val_loss: Every i-th entry of this list correspond to the value of 
+        that i-th epochs of the losses gathered during validation.
+        second_run: Temporary flag to differentiate between end-to-end 
+        trainig and fine-tuning.
+        path_models: Folder path in which to save the current model.
+        config: Hashmap containing the additional information on the 
+        current model in training.
+        tot_time: Floating value indicating the total time used for the overall
+        training phase.
+        tot_epochs: Integer representings the total number of epochs. Usefull
+        to record in case of early stops to avoid overfitting.
+    """
 
     # Un-pack the losses in the original variables
     train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border = zip(*train_loss) 
@@ -58,6 +85,7 @@ def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_model
     
     stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border, val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border]))
     try:
+
         if second_run:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_2nd_loss.txt')), X=stats,
                     fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
@@ -68,9 +96,10 @@ def save_training_loss(loss_labels, train_loss, val_loss, second_run, path_model
             np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), X=stats,
                     fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
                     header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
+            
+            # FIXME: Move to the calling function.
             config['training_time'], config['trained_epochs'] = tot_time, tot_epochs + 1
-        
-        print(f"Training losses saved corretly and current configuration parameters updated")
+        print(f"Training losses saved corretly and current configuration parameters updated!")
 
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
