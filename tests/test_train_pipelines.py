@@ -328,6 +328,7 @@ class TestMockTrainPipelines:
                 """Implement the original dual unet training arg class from the factory pattern.
                 """
 
+    # FIXME: Main pipeline to refactor - both for the dataloder and for the images of the training set created.
     @pytest.mark.pipeline
     def test_training_loop(self):
         """

@@ -1,3 +1,6 @@
+"""This module compute and return different losses based on the neural network architecture.
+"""
+from collections.abc import Callable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
@@ -39,7 +42,6 @@ def get_weights_tensor(target_mask_batch: torch.Tensor, device: torch.device = N
         class_weights = class_weights.to(device)
     return class_weights
 
-
 def count_pixels(target_mask_batch):
     """
     Counts the number of pixels equal to 1 and 0 in a target mask tensor, usefull for computing the weights of the classes.
@@ -62,7 +64,6 @@ def count_pixels(target_mask_batch):
     num_ones = torch.sum(target_mask_flat == 1, dim=1).sum().item()  # Counts across columns for each image
     num_zeros = torch.sum(target_mask_flat == 0, dim=1).sum().item()   # Counts across columns for each image
     return num_ones, num_zeros
-
 
 def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int, emergency_coefficent = 10) -> torch.Tensor:
     """
@@ -95,7 +96,6 @@ def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int, emergency_
     class_weights = torch.tensor([num_cell_pixels / total_pixels, num_bg_pixels / total_pixels])
     return class_weights
 
-
 # NOTE: Custom class to dinamically use a criterion with the current class imbalanceness
 class WeightedCELoss(nn.Module):
     """
@@ -103,7 +103,6 @@ class WeightedCELoss(nn.Module):
 
     Args:
         weight_func (callable, optional): Function that calculates class weights for each batch.
-                                            Defaults to None.
     """
 
     def __init__(self, weight_func=None, device = None):
@@ -136,7 +135,6 @@ class WeightedCELoss(nn.Module):
 
         else:
             raise ValueError(f"The provided weight function is not valid!")
-
 
 # NOTE: Work in progress - finish to implement
 class CrossEntropyDiceLoss(nn.Module):
@@ -214,7 +212,6 @@ class CrossEntropyDiceLoss(nn.Module):
 
         # Return the final coeff. for the current binary class
         return (2 * intersection + smooth) / (union + smooth)
-
 
 # NOTE: Work in progress - to test the values and the efficacy in training
 class MultiClassJLoss(nn.Module):
@@ -308,7 +305,6 @@ class MultiClassJLoss(nn.Module):
         loss = bce_loss + self.lambda_ * j_reg_term.mean()
         return loss
 
-
 def get_loss(config, device):
     """ Get loss function(s) for the training process based on the current architecture.
 
@@ -370,7 +366,6 @@ def get_loss(config, device):
         criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
     return criterion
 
-
 def compute_cross_entropy(pred_batches, batches_dict, criterion):
     # Pred. batches as dict. to decrease the number of args - batches dict. is the correspondent GT images batches
 
@@ -386,7 +381,6 @@ def compute_cross_entropy(pred_batches, batches_dict, criterion):
     losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
     return loss, losses_list
 
-
 def compute_weighted_cross_entropy_dice(pred_batches, batches_dict, criterion):
     # Wrappper function to encapsulate the loss computation (in this case of the cross-entropy plus the dice contribution)
 
@@ -398,7 +392,6 @@ def compute_weighted_cross_entropy_dice(pred_batches, batches_dict, criterion):
     losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
     return loss, losses_list
 
-
 def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
     # Wrappper function to encapsulate the loss computation
 
@@ -409,7 +402,6 @@ def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
     loss = loss_binary_border + loss_cell + loss_mask
     losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
     return loss, losses_list
-
 
 def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
 
@@ -429,7 +421,4 @@ def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
     print(loss)
     print(losses_list)
     return loss, losses_list
-
-
-
 

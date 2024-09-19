@@ -152,9 +152,9 @@ def create_logging():
 
 # NOTE: Reaname the function - It is confusing.
 def set_device() -> Tuple[torch.device, int]:
-    """
-    It will check for the devices available - for now uses 
-    a single GPU for train and test
+    """It will check for the devices available.
+    
+    It uses (if availbale) a single GPU for train and test.
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
