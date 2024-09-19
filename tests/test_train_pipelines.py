@@ -10,6 +10,7 @@ To test just the sub-functions:
 To test just the entire pipeline:
 > python -m pytest -v --run-pipeline tests/test_train_pipelines.py
 """
+
 import pytest
 import logging
 from typing import Dict, Any, List, Tuple
@@ -17,8 +18,10 @@ from pathlib import Path
 from shutil import rmtree
 import torch
 import os
+import numpy as np
 from os.path import join, exists
 
+from training.data_generation_classes import data_generation_factory
 from train import set_up_training_loops
 from net_utils.utils import create_model_architecture
 from utils import load_environment_variables, set_current_run_folders, \
@@ -87,7 +90,8 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
                                     cell_type = cell_type,
                                     split = args["split"],
                                     min_a_images = args["min_a_images"],
-                                    crop_size = args["crop_size"])
+                                    crop_size = args["crop_size"],
+                                    train_arg_class = train_args_cls)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
     
@@ -144,7 +148,14 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
     # Call the original methods - method to refactor.
     set_up_training_loops(log, train_args_cls, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
 
-    
+def mock_processed_images(args: Dict) -> Dict[str, np.ndarray]:
+    """It use the images generation factory class and return the computed
+    dictionary.
+    """
+    processed_images = data_generation_factory.create_training_data(args["labels"], args["img"], args["mask"], 
+                                                                    args["tra_gt"], args["td_settings"])
+    return processed_images
+
 def update_default_args(default_args: Dict, new_args: Dict) -> Dict[str, Any]:
     """
     It updates/adds key-value pairs to the 'default_args' from
@@ -175,6 +186,28 @@ def check_created_training_set_structure(folder_path: str, expected_folders: Lis
     if sorted(dir_list) != sorted(expected_files + expected_folders):
         return False 
     return True
+
+def load_images(folder_path: str) -> list[np.ndarray, np.ndarray, np.ndarray]:
+    """Load saved images (.npy format) such us image, mask and tracking
+    mask.
+    
+    The dtype of this numpy arrays should be uint8 (image) and uint16 (the masks).
+
+    Args:
+        folder_path: String corresponding to the folder
+        path containg the files to load.
+
+    Returns:
+        A list containing respectively the image, mask and the
+        tracking mask.
+    """
+    file_names = ["Mock-E2DV-train-t000.npy", "Mock-E2DV-train-man_seg000.npy", "Mock-E2DV-train-man_track000.npy"]
+    images = []
+    for file_name in file_names:
+
+        # Load the images saved as '.npy' format
+        images.append(np.load(os.path.join(folder_path, file_name)))
+    return images
 
 def check_created_images(dataset_folder: str, folder_path: str, expected_image_prefixes: List[str], expected_image_number: int) -> bool:
     """
@@ -211,7 +244,48 @@ class TestMockTrainPipelines:
     and training of the deep learning models.
     """
 
-    # FIXME: For now just implement the dataset creation with a 'mock' dataset folder.
+    @pytest.mark.sub
+    def test_images_creation(self):
+        """Load image and masks to compute the hasmap containing the images
+        to crop and save.
+
+        For example the creation of neighbor and distance tranformation.
+        """
+        images_folder_path = "tests"
+        
+        # Usually computed dinamically based on the current dataset.
+        mock_settings = {'search_radius': 100,
+            'disk_radius': 3, 
+            'min_area': 20,
+            'max_mal': 200,
+            'scale': 1,
+            'crop_size': 320}
+        
+        test_arguments = [
+            {"td_settings": mock_settings, "labels": tuple(["dist_cell_and_neighbor", ]), "expected_keys": ["dist_cell", "dist_neighbor", "img", "mask", "tra_gt"],
+             "expected_types": ['uint8', 'uint16', 'float32']},
+             {"td_settings": mock_settings, "labels": tuple(["mask_label", "binary_border_label"]), "expected_keys": ["mask_label", "binary_border_label", "img", "mask", "tra_gt"],
+             "expected_types": ['uint8', 'uint16', 'float32']}
+        ]
+
+        for test_args in test_arguments:
+            img, seg_mask, tra_gt = load_images(folder_path=images_folder_path)
+            test_args["img"] = img
+            test_args["mask"] = seg_mask
+            test_args["tra_gt"] = tra_gt
+            processed_images = mock_processed_images(test_args)
+
+            # Assert the type requested by the challenge guidelines before the labels.
+            assert test_args["expected_types"][0] == str(processed_images["img"].dtype)
+            for label, value in processed_images.items():
+                if label in ["mask_label", "binary_border_label", "mask"]:
+                    assert test_args["expected_types"][1] == str(value.dtype)
+                elif label in ["dist_cell", "dist_neighbor"]:
+                    assert test_args["expected_types"][2] == str(value.dtype)
+
+            # Assert for the returned images labels from the factory
+            assert sorted(test_args["expected_keys"]) == sorted(processed_images.keys())
+            
     @pytest.mark.sub
     def test_training_dataset_creation(self):
         """
@@ -221,7 +295,7 @@ class TestMockTrainPipelines:
         expected_files = ["info.json"]
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38], "expected_images_prefix": ["dist_cell_", "dist_neighbor_", "img_", "mask_", "binary_border_label_", "mask_label_"]}
+            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38], "expected_images_prefix": ["dist_cell_", "dist_neighbor_", "img_", "mask_"]}
         ]
 
         for test_args in test_arguments:
@@ -251,9 +325,7 @@ class TestMockTrainPipelines:
                                      expected_image_number)
                 assert images_integrity == True
 
-                """
-                Test function corrently in use to support
-                the creation dataset module refactoring.
+                """Implement the original dual unet training arg class from the factory pattern.
                 """
 
     @pytest.mark.pipeline

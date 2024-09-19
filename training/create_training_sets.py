@@ -1,11 +1,11 @@
 import json
+from typing import Dict
 import math
 import numpy as np
 import os
 import tifffile as tiff
 import copy
 import scipy.ndimage as ndimage
-
 from pathlib import Path
 from random import shuffle, random
 from scipy.ndimage import gaussian_filter
@@ -14,25 +14,28 @@ from skimage.measure import regionprops
 from skimage.morphology import binary_closing, binary_opening
 from skimage.transform import rescale
 
+from training.data_generation_classes import data_generation_factory
 from utils import train_arg_class_interface
 from training.train_data_representations import distance_label_2d
 from net_utils.utils import get_nucleus_ids, write_file
 
 
-def adjust_dimensions(crop_size, *imgs):
-    """ Adjust dimensions so that only 'complete' crops are generated.
+# FIXME: Adapt this to the dict.
+def adjust_dimensions(crop_size: int, imgs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+    """Adjust dimensions so that only 'complete' crops are generated.
 
-    :param crop_size: Size of the (square) crops.
-        :type crop_size: int
-    :param imgs: Images to adjust the dimensions.
-        :type imgs:
-    :return: img with adjusted dimension.
+    Args:
+        crop_size: Size of the (square) crops.
+        **imgs: Key-value pairs of images to adjust for 
+            the subsequent cropping.
+
+    Returns:
+        Processed key-value hashmap of the original images
     """
 
-    img_adj = []
-
+    adj_images = {}
     # Add pseudo color channels
-    for img in imgs:
+    for label, img in imgs.items():
         img = np.expand_dims(img, axis=-1)
 
         pads = []
@@ -52,12 +55,11 @@ def adjust_dimensions(crop_size, *imgs):
                     pads.append((0, 0))
                 else:
                     pads.append((0, crop_size - (img.shape[i] % crop_size)))
-
         img = np.pad(img, (pads[0], pads[1], (0, 0)), mode='constant')
-
-        img_adj.append(img)
-
-    return img_adj
+        
+        # Store the processed image with the same label
+        adj_images[label] = img
+    return adj_images
 
 
 def close_mask(mask, apply_opening=False, kernel_closing=np.ones((10, 10)), kernel_opening=np.ones((10, 10))):
@@ -197,10 +199,8 @@ def foi_correction_train(cell_type, mode, *imgs):
 
 
 # TODO: Add the train_args class with the encapsulated 'needed' images.
-def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame, path, train_arg_class) -> None:
-    """ 
-    Calculate cell and neighbor distances - the saved images are already cropped when saved 
-    in this function.
+def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame, path, train_arg_class: type[train_arg_class_interface]) -> None:
+    """It process the images, crop them and save them on disk.
 
     :param img: Image.
         :type img: numpy array
@@ -227,52 +227,56 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
     """
 
     # Calculate train data representations
-    cell_dist, neighbor_dist = distance_label_2d(label=mask,
+    """cell_dist, neighbor_dist = distance_label_2d(label=mask,
                                                  cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
                                                  neighbor_radius=td_settings['search_radius'], 
-                                                 disk_radius = td_settings['disk_radius'])
-
+                                                 disk_radius = td_settings['disk_radius'])"""
+    images_labels = train_arg_class.get_requested_image_labels()
+    processed_images = data_generation_factory.create_training_data(images_labels, img,
+                                                                         mask, tra_gt, td_settings)
     # Adjust image dimensions for appropriate cropping
-    img, mask, cell_dist, neighbor_dist, tra_gt = adjust_dimensions(td_settings['crop_size'], img, mask, cell_dist,
-                                                                    neighbor_dist, tra_gt)
-
+    """img, mask, cell_dist, neighbor_dist, tra_gt = adjust_dimensions(td_settings['crop_size'], img, mask, cell_dist,
+                                                                    neighbor_dist, tra_gt)"""
+    dim_adjusted_images = adjust_dimensions(td_settings['crop_size'], processed_images)
+    
     # Cropping
+    img = dim_adjusted_images["img"]
     nx, ny = math.floor(img.shape[1] / td_settings['crop_size']), math.floor(img.shape[0] / td_settings['crop_size'])
     for y in range(ny):
         for x in range(nx):
 
             # Crop
-            img_crop, mask_crop, cell_dist_crop, neighbor_dist_crop, tra_gt_crop = get_crop(x, y, td_settings['crop_size'],
+            cropped_images = get_crop(x, y, td_settings['crop_size'], dim_adjusted_images)
+            """img_crop, mask_crop, cell_dist_crop, neighbor_dist_crop, tra_gt_crop = get_crop(x, y, td_settings['crop_size'],
                                                                                             img, mask, cell_dist,
-                                                                                            neighbor_dist, tra_gt)
+                                                                                            neighbor_dist, tra_gt)"""
             # Get crop name
             crop_name = '{}_{}_{}_{}_{:02d}_{:02d}.tif'.format(cell_type, mode, subset, frame, y, x)
 
-            # Check cell number TRA/SEG
-            tr_ids, mask_ids = get_nucleus_ids(tra_gt_crop), get_nucleus_ids(mask_crop)
-            if np.sum(mask_crop[10:-10, 10:-10, 0] > 0) < td_settings['min_area']:  # only cell parts / no cell
+            # NOTE: Check cell number TRA/SEG for possible skipping.
+            tr_ids, mask_ids = get_nucleus_ids(cropped_images["tra_gt"]), get_nucleus_ids(cropped_images["mask"])
+            if np.sum(cropped_images["mask"][10:-10, 10:-10, 0] > 0) < td_settings['min_area']:  # only cell parts / no cell
                 continue
+            
+            # 'neighbor' may be cut from crop, set dist to 0.
+            if len(mask_ids) == 1:
+                cropped_images["dist_neighbor"] = np.zeros_like(cropped_images["dist_neighbor"])
 
-            if len(mask_ids) == 1:  # neighbor may be cut from crop --> set dist to 0
-                neighbor_dist_crop = np.zeros_like(neighbor_dist_crop)
-
-            if np.sum(img_crop == 0) > (0.66 * img_crop.shape[0] * img_crop.shape[1]):  # almost background
+            if np.sum(cropped_images["img"] == 0) > (0.66 * cropped_images["img"].shape[0] * cropped_images["img"].shape[1]):  # almost background
                 # For (e.g.) GOWT1 cells a lot of 0s are in the image
-                if np.min(img_crop[:100, :100, ...]) == 0:
-                    if np.sum(gaussian_filter(np.squeeze(img_crop), sigma=1) == 0) > (0.66 * img_crop.shape[0] * img_crop.shape[1]):
+                if np.min(cropped_images["img"][:100, :100, ...]) == 0:
+                    if np.sum(gaussian_filter(np.squeeze(cropped_images["img"]), sigma=1) == 0) > (0.66 * cropped_images["img"].shape[0] * cropped_images["img"].shape[1]):
                         continue
                 else:
                     continue
-
-            if np.max(cell_dist_crop) < 0.8:
-                continue
+            
+            # Check if the images is contained in the dict.
+            if "dist_cell" in cropped_images:
+                if np.max(cropped_images["dist_cell"]) < 0.8:
+                    continue
                         
-            # Final transformations are done if the current 'crop' is deemed 'acceptable'
-            binary_border_label = extract_binary_border_labels(mask_crop)
-            mask_label = prepare_seg_mask(mask_crop)
-
             # Don't count the partially visible cells in mask for better comparison with tra_gt
-            props_crop, n_part = regionprops(mask_crop), 0
+            props_crop, n_part = regionprops(cropped_images["mask"]), 0
             for cell in props_crop:
                 if mode == 'GT' and cell.area <= 0.1 * td_settings['min_area'] and td_settings['scale'] == 1:  # needed since tra_gt seeds are smaller
                     n_part += 1
@@ -283,93 +287,48 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
             else:
                 continue
 
-            # NOTE: Deprecated - Save only needed crops for kit-sch-ge split.
+            # NOTE: Deprecated - Save only needed crops for kit-sch-ge split but this list will be empty.
             if td_settings['used_crops']:
                 if not ([subset, frame, '{:02d}'.format(y), '{:02d}'.format(x), 'train'] in td_settings['used_crops']) \
                             and not ([subset, frame, '{:02d}'.format(y), '{:02d}'.format(x), 'val'] in td_settings['used_crops']):
                         continue
-
-            # Save the images
-            tiff.imsave(str(path / crop_quality / 'img_{}'.format(crop_name)), img_crop)
-            tiff.imsave(str(path / crop_quality / 'mask_{}'.format(crop_name)), mask_crop)
-            tiff.imsave(str(path / crop_quality / 'dist_cell_{}'.format(crop_name)), cell_dist_crop)
-            tiff.imsave(str(path / crop_quality / 'dist_neighbor_{}'.format(crop_name)), neighbor_dist_crop)
-            tiff.imsave(str(path / crop_quality / 'mask_label_{}'.format(crop_name)), mask_label)
-            tiff.imsave(str(path / crop_quality / 'binary_border_label_{}'.format(crop_name)), binary_border_label)
             
-"""
-Adding utilities for creation of multiple images - finish to test.
-"""
-def extract_binary_border_labels(mask: np.ndarray, border_width: int = 4) -> np.ndarray:
-    """
-    Extracts binary borders of cells from a binary segmentation mask.
+            # The tracking mask is not needed anymore.
+            cropped_images.pop("tra_gt")
+            for label, values in cropped_images.items():
+                tiff.imsave(str(path / crop_quality / '{}_{}'.format(label, crop_name)), cropped_images[label])
+            """# Save the images
+            tiff.imsave(str(path / crop_quality / 'img_{}'.format(crop_name)), cropped_images["img"])
+            tiff.imsave(str(path / crop_quality / 'mask_{}'.format(crop_name)), cropped_images["mask"])
+            if "dist_cell" in cropped_images:
+                tiff.imsave(str(path / crop_quality / 'dist_cell_{}'.format(crop_name)), cropped_images["dist_cell"])
+            if "dist_neighbor" in cropped_images:
+                tiff.imsave(str(path / crop_quality / 'dist_neighbor_{}'.format(crop_name)), cropped_images["dist_neighbor"])
+            if "mask_label" in cropped_images:
+                tiff.imsave(str(path / crop_quality / 'mask_label_{}'.format(crop_name)), cropped_images["mask_label"])
+            if "binary_border_label" in 
+            tiff.imsave(str(path / crop_quality / 'binary_border_label_{}'.format(crop_name)), cropped_images["binary_border_label"])
+            """
 
-    Args:
-        mask: Binary mask (2D Array of uint16 type) with cells represented as 1 and background as 0.
-        border_width: Width of the border to extract from the annotated particles.
+def get_crop(x: int, y: int, crop_size: int, imgs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+    """Get crop from dict. of images.
 
+    Args
+        x: Grid position (x-dim).
+        y: Grid position (y-dim).
+        crop_size: size of the (square) crop.
+        imgs: Images to crop.
+    
     Returns:
-        np.ndarray: Mask with only cell borders remaining.
-    """
-    # pre-conditions - np.ndarray of uint16
-    if not mask.dtype == np.uint16:
-        raise ValueError(f"The current cropped mask passed is of a type class {mask.dtype}")
-    
-    mask = copy.copy(mask)
-    # NOTE: Currently reating all the cells as the same class (e.g. not distinguish between the EVs and Cells)
-    mask[mask > 0] = 1 
-
-    # Work with the boolean array to invert the original mask
-    inverted_mask = ~mask.astype(bool)
-    inverted_mask = inverted_mask.astype(int)
-
-    # Dilate the mask to slightly enlarge the borders (handling very thin borders)
-    dil_inverted_mask = ndimage.binary_dilation(inverted_mask, iterations = border_width)
-    
-    # Obtain the borders directly by difference
-    cell_border = dil_inverted_mask ^ inverted_mask
-
-    # Post-conditions
-    cell_border = cell_border.astype(mask.dtype)
-    return cell_border
-
-def prepare_seg_mask(mask: np.ndarray) -> np.ndarray:
-        """
-        Prepare the segmentation mask for the binary cross entropy.
-
-        Args:
-            mask: Integer np.ndarray with every cell represented
-            by a different number
-
-        Returns:
-            Binary annotated mask - not distringuishing between different cell types.
-        """ 
-
-        mask_picture = copy.copy(mask) # Work on the copy of the object - no reference
-        mask_picture[mask_picture > 0] = 1 
-        return mask_picture
-
-
-def get_crop(x, y, crop_size, *imgs):
-    """ Get crop from image.
-
-    :param x: Grid position (x-dim).
-        :type x: int
-    :param y: Grid position (y-dim).
-        :type y: int
-    :param crop_size: size of the (square) crop
-        :type crop_size: int
-    :param imgs: Images to crop.
-        :type imgs:
-    :return: img crop.
+        Dicitonary containing the original labels but with the cropped images.
     """
 
-    imgs_crop = []
+    imgs_crop = {}
 
-    for img in imgs:
+    for label, img in imgs.items():
+        img = copy.copy(img)
         img_crop = img[y * crop_size:(y + 1) * crop_size, x * crop_size:(x + 1) * crop_size, :]
-        imgs_crop.append(img_crop)
-
+        imgs_crop[label] = img_crop
     return imgs_crop
 
 
@@ -621,7 +580,7 @@ def remove_st_with_gt_annotation(st_ids, annotated_gt_frames):
 
 
 def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', crop_size=320, st_limit=280,
-                             min_a_images=30, train_arg_class: train_arg_class_interface = None) -> None:
+                             min_a_images=30, train_arg_class: type[train_arg_class_interface] = None) -> None:
     """ Create training sets for Cell Tracking Challenge data.
 
     In the new version of this code, 2 Fluo-C3DL-MDA231 crops and 1 Fluo-C3DH-H157 crop differ slightly from the
@@ -678,7 +637,9 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
     # Iterate through files and load images and masks (and TRA GT for GT mode)
     log.info(f"Starting loop over the loaded masks {mask_ids}")
-    if td_settings['scale'] !=1: log.debug(f"Downsampling operation will be performed due to the suggested 'scale' value {td_settings['scale']}")
+    if td_settings['scale'] !=1: 
+        log.debug(f"Downsampling operation will be performed due to the suggested 'scale' value {td_settings['scale']}")
+    
     for mask_id in mask_ids: # TODO: To parallelize
  
         frame = mask_id.stem.split('man_seg')[-1] # Just 2D images
@@ -717,10 +678,9 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
 
         # Calculate distance transforms, crop and classify crops into 'A' (fully annotated) and 'B' (>80% annotated)
         _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=cell_type,
-                                      mode=mode, subset=subset, frame=frame, path=path_trainset)
+                                      mode=mode, subset=subset, frame=frame, path=path_trainset, 
+                                      train_arg_class=train_arg_class)
         
-        # 
-
     td_settings.pop('used_crops')
     if mode == 'GT':
         td_settings.pop('st_limit')

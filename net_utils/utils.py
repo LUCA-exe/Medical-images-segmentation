@@ -326,17 +326,18 @@ def get_seg_score(path):
     return seg_score
 
 
-def get_nucleus_ids(img):
-    """ Get nucleus ids in intensity-coded label image.
+def get_nucleus_ids(img: np.ndarray) -> List[int,]:
+    """Get nucleus ids in intensity-coded label image
+    skipping the background values (0).
 
-    :param img: Intensity-coded nuclei image.
-        :type:
-    :return: List of nucleus ids.
+    Args:
+        img: Intensity-coded nuclei image.
+    
+    Returns: 
+        List of nucleus ids as integer values.
     """
-
     values = np.unique(img)
     values = values[values > 0]
-
     return values
 
 

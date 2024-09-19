@@ -1,7 +1,7 @@
-"""
-This file contains the implementation of the 
-generation of data split by different concrete classes
-inheriting from general interface.
+""" This module generates images data for the training loop.
+
+It implements a factory class to return the requested processed images
+for further processing before the saving of the files in memory.
 """
 
 from typing import Any, Dict, Tuple, Union, List
@@ -21,33 +21,24 @@ class data_generation_factory_interface(metaclass = ABCMeta):
 
     @abstractmethod
     def create_training_data(labels: List[str], img: np.ndarray, mask: np.ndarray, tra: np.ndarray):
-        """
-        For every label generate the requested images.
-
-        Args:
-            Labels: Variable-length argument list containing the labels to provide the correspondent images.
-            img: Original image.
-            mask: Loaded annotate mask (array of type uint16).
-            tra: Loaded annotate mask for tracking objects (array of type uint16).
+        """For every label generate the requested images.
         """
         raise NotImplementedError
     
 
 class data_generation_factory(data_generation_factory_interface):
-    """
-    Implementing the interface to provide computed images based on the labels needed.
+    """It provides the method to get the requested images based on the 
+    provided architecture arg.
     """
 
-    def create_training_data(labels: List[str], img: np.ndarray, mask: np.ndarray,
-                             td_settings: Dict) -> Dict[str, np.ndarray]:
+    def create_training_data(labels: Tuple[str,], img: np.ndarray, mask: np.ndarray,
+                             tra_gt: np.ndarray, td_settings: Dict) -> Dict[str, np.ndarray]:
         """
-        For every label generate the requested images.
-
         Args:
             Labels: Variable-length argument list containing the labels to provide the correspondent images.
             img: Original image.
             mask: Loaded annotate mask (array of type uint16).
-            tra: Loaded annotate mask for tracking objects (array of type uint16).
+            tra_gt: Loaded annotate mask for tracking objects (array of type uint16).
             td_settings: hasmap containing different key-value pair with processing
                         informations
         
@@ -56,21 +47,34 @@ class data_generation_factory(data_generation_factory_interface):
         """
         # Pre-conditions for the 'correctness' labels strings inside 'labels'
         images = {}
+        images["img"] = img
+        images["mask"] = mask
+        images["tra_gt"] = tra_gt
         for label in labels:
-
-            # The following images are created toghether reducing the complexity.
             if label == "dist_cell_and_neighbor":
-                # Calculate train data representations
-                images["cell_dist"], images["neighbor_dist"] = distance_label_2d(label=mask,
+                images["dist_cell"], images["dist_neighbor"] = distance_label_2d(label=mask,
                                                             cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
                                                             neighbor_radius=td_settings['search_radius'], 
                                                             disk_radius = td_settings['disk_radius'])
+                
+                if not ((str(images["dist_cell"].dtype) == 'float32') and (str(images["dist_neighbor"].dtype) == 'float32')):
+                    raise TypeError(f"The dist_cell and dist_neighbor computed are not the expected type!")
+            
+            if label == "mask_label":
+                images["mask_label"] = extract_binary_mask_label(mask)
 
-            if label == "binary_mask_label":
-                images["binary_mask_label"] = extract_binary_mask_label(mask)
-
+                if not str(images["mask_label"].dtype) == 'uint16':
+                    raise TypeError(f"The mask_label computed is not the expected type!")
+            
             if label == "binary_border_label":
                 images["binary_border_label"] = extract_binary_border_label(mask)
+
+                if not str(images["binary_border_label"].dtype) == 'uint16':
+                    raise TypeError(f"The binary_border_label computed is not the expected type!")
+
+        # Last check before returning the processed dictionary.
+        if len(images.keys()) <= 2:
+            raise ValueError(f"The dict. contains just {images.keys()}: erroneous labels passed: {labels}")
         return images
     
 

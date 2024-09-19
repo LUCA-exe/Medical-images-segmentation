@@ -427,17 +427,15 @@ class train_arg_dual_unet(train_arg_class_interface):
 
         # Internal attributes
         # TODO: check againts a config.json file for the 'allowed' images to request.
-        self._ground_truth_labels = tuple("dist_cell_and_neighbor")
+        self._ground_truth_labels = tuple(["dist_cell_and_neighbor", ])
 
     def get_arch_args(self) -> Tuple[Union[str, bool]]:
+        """Return all the architecture args as tuple
         """
-         Return all the architecture args as tuple
-         """
         return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False, False
 
-    def get_requested_image_labels(self) -> Tuple[str]:
-        """
-        It returns a tuple with the requested label to generate for 
+    def get_requested_image_labels(self) -> Tuple[str,]:
+        """It returns a tuple with the requested label to generate for 
         training the correspondent neural network.
         """
         return self._ground_truth_labels
