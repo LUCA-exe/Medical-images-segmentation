@@ -5,11 +5,13 @@ This repository implements and evaluates various [techniques](#projects-consider
 
 ### Parameters
 The default values for the parameters will be highlighted in bold:
-* ```--crop_size```: Crop to perform over the original images (**320**).
+* ```--dataset```: Name of the dataset to use for generate the training images. The default position for the training dataset folder is *./training_data*.
+* ```--batch-size```: Batch size used for training (**2**).
+* ```--crop_size```: Crop to perform over the original images (**320**). It will be used for generating the training dataset.
 * ```--filters```: Number of kernels (**64 1024**). After each pooling, the number is doubled in the encoder till the maximum is reached.
-* ```--model-pipeline```: Architecture of the neural networks to select (**"dual-unet"**, "original-dual-unet").
+* ```--model-pipeline```: Architecture of the neural networks to select (**"dual-unet"**, "original-dual-unet"). The architecture differs both in terms of structure and losses available.
 * ```--loss```: Loss to implement with the chosen architecture (**l1_smooth**, "weightd-cross-entropy", "dice-cross-entroy").
-* * **NOTE**: The loss chosen through the previous parameter has to be available for the chosen architecture.
+  * **NOTE**: The loss chosen through this parameter has to be available for the chosen architecture.
 ### Examples
 To train new model end-to-end with a specific dataset you can execute:
 ```
