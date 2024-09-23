@@ -13,7 +13,7 @@ from parser import get_parser, get_processed_args
 from net_utils.utils import unique_path, write_train_info, create_model_architecture
 from net_utils import unets
 from training.create_training_sets import create_ctc_training_sets, get_file
-from training.training import train, train_auto, get_max_epochs, get_weights
+from training.training import train, get_max_epochs, get_weights
 from training.mytransforms import augmentors
 from training.autoencoder_dataset import AutoEncoderDataset
 from training.cell_segmentation_dataset import CellSegDataset
