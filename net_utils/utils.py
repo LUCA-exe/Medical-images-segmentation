@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 from multiprocessing import cpu_count
 import torch
 from torch import nn
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Type
 import pandas as pd
 
 from net_utils import unets
 
 
-def create_model_architecture(log: logging.Logger, model_config: Dict[str, Union[str, int]], device: int, num_gpus: int, pre_train: bool = False) -> nn.Module:
+def create_model_architecture(log: logging.Logger, model_config: Dict[str, Union[str, int]], device: int, num_gpus: int, pre_train: bool = False) -> Type[nn.Module]:
     """
     Call the public method in the './unets.py' module to return the correct
     NN class.

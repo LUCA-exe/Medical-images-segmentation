@@ -226,17 +226,11 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
         :type slice_idx: int
     """
 
-    # Calculate train data representations
-    """cell_dist, neighbor_dist = distance_label_2d(label=mask,
-                                                 cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
-                                                 neighbor_radius=td_settings['search_radius'], 
-                                                 disk_radius = td_settings['disk_radius'])"""
     images_labels = train_arg_class.get_requested_image_labels()
+    # Calculate train data representations
     processed_images = data_generation_factory.create_training_data(images_labels, img,
                                                                          mask, tra_gt, td_settings)
     # Adjust image dimensions for appropriate cropping
-    """img, mask, cell_dist, neighbor_dist, tra_gt = adjust_dimensions(td_settings['crop_size'], img, mask, cell_dist,
-                                                                    neighbor_dist, tra_gt)"""
     dim_adjusted_images = adjust_dimensions(td_settings['crop_size'], processed_images)
     
     # Cropping
@@ -247,9 +241,7 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
 
             # Crop
             cropped_images = get_crop(x, y, td_settings['crop_size'], dim_adjusted_images)
-            """img_crop, mask_crop, cell_dist_crop, neighbor_dist_crop, tra_gt_crop = get_crop(x, y, td_settings['crop_size'],
-                                                                                            img, mask, cell_dist,
-                                                                                            neighbor_dist, tra_gt)"""
+            
             # Get crop name
             crop_name = '{}_{}_{}_{}_{:02d}_{:02d}.tif'.format(cell_type, mode, subset, frame, y, x)
 
@@ -275,7 +267,7 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
                 if np.max(cropped_images["dist_cell"]) < 0.8:
                     continue
                         
-            # Don't count the partially visible cells in mask for better comparison with tra_gt
+            # Don't count the partially visible cells in mask for better comparison with tra_gt.
             props_crop, n_part = regionprops(cropped_images["mask"]), 0
             for cell in props_crop:
                 if mode == 'GT' and cell.area <= 0.1 * td_settings['min_area'] and td_settings['scale'] == 1:  # needed since tra_gt seeds are smaller
@@ -297,18 +289,6 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
             cropped_images.pop("tra_gt")
             for label, values in cropped_images.items():
                 tiff.imsave(str(path / crop_quality / '{}_{}'.format(label, crop_name)), cropped_images[label])
-            """# Save the images
-            tiff.imsave(str(path / crop_quality / 'img_{}'.format(crop_name)), cropped_images["img"])
-            tiff.imsave(str(path / crop_quality / 'mask_{}'.format(crop_name)), cropped_images["mask"])
-            if "dist_cell" in cropped_images:
-                tiff.imsave(str(path / crop_quality / 'dist_cell_{}'.format(crop_name)), cropped_images["dist_cell"])
-            if "dist_neighbor" in cropped_images:
-                tiff.imsave(str(path / crop_quality / 'dist_neighbor_{}'.format(crop_name)), cropped_images["dist_neighbor"])
-            if "mask_label" in cropped_images:
-                tiff.imsave(str(path / crop_quality / 'mask_label_{}'.format(crop_name)), cropped_images["mask_label"])
-            if "binary_border_label" in 
-            tiff.imsave(str(path / crop_quality / 'binary_border_label_{}'.format(crop_name)), cropped_images["binary_border_label"])
-            """
 
 def get_crop(x: int, y: int, crop_size: int, imgs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
     """Get crop from dict. of images.

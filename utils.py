@@ -402,8 +402,7 @@ class train_arg_class_interface(metaclass=abc.ABCMeta):
 
 # FIXME: Instead of positional args (*args) use the **kwargs.
 class train_arg_dual_unet(train_arg_class_interface):
-    """
-    Specific argument training class for the KIT-GE model implementation taken from the paper
+    """Specific argument training class for the KIT-GE model implementation taken from the paper
     "https://arxiv.org/abs/2004.01486".
     """
 

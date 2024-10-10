@@ -1,9 +1,12 @@
-"""This module compute and return different losses based on the neural network architecture.
+"""This module contains losses class and public method for execute them.
+
+The classes are instantiated from the public method 'get_loss(...)' 
+and return different criterion based on the neural network architecture.
 """
-from collections.abc import Callable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+from typing import Dict, Type, Any, Union, Optional, Tuple, List
 
 def get_weights_tensor(target_mask_batch: torch.Tensor, device: torch.device = None) -> torch.Tensor:
     """
@@ -305,7 +308,7 @@ class MultiClassJLoss(nn.Module):
         loss = bce_loss + self.lambda_ * j_reg_term.mean()
         return loss
 
-def get_loss(config, device):
+def get_loss(config: Dict[str, Any], device) -> Type[nn.Module]:
     """ Get loss function(s) for the training process based on the current architecture.
 
     :param loss_function: Loss function to use.
@@ -422,3 +425,84 @@ def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
     print(losses_list)
     return loss, losses_list
 
+# NOTE: Working on the 'loss' computation refactoring.
+class LossComputator():
+    """This class defines the internal configurations and methods for the loss.
+    """
+
+    def __init__(self,
+                 regression_loss: Optional[str], 
+                 classification_loss: Optional[str], 
+                 device: torch.device) -> None:
+        """Instantiates the LossComputator class.
+
+        Args:
+            regression_loss: It indicates the name of the regressive branch losses
+                implemented if any.
+            classification_loss: It indicates the name of the classification branch losses
+                implemented if any.
+            device: Location of both of the batches for loss computation.
+                ('gpu' or 'cpu').
+        """
+        self.reg_loss = regression_loss
+        self.class_loss = classification_loss
+        self.device = device
+
+        # NOTE: Temporary hard-coded values.
+        self.image_types = ["border", "cell", "binary_border", "mask"]
+        self.loss_criterions: Dict[str, Optional[nn.Module]] = {}
+        for type in self.image_types:
+            self.loss_criterions[type] = self.get_loss(type)
+    
+    def get_loss(self, image_type: str) -> Type[nn.Module]:
+        """It return the correct loss class for the image_type provided.
+
+        Raises:
+            ValueError: The errors 
+        """
+        if image_type in ["border", "cell"]:
+            if self.reg_loss == 'l1':
+                return nn.L1Loss()
+            elif self.reg_loss  == 'l2':
+                return nn.MSELoss()
+            elif self.reg_loss == 'smooth_l1':
+                return nn.SmoothL1Loss()
+            elif self.reg_loss is None:
+                return None
+            else:
+                raise ValueError(f"The {self.reg_loss} is not supported among the regression losses!")
+
+        if image_type in ["binary_border", "mask"]:
+
+            if self.class_loss ==  "cross-entropy":
+                return nn.CrossEntropyLoss()
+            
+            elif self.class_loss == "weighted-cross-entropy":
+                return WeightedCELoss(weight_func=get_weights_tensor, device = self.device)
+
+            elif self.class_loss == "cross-entropy-dice":
+                return CrossEntropyDiceLoss(weight_func=get_weights_tensor, device = self.device)
+            elif self.class_loss is None:
+                return None
+            else:
+                raise ValueError(f"The {self.class_loss} is not supported among the classification losses!")
+    
+    # TODO: Finish testing the loss computation.
+    def compute_loss(self, 
+                     pred_batches: Dict[str, torch.Tensor], 
+                     gt_batches: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, List[float]]:
+        """Loop over the provided batches for using the stored loss criterions and compute the final loss.
+
+        Args:
+            pred_batches: It contains the predicted images stored in the
+                corresponding image type label. 
+            gt_batches: It contains the ground truth images stored in the
+                corresponding image type label.
+        """
+        if pred_batches.keys() != gt_batches.keys():
+            raise ValueError(f"The provided batches for the loss computation contains different keys: pred keys are {pred_batches.keys()} while the gt keys are {gt_batches.keys()}")
+        losses = []
+        for key, image in pred_batches.items():
+            losses.append(self.loss_criterions(image, gt_batches[key]))
+        total_loss = sum(losses)
+        return total_loss, losses

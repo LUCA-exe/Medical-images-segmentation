@@ -8,6 +8,7 @@ from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import torch.nn as nn
 from copy import deepcopy
+from typing import Dict, Type, Any
 
 from training.ranger2020 import Ranger
 from training.losses import get_loss, get_weights_tensor, WeightedCELoss, compute_cross_entropy, compute_weighted_cross_entropy, compute_j_cross_entropy
@@ -258,8 +259,8 @@ def move_batches_to_device(samples_dict, device):
     return samples_dict
 
 
-def train(log, net, datasets, config, device, path_models, best_loss=1e4):
-    """ Train the model.
+def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, path_models, best_loss=1e4):
+    """Train the model using the .
 
     :param net: Model/Network to train.
         :type net:

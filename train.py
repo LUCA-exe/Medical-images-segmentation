@@ -8,7 +8,9 @@ import os
 from pathlib import Path
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, train_factory
+from typing import Dict, Type, Any
+
+from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, train_factory, train_arg_class_interface
 from parser import get_parser, get_processed_args
 from net_utils.utils import unique_path, write_train_info, create_model_architecture
 from net_utils import unets
@@ -41,10 +43,11 @@ def set_up_training_set(log, args, path_data, cell_type):
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
-def get_training_args_class(log, args, train_factory):
-    # Get training args class depending on the chosen model pipeline
+def get_training_args_class(log, args: Dict) -> Type[train_arg_class_interface]:
+    """Get the training argument class for the current model configurations.
+    """
 
-    train_args = train_factory.create_argument_class(args.model_pipeline,
+    train_args = train_factory().create_argument_class(args.model_pipeline,
                             args.act_fun,
                             args.batch_size, 
                             args.filters,
@@ -67,8 +70,9 @@ def get_training_args_class(log, args, train_factory):
     log.info(train_args)
     return train_args
 
-def get_model_config(log, train_args, num_gpus):
-    # Get training settings
+def get_model_config(log, train_args: Type[train_arg_class_interface], num_gpus: int) -> Dict[str, Any]:
+    """Get the current neural network low-level configurations.
+    """
     
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
     model_config = {'architecture': train_args.get_arch_args(),
@@ -86,7 +90,7 @@ def get_model_config(log, train_args, num_gpus):
 
 
 # NOTE: Refactoring in progress.
-def set_up_training_loops(log, args, path_data, trainset_name, path_models, model_config, net, num_gpus, device):
+def set_up_training_loops(log, args: Type[train_arg_class_interface], path_data, trainset_name, path_models, model_config: Dict[str, Any], net, num_gpus, device):
     # Loop to iterate over the different trained/re-trained architectures.
 
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
@@ -193,11 +197,8 @@ def set_up_training():
         log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
         return None # Exit the script
 
-    # Instantiate the training factory class
-    factory = train_factory()
-
     # Parse the training arguments and settings for the specific model pipeline
-    train_args = get_training_args_class(log, args, factory)
+    train_args = get_training_args_class(log, args)
     model_config = get_model_config(log, train_args, num_gpus)
     net = create_model_architecture(log, model_config, device, num_gpus, train_args.pre_train)
 

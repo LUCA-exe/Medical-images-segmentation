@@ -9,6 +9,8 @@ To test just the sub-functions:
 
 To test just the entire pipeline:
 > python -m pytest -v --run-pipeline tests/test_train_pipelines.py
+
+In some tests it will uses the *.npy files listed in the ./tests/README.txt file.
 """
 
 import pytest
@@ -324,9 +326,6 @@ class TestMockTrainPipelines:
                                      test_args["expected_images_prefix"],
                                      expected_image_number)
                 assert images_integrity == True
-
-                """Implement the original dual unet training arg class from the factory pattern.
-                """
 
     # FIXME: Main pipeline to refactor - both for the dataloder and for the images of the training set created.
     @pytest.mark.pipeline
