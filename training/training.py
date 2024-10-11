@@ -360,6 +360,8 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
                 # Forward pass (track history if only in train)
                 with torch.set_grad_enabled(phase == 'train'):
 
+                    # NOTE: The padding in case of different input image format?
+
                     # NOTE: important the orders of the true_label_batch
                     loss, losses_list = get_losses_from_model(samples_dict, arch_name, net, criterion, config, phase, val_phase_counter)
 

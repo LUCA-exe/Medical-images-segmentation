@@ -3,14 +3,15 @@
 The classes are instantiated from the public method 'get_loss(...)' 
 and return different criterion based on the neural network architecture.
 """
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from typing import Dict, Type, Any, Union, Optional, Tuple, List
+from collections.abc import Callable
 
 def get_weights_tensor(target_mask_batch: torch.Tensor, device: torch.device = None) -> torch.Tensor:
-    """
-    Calculates and returns a weight tensor for balanced cross-entropy loss in binary segmentation.
+    """Calculates and returns a weight tensor for balanced cross-entropy loss in binary segmentation.
 
     Args:
         target_mask_batch (torch.Tensor): A 4D tensor of shape [N, 1, H, W],
@@ -45,9 +46,8 @@ def get_weights_tensor(target_mask_batch: torch.Tensor, device: torch.device = N
         class_weights = class_weights.to(device)
     return class_weights
 
-def count_pixels(target_mask_batch):
-    """
-    Counts the number of pixels equal to 1 and 0 in a target mask tensor, usefull for computing the weights of the classes.
+def count_pixels(target_mask_batch) -> Tuple[int, int]:
+    """Counts the number of pixels equal to 1 and 0 in a target mask tensor..
 
     Args:
         target_mask (torch.Tensor): A 4D tensor of shape [N, 1, 320, 320],
@@ -55,9 +55,9 @@ def count_pixels(target_mask_batch):
                                     each element is 0 or 1.
 
     Returns:
-        tuple: A tuple of two torch.Tensors, where:
-            - The first element is the count of pixels equal to 1, with shape (N,).
-            - The second element is the count of pixels equal to 0, with shape (N,).
+        A tuple where:
+            - The first element is the count of pixels equal to 1.
+            - The second element is the count of pixels equal to 0.
     """
 
     # Reshape the target mask to remove the channel dimension (assuming single channel for the mask)
@@ -69,8 +69,7 @@ def count_pixels(target_mask_batch):
     return num_ones, num_zeros
 
 def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int, emergency_coefficent = 10) -> torch.Tensor:
-    """
-    Calculates class weights for addressing class imbalance in binary segmentation tasks during the training phase.
+    """Calculates class weights in binary segmentation. 
 
     Args:
         num_bg_pixels (int): Total number of background pixels in the dataset.
@@ -99,16 +98,17 @@ def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int, emergency_
     class_weights = torch.tensor([num_cell_pixels / total_pixels, num_bg_pixels / total_pixels])
     return class_weights
 
-# NOTE: Custom class to dinamically use a criterion with the current class imbalanceness
 class WeightedCELoss(nn.Module):
-    """
-    Wrapper function for dynamically weighted cross-entropy loss.
+    """Wrapper function for dynamically weighted cross-entropy loss.
+
+    The internal weight_func, if passed, will compute the weights for the classes
+    on the current batch.
 
     Args:
         weight_func (callable, optional): Function that calculates class weights for each batch.
     """
 
-    def __init__(self, weight_func=None, device = None):
+    def __init__(self, device: torch.device, weight_func: Optional[Callable[[torch.Tensor], torch.Tensor]] = None):
         super().__init__()
         self.weight_func = weight_func
         self.device = device
@@ -124,14 +124,20 @@ class WeightedCELoss(nn.Module):
         Returns:
             torch.Tensor: Weighted cross-entropy loss.
         """
+        # DEBUG
+        print(f"PROVA: {input.shape}")
+        print(target.shape)
+        print(np.unique(target))
+        print(np.unique(input))
   
         if self.weight_func is not None:
             # Calculate class weights based on current batch
             class_weights = self.weight_func(target, device = self.device)
 
             # Apply weights in forward pass
-            loss = nn.CrossEntropyLoss(weight=class_weights)
-            
+            loss = nn.CrossEntropyLoss(weight = class_weights)
+            #loss = nn.BCELoss(weight=class_weights)
+
             # TODO: Modify here the shape of the target if necessary - Attention to the shape of the "target" of the cross entropy loss.
             target = target[:, 0, :, :]
             return loss(input, target)
@@ -476,9 +482,10 @@ class LossComputator():
 
             if self.class_loss ==  "cross-entropy":
                 return nn.CrossEntropyLoss()
+                #return nn.BCEWithLogitsLoss()
             
             elif self.class_loss == "weighted-cross-entropy":
-                return WeightedCELoss(weight_func=get_weights_tensor, device = self.device)
+                return WeightedCELoss(weight_func = get_weights_tensor, device = self.device)
 
             elif self.class_loss == "cross-entropy-dice":
                 return CrossEntropyDiceLoss(weight_func=get_weights_tensor, device = self.device)
@@ -503,6 +510,6 @@ class LossComputator():
             raise ValueError(f"The provided batches for the loss computation contains different keys: pred keys are {pred_batches.keys()} while the gt keys are {gt_batches.keys()}")
         losses = []
         for key, image in pred_batches.items():
-            losses.append(self.loss_criterions(image, gt_batches[key]))
+            losses.append(self.loss_criterions[key](image, gt_batches[key]))
         total_loss = sum(losses)
         return total_loss, losses
