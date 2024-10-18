@@ -11,7 +11,7 @@ from copy import deepcopy
 from typing import Dict, Type, Any
 
 from training.ranger2020 import Ranger
-from training.losses import get_loss, get_weights_tensor, WeightedCELoss, compute_cross_entropy, compute_weighted_cross_entropy, compute_j_cross_entropy
+from training.losses import get_weights_tensor, WeightedCELoss
 from net_utils.utils import get_num_workers, save_current_model_state, save_current_branch_state, save_training_loss, show_training_dataset_samples, save_image
 
 

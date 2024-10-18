@@ -37,11 +37,7 @@ def load_environment_variables(env_file_path: str = "./.env") -> None:
 
     Parameters:
         env_file_path : The path to the .env file.
-
-    Returns:
-        None
     """
-    # Load the .env file
     load_dotenv(dotenv_path = env_file_path)
 
 def set_current_run_folders() -> None:

@@ -91,7 +91,8 @@ def get_model_config(log, train_args: Type[train_arg_class_interface], num_gpus:
 
 # NOTE: Refactoring in progress.
 def set_up_training_loops(log, args: Type[train_arg_class_interface], path_data, trainset_name, path_models, model_config: Dict[str, Any], net, num_gpus, device):
-    # Loop to iterate over the different trained/re-trained architectures.
+    """Loop to iterate over the different trained/re-trained architectures.
+    """
 
     for idx, crop_size in enumerate(args.crop_size): # Cicle over multiple 'crop_size' if provided
         model_name = '{}_{}_{}_{}_{}_{}'.format(trainset_name, args.mode, args.split, crop_size, args.pre_processing_pipeline, args.arch)

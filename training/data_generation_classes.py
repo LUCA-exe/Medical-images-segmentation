@@ -73,7 +73,7 @@ class data_generation_factory(data_generation_factory_interface):
                     raise TypeError(f"The binary_border_label computed is not the expected type!")
 
         # Last check before returning the processed dictionary.
-        if len(images.keys()) <= 2:
+        if len(images.keys()) <= 3:
             raise ValueError(f"The dict. contains just {images.keys()}: erroneous labels passed: {labels}")
         return images
     

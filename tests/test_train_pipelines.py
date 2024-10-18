@@ -32,8 +32,7 @@ from utils import load_environment_variables, set_current_run_folders, \
 from training.create_training_sets import create_ctc_training_sets
 
 def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger, int, torch.device, str, str, str]:
-    """
-    This function provide a 'mock' train pipeline to 
+    """This function provide a 'mock' train pipeline to 
     test the overall functions from the set up of the loggers,
     folders to the building of the neural networks.
 
@@ -44,7 +43,7 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
         args: Arguments already parsed from calling function.
 
     Returns:
-        None
+        A tuple of any types for the further training loop execution.
     """
     # Set up the current environment/folders
     load_environment_variables()

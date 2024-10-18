@@ -1,6 +1,5 @@
 """This module tests the losses configurations and computation only.
 """
-from training.losses import get_loss
 from typing import Dict, Union, Optional
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, SmoothL1Loss
 from torch import nn
@@ -50,11 +49,9 @@ def add_gaussian_noise(image: np.ndarray,
     return image + gauss
 
 def add_class_label(mask: np.ndarray,
-                    label: Union[float, int] = 1,
+                    label: Union[float, int] = 1.0,
                     p: float = 0.7) -> np.ndarray:
     """Add the provided label class to the mask in random positions.
-
-    The mask in input will be converted to boolean mask.
 
     Args:
         mask: Categorical image of shape (H, W).
@@ -171,15 +168,15 @@ class TestMockCriterionComputation:
         gt_batch = {"cell": gt_float_img, "mask": gt_categorical_img}
             
         test_arguments = [
-            {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10},
-            {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10},
-            {"regression_loss": "l1", "classification_loss": "cross-entropy",  "mean": 40, "var": 20},
+            {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10, "p": 0.7},
+            {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10, "p": 0.5},
+            {"regression_loss": "l1", "classification_loss": "cross-entropy",  "mean": 40, "var": 20, "p": 0.3},
         ]
         for test_args in test_arguments:
 
             # Add artifacts on the images for the loss computation.
             noised_img = add_gaussian_noise(img, test_args["mean"], test_args["var"])
-            noised_seg_mask = add_class_label(seg_mask)
+            noised_seg_mask = add_class_label(seg_mask, p = test_args["p"])
             pred_float_img = get_mock_float_batch(noised_img)
             pred_categorical_img = get_mock_categorical_batch(noised_seg_mask, gt = False)
             pred_batch = {"cell": pred_float_img, "mask": pred_categorical_img}

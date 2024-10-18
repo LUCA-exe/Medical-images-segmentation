@@ -141,7 +141,6 @@ class WeightedCELoss(nn.Module):
         else:
             raise ValueError(f"The provided weight function is not valid!")
 
-# NOTE: Work in progress - finish to implement
 class CrossEntropyDiceLoss(nn.Module):
     """
     Wrapper function for dynamically weighted cross-entropy loss plus the Dice loss for refining the borders.
@@ -218,7 +217,7 @@ class CrossEntropyDiceLoss(nn.Module):
         # Return the final coeff. for the current binary class
         return (2 * intersection + smooth) / (union + smooth)
 
-# NOTE: Work in progress - to test the values and the efficacy in training
+# NOTE: Work in progress - finish to test.
 class MultiClassJLoss(nn.Module):
     """
     Combined loss function with multi-class J-regularization and binary cross-entropy.
@@ -310,124 +309,6 @@ class MultiClassJLoss(nn.Module):
         loss = bce_loss + self.lambda_ * j_reg_term.mean()
         return loss
 
-def get_loss(config: Dict[str, Any], device) -> Type[nn.Module]:
-    """ Get loss function(s) for the training process based on the current architecture.
-
-    :param loss_function: Loss function to use.
-        :type loss_function: str
-    :return: Loss function / dict of loss functions.
-    """
-
-    if config['loss'] == 'l1':
-        border_criterion = nn.L1Loss()
-        cell_criterion = nn.L1Loss()
-    elif config['loss']  == 'l2':
-        border_criterion = nn.MSELoss()
-        cell_criterion = nn.MSELoss()
-    elif config['loss']  == 'smooth_l1':
-        border_criterion = nn.SmoothL1Loss()
-        cell_criterion = nn.SmoothL1Loss()
-    
-    if config['architecture'][0] == 'dual-unet':
-        criterion = {'border': border_criterion, 'cell': cell_criterion}
-        
-    elif config['architecture'][0] == 'triple-unet':
-
-        if config["classification_loss"] == "weighted-cross-entropy":
-            mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
-
-        elif config["classification_loss"] == "cross-entropy-dice":
-            mask_criterion = CrossEntropyDiceLoss(weight_func=get_weights_tensor, device = device)
-
-        elif config["classification_loss"] == "cross-entropy":
-            mask_criterion = nn.CrossEntropyLoss()
-
-        else:
-            raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
-
-        criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
-
-    elif config['architecture'][0] == 'original-dual-unet':
-        
-        if config["classification_loss"] == "weighted-cross-entropy":
-            mask_criterion = WeightedCELoss(weight_func=get_weights_tensor, device = device)
-
-        elif config["classification_loss"] == "cross-entropy-dice":
-            mask_criterion = CrossEntropyDiceLoss(weight_func=get_weights_tensor, device = device)
-        
-        elif config["classification_loss"] == "cross-entropy":
-            mask_criterion = nn.CrossEntropyLoss()
-
-        # NOTE: Finish test
-        elif config["classification_loss"] == "j-cross-entropy":
-            mask_criterion = MultiClassJLoss(lambda_=0.5,  # Adjust weighting factor as needed
-                                            class_weights=torch.tensor([[1.0, 1.0, 1.0],  # Example class weights - try with 2 and 3 classes.
-                                                                        [1.0, 1.0, 1.0],
-                                                                        [1.0, 1.0, 1.0]]),
-                                                                        device = device)
-        else:
-            raise ValueError(f"The {config['classification_loss']} is not supported among the classificaiton losses!")
-
-        criterion = {'binary_border': mask_criterion, 'cell': cell_criterion, 'mask': mask_criterion}
-    return criterion
-
-def compute_cross_entropy(pred_batches, batches_dict, criterion):
-    # Pred. batches as dict. to decrease the number of args - batches dict. is the correspondent GT images batches
-
-    # Adapt the dim. of the target batches
-    target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
-    target_mask =  batches_dict["mask_label"][:, 0, :, :]    
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], target_binary_border)
-    loss_mask = criterion['mask'](pred_batches["mask_pred"], target_mask)
-
-    loss = loss_binary_border + loss_cell + loss_mask
-    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-    return loss, losses_list
-
-def compute_weighted_cross_entropy_dice(pred_batches, batches_dict, criterion):
-    # Wrappper function to encapsulate the loss computation (in this case of the cross-entropy plus the dice contribution)
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], batches_dict["binary_border_label"])
-    loss_mask = criterion['mask'](pred_batches["mask_pred"], batches_dict["mask_label"])
-
-    loss = loss_binary_border + loss_cell + loss_mask
-    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-    return loss, losses_list
-
-def compute_weighted_cross_entropy(pred_batches, batches_dict, criterion):
-    # Wrappper function to encapsulate the loss computation
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], batches_dict["binary_border_label"])
-    loss_mask = criterion['mask'](pred_batches["mask_pred"], batches_dict["mask_label"])
-
-    loss = loss_binary_border + loss_cell + loss_mask
-    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-    return loss, losses_list
-
-def compute_j_cross_entropy(pred_batches, batches_dict, criterion):
-
-    # Adapt the dim. of the target batches
-    target_binary_border = batches_dict["binary_border_label"][:, 0, :, :]
-    target_mask =  batches_dict["mask_label"][:, 0, :, :]
-
-    loss_cell = criterion['cell'](pred_batches["cell_pred"], batches_dict["cell_label"])
-    loss_binary_border = criterion['binary_border'](pred_batches["binary_border_pred"], target_binary_border)
-    loss_mask = criterion['mask'](pred_batches["mask_pred"], target_mask)
-
-    loss = loss_binary_border + loss_cell + loss_mask
-    # The custom j regularized cross entropy is a value from functional package - not an object
-    losses_list = [loss_binary_border.item(), loss_cell.item(), loss_mask.item()]
-
-    # DEBUG
-    print(loss)
-    print(losses_list)
-    return loss, losses_list
-
-# NOTE: Working on the 'loss' computation refactoring.
 class LossComputator():
     """This class defines the internal configurations and methods for the loss.
     """
