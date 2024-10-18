@@ -13,13 +13,6 @@ from copy import copy
 from utils import set_device
 from training.losses import LossComputator, WeightedCELoss, CrossEntropyDiceLoss, MultiClassJLoss
 
-# NOTE: DEPRECATED
-def mock_set_criterion(args: dict) -> Dict[str, nn.Module]:
-    """Function to retrieve the set of losses corresponding
-    to the architecture.
-    """
-    criterion = get_loss(args["config"], args["device"])
-    return criterion
 
 def load_images(folder_path: str) -> list[np.ndarray, np.ndarray]:
     """Load saved images (npy format) such us image, mask and tracking
@@ -103,23 +96,24 @@ def get_mock_categorical_batch(mask: np.ndarray, n_batch: int = 4, gt: bool = Tr
     for batch suitability. 
 
     Args:
-        image: Image array of shape (H, W).
+        image: Image array of shape (H, W) containing classes labels.
         n_batch: Number of images contained in the batch.
         gt: Flag to add a new dim. If the categorical image
-            is used in the 'prediction' batch, then a new
-            dim. has to be added as C axis.
+            is used in the 'prediction' batch, then a copy
+            of the mask will be stacked to simulate C=2.
 
     Returns:
-        It returns a tensor of shape (N, C = 1, H, W).
+        It returns a tensor of shape (N, C, H, W). Specifically for
+        with C = 1 Long type for target batch and C = 2 Float type 
+        for predicted batch.
     """
     mask = copy(mask)
     mask = np.expand_dims(mask, axis = 0)
     if not gt:
-        mask = torch.from_numpy(mask)
+        double_mask = np.append(mask, mask, axis=0)
+        mask = torch.from_numpy(double_mask)
     else:
-        mask = torch.from_numpy(mask)
-        #mask = torch.tensor(mask, dtype=torch.long)
-    # Add a dimension to create mock batch data
+        mask = torch.from_numpy(mask).long()
     masks = [mask] * n_batch
     batch = torch.stack(masks, dim = 0)
     return batch
@@ -130,17 +124,6 @@ class TestMockCriterionComputation:
 
     It instantiates the losses and provide mock computation for every configuration.
     """
-
-    def test_criterion_retrieval(self):
-        """Load the loss classes based on the architecture configurations.
-        """
-
-        test_arguments = [
-            {"config": {"loss": "l1"}, "device": torch.device("cpu")}
-        ]
-
-        for test_args in test_arguments:
-            raise NotImplementedError
         
     def test_loss_computator(self):
         """Test the correct instantiations of the loss computator.
@@ -178,18 +161,19 @@ class TestMockCriterionComputation:
 
         # Forming the "mock" ground-truth batch.
         img, seg_mask = load_images(folder_path=images_folder_path)
-        img = img.astype(np.float64, copy=False)
+        img = img.astype(np.float32, copy = False)
 
-        # up to this point the mask image should contain one label for each distinct element.
+        # NOTE: up to this point the mask image should contain one label for each distinct element.
         seg_mask = np.array(seg_mask, dtype=bool)
-        seg_mask = seg_mask.astype(np.float64, copy=False)
+        seg_mask = seg_mask.astype(np.float32, copy=False)
         gt_float_img = get_mock_float_batch(img)
         gt_categorical_img = get_mock_categorical_batch(seg_mask)
         gt_batch = {"cell": gt_float_img, "mask": gt_categorical_img}
             
         test_arguments = [
+            {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10},
+            {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10},
             {"regression_loss": "l1", "classification_loss": "cross-entropy",  "mean": 40, "var": 20},
-            {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10}
         ]
         for test_args in test_arguments:
 
@@ -197,8 +181,15 @@ class TestMockCriterionComputation:
             noised_img = add_gaussian_noise(img, test_args["mean"], test_args["var"])
             noised_seg_mask = add_class_label(seg_mask)
             pred_float_img = get_mock_float_batch(noised_img)
-            pred_categorical_img = get_mock_categorical_batch(noised_seg_mask, gt=False)
+            pred_categorical_img = get_mock_categorical_batch(noised_seg_mask, gt = False)
             pred_batch = {"cell": pred_float_img, "mask": pred_categorical_img}
             computator = LossComputator(test_args["regression_loss"], test_args["classification_loss"], device)
-            _ = computator.compute_loss(pred_batch, gt_batch)
-            
+
+            # If the simple cross-entropy is employed, override the shape of the gt batch.
+            if test_args["classification_loss"] == "cross-entropy":
+                gt_batch["mask"] = gt_batch["mask"][:, 0, :, :]
+            loss, losses_list = computator.compute_loss(pred_batch, gt_batch)
+            assert isinstance(loss, torch.Tensor)
+            for number in losses_list:
+                assert isinstance(number, float)
+                assert number > 0.0

@@ -117,31 +117,27 @@ class WeightedCELoss(nn.Module):
         """
         Calculates forward pass with dynamic weight calculation.
 
+        It implements the default CrossEntropy() nn.module. It expects
+        un-normalized inputs and the target batch will be used with the
+        C = 0 channel.
+
         Args:
             input (torch.Tensor): Model output, shape (N, C, H, W).
-            target (torch.Tensor): Ground truth labels, shape (N, H, W).
+            target (torch.Tensor): Ground truth labels, shape (N, C = 1, H, W).
 
         Returns:
             torch.Tensor: Weighted cross-entropy loss.
         """
-        # DEBUG
-        print(f"PROVA: {input.shape}")
-        print(target.shape)
-        print(np.unique(target))
-        print(np.unique(input))
-  
         if self.weight_func is not None:
             # Calculate class weights based on current batch
             class_weights = self.weight_func(target, device = self.device)
 
             # Apply weights in forward pass
             loss = nn.CrossEntropyLoss(weight = class_weights)
-            #loss = nn.BCELoss(weight=class_weights)
 
             # TODO: Modify here the shape of the target if necessary - Attention to the shape of the "target" of the cross entropy loss.
             target = target[:, 0, :, :]
             return loss(input, target)
-
         else:
             raise ValueError(f"The provided weight function is not valid!")
 
@@ -482,7 +478,6 @@ class LossComputator():
 
             if self.class_loss ==  "cross-entropy":
                 return nn.CrossEntropyLoss()
-                #return nn.BCEWithLogitsLoss()
             
             elif self.class_loss == "weighted-cross-entropy":
                 return WeightedCELoss(weight_func = get_weights_tensor, device = self.device)
@@ -494,11 +489,10 @@ class LossComputator():
             else:
                 raise ValueError(f"The {self.class_loss} is not supported among the classification losses!")
     
-    # TODO: Finish testing the loss computation.
     def compute_loss(self, 
                      pred_batches: Dict[str, torch.Tensor], 
                      gt_batches: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, List[float]]:
-        """Loop over the provided batches for using the stored loss criterions and compute the final loss.
+        """Loop over the provided batches for using the previous stored loss criterions.
 
         Args:
             pred_batches: It contains the predicted images stored in the
@@ -512,4 +506,7 @@ class LossComputator():
         for key, image in pred_batches.items():
             losses.append(self.loss_criterions[key](image, gt_batches[key]))
         total_loss = sum(losses)
+        
+        # Convert to plain python number.
+        losses = [loss.item() for loss in losses]
         return total_loss, losses
