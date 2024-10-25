@@ -6,11 +6,36 @@ from imgaug import augmenters as iaa
 from skimage.exposure import equalize_adapthist, rescale_intensity
 from skimage.transform import rescale
 from torchvision import transforms
+from typing import Dict, List
 
 from net_utils.utils import min_max_normalization
 
+# NOTE: Move to a conf.json/ other modules and import from there.
+ALLOWED_FLOAT_LABELS = ["image", "cell_label",  "border_label"]
+ALLOWED_CATEGORICAL_LABELS = ["binary_border_label", "mask_label"]
 
-def augmentors(label_type, min_value, max_value):
+
+# NOTE: For now don't implement properties decorator - exposing jsut the internal attributes.
+class ImagesTranformationsController():
+    """This class contains mixin methods in order to split float and categorical images tranformations.
+
+    This class specifically extends the classes present in this module in order
+    to simplify the extensions of different images based on their label and properties.
+    """
+
+    def __init__(self):
+        """Instantiates the object reading from constants.
+        """
+        self.float_labels = ALLOWED_FLOAT_LABELS
+        self.categorical_labels = ALLOWED_FLOAT_LABELS
+
+    def allowed_blurred_labels(self) -> List[str]:
+        """It provides the image labels that can be blurred
+        """
+        return ["image"]
+    
+
+def augmentors(label_type, min_value, max_value) -> Dict[str, transforms.Compose]:
     """ Get augmentations for the training process.
 
     :param label_type: Type of the label images, e.g., 'boundary' or 'distance'.
@@ -19,7 +44,10 @@ def augmentors(label_type, min_value, max_value):
         :type min_value: int
     :param max_value: Minimum value for the min-max normalization.
         :type min_value: int
-    :return: Dict of augmentations.
+
+    Returns:
+        Dict of augmentation functions (one Compose obj. for train and
+        one for val as key of the dictionary).
     """
 
     if label_type == 'auto':
@@ -42,7 +70,7 @@ def augmentors(label_type, min_value, max_value):
     return data_transforms
 
 
-class Blur(object):
+class Blur(object, ImagesTranformationsController):
     """ Blur augmentation (label-preserving transformation) """
 
     def __init__(self, p=1):
@@ -55,7 +83,6 @@ class Blur(object):
         
     def __call__(self, sample):
         """
-
         :param sample: Dictionary containing image and label image (numpy arrays).
             :type sample: dict
         :return: Dictionary containing augmented image and label image (numpy arrays).

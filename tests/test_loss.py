@@ -14,8 +14,7 @@ from training.losses import LossComputator, WeightedCELoss, CrossEntropyDiceLoss
 
 
 def load_images(folder_path: str) -> list[np.ndarray, np.ndarray]:
-    """Load saved images (npy format) such us image, mask and tracking
-    mask.
+    """Load saved images (npy format) such us image, mask.
     
     The dtype of this numpy arrays should be uint8 (image) and uint16 (the masks).
     The mask are in the shape of (H, W) while the original image are (H, W, C). 

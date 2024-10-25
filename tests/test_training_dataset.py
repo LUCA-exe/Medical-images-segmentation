@@ -2,6 +2,16 @@
 
 It employes a function for setting the training dataset on disk
 from the ./test_train_pipelines.py module.
+it involves the testing of the Dataset class custom dataset and 
+for the transformation functions.
+
+To test just the transformation functions:
+...> python -m pytest -v --run-sub tests/test_training_dataset.py
+
+To test just the entire pipeline:
+...> python -m pytest -v --run-pipeline tests/test_training_dataset.py
+
+In some tests it will uses the *.npy files listed in the ./tests/README.txt file.
 """
 from typing import Dict, Any, List, Tuple
 from shutil import rmtree
@@ -9,20 +19,43 @@ import torch
 import os
 from os.path import join
 from pathlib import Path
+import numpy as np
+import pytest
+from copy import copy
 
 from training.mytransforms import augmentors
 from utils import read_json_file
-
 from tests.test_train_pipelines import mock_training_dataset_creation_pipeline, update_default_args
+from tests.test_loss import load_images
 from training.cell_segmentation_dataset import CellSegDataset
 
-class TestTrainingDataset:
+def create_mock_dict_for_tranformations(float_image: np.array, 
+                                        categorical_image: np.array,
+                                        float_labels: List[str] = ["image", "cell_label", "border_label"],
+                                        categorical_labels: List[str] = ["mask_label", "binary_border_label"]) -> Dict[str, np.array]:
+    """It generates a mock dictionary containing compatible images for the Compose obj.
+
+    For the further processing (in the Compose class) the categorical images have
+    to be in the [H, W, C] shape.
+    """
+    categorical_image = np.expand_dims(copy(categorical_image), axis = 2)
+    mock_sample = {}
+    for label in float_labels:
+        mock_sample[label] = float_image.astype(np.float32)
+
+    for label in categorical_labels:
+        mock_sample[label] = categorical_image.astype(np.bool_)
+        mock_sample[label] = categorical_image.astype(np.uint8)
+    return mock_sample
+
+class TestCustomDataset:
     """This class contains functions to set local training dataset folders and tests 
     custom Dataset methods and classes for training.
     """
 
     # NOTE: Refactoring in process.
-    def test_training_custom_dataset(self):
+    @pytest.mark.pipeline
+    def test_custom_dataset(self):
         """Set the tranform function and a custom torch.utils.data.Dataset class.
 
         This function will call the method to save processed images on the local disk
@@ -38,7 +71,7 @@ class TestTrainingDataset:
         path_data = Path("training_data")
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3}
         ]
 
         for test_args in test_arguments:
@@ -57,7 +90,6 @@ class TestTrainingDataset:
             dataset_name = "{}_{}_{}_{}".format(test_args["dataset"], "GT", "01", test_args["crop_size"])
             datasets = {x: CellSegDataset(root_dir = path_data / Path(dataset_name), mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
-            
             for key, dataset in datasets.items():
 
                 # NOTE: Temporary testing just the first sample.
@@ -67,7 +99,22 @@ class TestTrainingDataset:
 
                     # Checks on expected unique values just for category data (e.g. mask).
                     if "unique_values" in expected_label_type[key]:
-                         assert expected_label_type[key]["unique_values"] == len(torch.unique(item))
+                        assert expected_label_type[key]["unique_values"] == len(torch.unique(item))
 
-            
+    @pytest.mark.sub
+    def test_transformation_functions(self):
+        """It tests the Compose class in case of val and training datasets.
 
+        The Compose object is used inside the CellSegDataset class. 
+        This function will load a set of mock images present in the ./tests
+        folder.
+        """ 
+        images_folder_path = "tests"
+        img, seg_mask = load_images(folder_path = images_folder_path)
+
+        # Get mock sample for the current labels transformation
+        mock_sample = create_mock_dict_for_tranformations(img, seg_mask)
+        data_transform = augmentors(label_type = "null", min_value=0, max_value=65535)
+        for mode in ['train', 'val']:
+            tranform_functions = data_transform[mode]
+            _ = tranform_functions(mock_sample)

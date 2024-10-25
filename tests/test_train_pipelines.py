@@ -299,9 +299,6 @@ class TestMockTrainPipelines:
         ]
 
         for test_args in test_arguments:
-            #DEBUG
-            print(f"TEST {test_args['model_pipeline']}")
-
             run_parameters = update_default_args(default_args, test_args)
             
             # Compose current dataset folder.
