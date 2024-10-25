@@ -1,5 +1,5 @@
 import json
-from typing import Dict
+from typing import Dict, List
 import math
 import numpy as np
 import os
@@ -91,21 +91,20 @@ def close_mask(mask, apply_opening=False, kernel_closing=np.ones((10, 10)), kern
     return hlabel
 
 
-def copy_train_data(source_path, target_path, idx):
-    """  Copy generated training data crops.
+def copy_train_data(source_path: Path, target_path: Path, idx: Path, labels: List[str]) -> None:
+    """Copy generated training data crops.
 
-    :param source_path: Directory containing the training data crops.
-        :type source_path: pathlib Path object
-    :param target_path: Directory to copy the training data crops into.
-        :type target_path: pathlib Path Object
-    :param idx: path/id of the training data crops to copy.
-        :type idx: pathlib Path Object
-    :return: None
+    Args:
+    source_path: Directory containing the training data crops.
+    target_path: Directory to copy the training data crops into.
+    idx: path/id of the training data crops to copy.
+    labels: Image labels generated to copy.
     """
-    shutil.copyfile(str(source_path / "img_{}.tif".format(idx)), str(target_path / "img_{}.tif".format(idx)))
-    shutil.copyfile(str(source_path / "dist_cell_{}.tif".format(idx)), str(target_path / "dist_cell_{}.tif".format(idx)))
-    shutil.copyfile(str(source_path / "dist_neighbor_{}.tif".format(idx)), str(target_path / "dist_neighbor_{}.tif".format(idx)))
-    shutil.copyfile(str(source_path / "mask_{}.tif".format(idx)), str(target_path / "mask_{}.tif".format(idx)))
+    for label in labels:
+        shutil.copyfile(str(source_path / "{}_{}.tif".format(label, idx)), str(target_path / "{}_{}.tif".format(label, idx)))
+        #shutil.copyfile(str(source_path / "dist_cell_{}.tif".format(idx)), str(target_path / "dist_cell_{}.tif".format(idx)))
+        #shutil.copyfile(str(source_path / "dist_neighbor_{}.tif".format(idx)), str(target_path / "dist_neighbor_{}.tif".format(idx)))
+        #shutil.copyfile(str(source_path / "mask_{}.tif".format(idx)), str(target_path / "mask_{}.tif".format(idx)))
     return
 
 
@@ -199,7 +198,16 @@ def foi_correction_train(cell_type, mode, *imgs):
 
 
 # TODO: Add the train_args class with the encapsulated 'needed' images.
-def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame, path, train_arg_class: type[train_arg_class_interface]) -> None:
+def generate_data(img, 
+                  mask, 
+                  tra_gt, 
+                  td_settings, 
+                  cell_type, 
+                  mode, 
+                  subset, 
+                  frame, 
+                  path, 
+                  train_arg_class: type[train_arg_class_interface]) -> List[str]:
     """It process the images, crop them and save them on disk.
 
     :param img: Image.
@@ -224,6 +232,9 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
         :type crop_idx: int
     :param slice_idx: DEPRECATED - Slice index (for 3D data).
         :type slice_idx: int
+    
+    Returns:
+        List of labels of the generated images at the end of the generation process.
     """
 
     images_labels = train_arg_class.get_requested_image_labels()
@@ -250,9 +261,10 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
             if np.sum(cropped_images["mask"][10:-10, 10:-10, 0] > 0) < td_settings['min_area']:  # only cell parts / no cell
                 continue
             
-            # 'neighbor' may be cut from crop, set dist to 0.
-            if len(mask_ids) == 1:
-                cropped_images["dist_neighbor"] = np.zeros_like(cropped_images["dist_neighbor"])
+            if "dist_neighbor" in cropped_images:
+                # 'neighbor' may be cut from crop, set dist to 0.
+                if len(mask_ids) == 1:
+                    cropped_images["dist_neighbor"] = np.zeros_like(cropped_images["dist_neighbor"])
 
             if np.sum(cropped_images["img"] == 0) > (0.66 * cropped_images["img"].shape[0] * cropped_images["img"].shape[1]):  # almost background
                 # For (e.g.) GOWT1 cells a lot of 0s are in the image
@@ -289,6 +301,10 @@ def generate_data(img, mask, tra_gt, td_settings, cell_type, mode, subset, frame
             cropped_images.pop("tra_gt")
             for label, values in cropped_images.items():
                 tiff.imsave(str(path / crop_quality / '{}_{}'.format(label, crop_name)), cropped_images[label])
+    
+    # Remove not needed labels.
+    processed_images.pop("tra_gt")
+    return list(processed_images.keys())
 
 def get_crop(x: int, y: int, crop_size: int, imgs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
     """Get crop from dict. of images.
@@ -657,7 +673,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
         img = np.clip(img, 0, 65535).astype(np.uint16) # Kept the requested type 'unsigned' integer 16 bits
 
         # Calculate distance transforms, crop and classify crops into 'A' (fully annotated) and 'B' (>80% annotated)
-        _ = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=cell_type,
+        generated_image_labels = generate_data(img=img, mask=mask, tra_gt=tra_gt, td_settings=td_settings, cell_type=cell_type,
                                       mode=mode, subset=subset, frame=frame, path=path_trainset, 
                                       train_arg_class=train_arg_class)
         
@@ -694,7 +710,7 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
                 source_path = path_trainset / "A"
             else:
                 source_path = path_trainset / "B"
-            copy_train_data(source_path, path_trainset / train_mode, idx)
+            copy_train_data(source_path, path_trainset / train_mode, idx, generated_image_labels)
 
     # NOTE: The original repository contained a beatiful method to merge multiple dataset/cell type patches avoiding a final 'unbalanced' train/val split
     log.info(f"Trainig dataset created correctly")

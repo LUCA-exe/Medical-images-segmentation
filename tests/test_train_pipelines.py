@@ -5,10 +5,10 @@ This testing module provide the following test features (WORK IN PROGRESS):
 - Train pipeline.
 
 To test just the sub-functions:
-> python -m pytest -v --run-sub tests/test_train_pipelines.py
+...> python -m pytest -v --run-sub tests/test_train_pipelines.py
 
 To test just the entire pipeline:
-> python -m pytest -v --run-pipeline tests/test_train_pipelines.py
+...> python -m pytest -v --run-pipeline tests/test_train_pipelines.py
 
 In some tests it will uses the *.npy files listed in the ./tests/README.txt file.
 """
@@ -171,7 +171,6 @@ def update_default_args(default_args: Dict, new_args: Dict) -> Dict[str, Any]:
     Returns:
         Hasmap encompassing the args updated.
     """
-
     for key, value in new_args.items():
         default_args[key] = value
     return default_args
@@ -221,7 +220,6 @@ def check_created_images(dataset_folder: str, folder_path: str, expected_image_p
         expected_image_number: Every 'group' of images with a determined
         prefix has to have the provided number of files created.
     """
-
     dir_list = os.listdir(folder_path)
     for file in dir_list:
 
@@ -296,10 +294,14 @@ class TestMockTrainPipelines:
         expected_files = ["info.json"]
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38], "expected_images_prefix": ["dist_cell_", "dist_neighbor_", "img_", "mask_"]}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38], "expected_images_prefix": ["dist_cell_", "dist_neighbor_", "img_", "mask_"]},
+            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 30, "folder_to_check": ["A"], "expected_images": [38], "expected_images_prefix": ["dist_cell_", "binary_border_label_", "mask_label_", "img_", "mask_"]}
         ]
 
         for test_args in test_arguments:
+            #DEBUG
+            print(f"TEST {test_args['model_pipeline']}")
+
             run_parameters = update_default_args(default_args, test_args)
             
             # Compose current dataset folder.

@@ -7,8 +7,10 @@ import copy
 from net_utils.utils import save_image
 
 
+# NOTE: TDD and refactoring in progress.
 class CellSegDataset(Dataset):
-    """ Pytorch data set for instance cell nuclei segmentation """
+    """Custom data set for instance cell nuclei segmentation.
+    """
 
     def __init__(self, root_dir, mode='train', transform=lambda x: x):
         """
@@ -21,8 +23,10 @@ class CellSegDataset(Dataset):
             :type transform:
         :return: Dict (image, cell_label, border_label, id).
         """
-
         self.img_ids = sorted((root_dir / mode).glob('img*.tif'))
+        if len(self.img_ids) == 0:
+            raise ValueError(f"The {(root_dir / mode)} doens't contains any image!")
+        
         self.mode = mode
         self.root_dir = root_dir
         self.transform = transform

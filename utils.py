@@ -332,6 +332,7 @@ def download_datasets(log, args): # Main function to download the chosen dataset
     log.info(f"Program terminated")
     return None
 
+
 class train_factory_interface(metaclass=abc.ABCMeta):
     """
     Interface for creating training arguments classes.
@@ -420,7 +421,6 @@ class train_arg_dual_unet(train_arg_class_interface):
         self.pre_processing_pipeline = args[15]
         self.classification_loss = False # NOTE: In this architecture is not present the classification branch
 
-        # Internal attributes
         # TODO: check againts a config.json file for the 'allowed' images to request.
         self._ground_truth_labels = tuple(["dist_cell_and_neighbor", ])
 
@@ -476,7 +476,8 @@ class train_arg_tu(train_arg_class_interface):
 
 
 class train_arg_odu(train_arg_class_interface):
-    """Specific argument training class for the Dual U-net."""
+    """Specific argument training class for the Dual U-net.
+    """
 
     def __init__(self, args):
 
@@ -498,12 +499,22 @@ class train_arg_odu(train_arg_class_interface):
         self.pre_processing_pipeline = args[15]
         self.softmax_layer = args[16]
         self.classification_loss = args[17]
-
+        self._ground_truth_labels = tuple(["mask_label", "binary_border_label", "dist_cell"])
 
     def get_arch_args(self):
-        # Return all the architecture args as tuple
+        """Return the architecture args as tuple.
 
+        It follows a specific order for future parsing.
+        """
         return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, self.detach_fusion_layers, self.softmax_layer
+
+    def get_requested_image_labels(self) -> Tuple[str,]:
+        """It returns a tuple. 
+        
+        Specifically,with the requested label/labels to generate for 
+        training the correspondent neural network.
+        """
+        return self._ground_truth_labels
 
     def __str__(self):
         attributes = ', '.join(f'{key}={value}' for key, value in vars(self).items())
@@ -531,7 +542,7 @@ class train_factory(train_factory_interface):
             return train_arg_dual_unet(args)
 
         elif args[0] == "original-dual-unet":
-            return train_arg_tu(args)
+            return train_arg_odu(args)
 
         elif args[0] == "triple-unet":
             return train_arg_tu(args)

@@ -58,8 +58,19 @@ class data_generation_factory(data_generation_factory_interface):
                                                             disk_radius = td_settings['disk_radius'])
                 
                 if not ((str(images["dist_cell"].dtype) == 'float32') and (str(images["dist_neighbor"].dtype) == 'float32')):
-                    raise TypeError(f"The dist_cell and dist_neighbor computed are not the expected type!")
+                    raise TypeError(f"The dist_cell and dist_neighbor images computed are not the expected type!")
             
+            # NOTE: Temporary coupling of two processing method.
+            if label == "dist_cell":
+                images["dist_cell"], _ = distance_label_2d(label=mask,
+                                                            cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
+                                                            neighbor_radius=td_settings['search_radius'], 
+                                                            disk_radius = td_settings['disk_radius'])
+                
+                if not (str(images["dist_cell"].dtype) == 'float32'):
+                    raise TypeError(f"The dist_cell image computed are not the expected type!")
+
+
             if label == "mask_label":
                 images["mask_label"] = extract_binary_mask_label(mask)
 
@@ -71,9 +82,12 @@ class data_generation_factory(data_generation_factory_interface):
 
                 if not str(images["binary_border_label"].dtype) == 'uint16':
                     raise TypeError(f"The binary_border_label computed is not the expected type!")
-
-        # Last check before returning the processed dictionary.
-        if len(images.keys()) <= 3:
+        
+        # Check on correctly computed labels.   
+        len_comparison = len(labels)
+        # The following label add two processed images to the dict.
+        if "dist_cell_and_neighbor" in labels: len_comparison += 1
+        if len(images.keys()) != 3 + len_comparison:
             raise ValueError(f"The dict. contains just {images.keys()}: erroneous labels passed: {labels}")
         return images
     

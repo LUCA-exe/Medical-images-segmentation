@@ -1,7 +1,6 @@
 {
     "train_images_path": "training_data/",
     "pre_processing_pipeline": "kit-ge",
-    "model_pipeline": "dual-unet",
     "models_folder": "./models/all/",
     "scale": 1,
     "crop_size": 320,

@@ -24,11 +24,21 @@ class TestTrainingDataset:
     # NOTE: Refactoring in process.
     def test_training_custom_dataset(self):
         """Set the tranform function and a custom torch.utils.data.Dataset class.
+
+        This function will call the method to save processed images on the local disk
+        as trial dataset respecting the expected structure.
         """
+        # Hard-coded values for the expected labels.
+        expected_label_type = {"image": {"dtype": torch.float32},
+                               "cell_label": {"dtype": torch.float32},
+                               "border_label": {"dtype": torch.float32},
+                               "mask_label": {"dtype": torch.int64, "unique_values": 2},
+                               "binary_border_label": {"dtype": torch.int64, "unique_values": 2}
+                               }
         path_data = Path("training_data")
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3 }
+            {"dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3}
         ]
 
         for test_args in test_arguments:
@@ -41,15 +51,23 @@ class TestTrainingDataset:
             if os.path.isdir(join(run_parameters["train_images_path"], dataset_folder)):
                 rmtree(join(run_parameters["train_images_path"], dataset_folder))
             mock_training_dataset_creation_pipeline(run_parameters)
-            
-            data_transforms = augmentors(label_type = "distance", min_value=0, max_value=65535) # NOTE: min_value and max_value fixed params.
+
+            # NOTE: min_value and max_value fixed params.
+            data_transforms = augmentors(label_type = "distance", min_value=0, max_value=65535)
             dataset_name = "{}_{}_{}_{}".format(test_args["dataset"], "GT", "01", test_args["crop_size"])
-            
-            # In the original script it was implemented the 'all' dataset plus ST option.
             datasets = {x: CellSegDataset(root_dir = path_data / Path(dataset_name), mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
             
             for key, dataset in datasets.items():
+
+                # NOTE: Temporary testing just the first sample.
                 first_sample = dataset[0]
+                for key, item in first_sample.items():
+                    assert expected_label_type[key]["dtype"] == item.dtype
+
+                    # Checks on expected unique values just for category data (e.g. mask).
+                    if "unique_values" in expected_label_type[key]:
+                         assert expected_label_type[key]["unique_values"] == len(torch.unique(item))
+
             
 
