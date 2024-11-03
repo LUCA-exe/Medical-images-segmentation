@@ -21,7 +21,7 @@ from os.path import join
 from pathlib import Path
 import numpy as np
 import pytest
-from copy import copy
+from copy import copy, deepcopy
 
 from training.mytransforms import augmentors
 from utils import read_json_file
@@ -31,7 +31,8 @@ from training.cell_segmentation_dataset import CellSegDataset
 
 def create_mock_dict_for_tranformations(float_image: np.array, 
                                         categorical_image: np.array,
-                                        float_labels: List[str] = ["image", "cell_label", "border_label"],
+                                        original_image_labels: List[str] = ["image"],
+                                        float_labels: List[str] = ["cell_label", "border_label"],
                                         categorical_labels: List[str] = ["mask_label", "binary_border_label"]) -> Dict[str, np.array]:
     """It generates a mock dictionary containing compatible images for the Compose obj.
 
@@ -40,6 +41,10 @@ def create_mock_dict_for_tranformations(float_image: np.array,
     """
     categorical_image = np.expand_dims(copy(categorical_image), axis = 2)
     mock_sample = {}
+
+    for label in original_image_labels:
+        mock_sample[label] = float_image.astype(np.uint16)
+
     for label in float_labels:
         mock_sample[label] = float_image.astype(np.float32)
 
@@ -107,7 +112,7 @@ class TestCustomDataset:
 
         The Compose object is used inside the CellSegDataset class. 
         This function will load a set of mock images present in the ./tests
-        folder.
+        folder to test the integrity of the tranformations.
         """ 
         images_folder_path = "tests"
         img, seg_mask = load_images(folder_path = images_folder_path)
@@ -117,4 +122,4 @@ class TestCustomDataset:
         data_transform = augmentors(label_type = "null", min_value=0, max_value=65535)
         for mode in ['train', 'val']:
             tranform_functions = data_transform[mode]
-            _ = tranform_functions(mock_sample)
+            _ = tranform_functions(deepcopy(mock_sample))
