@@ -1,5 +1,4 @@
-"""
-This file provides additional util functions for both train/eval pipelines
+"""This file provides additional util functions for both train/eval pipelines
 as laoding the model weights, save/overwrite the metrics and results.
 """
 import logging
@@ -18,11 +17,13 @@ import pandas as pd
 
 from net_utils import unets
 
-
-def create_model_architecture(log: logging.Logger, model_config: Dict[str, Union[str, int]], device: int, num_gpus: int, pre_train: bool = False) -> Type[nn.Module]:
-    """
-    Call the public method in the './unets.py' module to return the correct
-    NN class.
+# NOTE: Can be deprecated - is just a giant wrapper.
+def create_model_architecture(log: logging.Logger, 
+                              model_config: Dict[str, Union[str, int]], 
+                              device: int, 
+                              num_gpus: int, 
+                              pre_train: bool = False) -> Type[nn.Module]:
+    """Call the public method in the './unets.py' module to return the correct NN class.
 
     Returns:
         Custom neural networks builded inheriting from the 'nn.Module'

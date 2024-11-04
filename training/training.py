@@ -1,3 +1,8 @@
+"""This module is the high-level funcitonality of executing the training loop.
+
+Specifically, It will set up the optimizer and loss manager following the current
+configurations and handling the losses and model state savings.
+"""
 import gc
 import numpy as np
 import random
@@ -8,7 +13,7 @@ from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import torch.nn as nn
 from copy import deepcopy
-from typing import Dict, Type, Any
+from typing import Dict, Type, Any, Optional
 
 from training.ranger2020 import Ranger
 from training.losses import get_weights_tensor, WeightedCELoss
@@ -34,7 +39,7 @@ def sample_plot_during_validation(batches_list, val_phase_counter, binary_pred =
             else:
                 save_image(np.squeeze(batch[sample].cpu().detach().numpy()), "./tmp", f"Floating batch {idx} sample {sample} (Validation {val_phase_counter})")
             
-
+# NOTE: Deprecated.
 def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase, val_phase_counter):
     # Extendible function for the deepen of the sstudy on different architecture
 
@@ -98,7 +103,6 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
             sample_plot_during_validation([batches_dict["image"], pred_batches["binary_border_pred"],  pred_batches["mask_pred"]], val_phase_counter)
 
     return loss, losses_list
-
 
 def set_up_optimizer_and_scheduler(config, net, best_loss):
     """ Set up the optimizer and scheduler configurations adn return them to the main function.
@@ -185,16 +189,16 @@ def set_up_optimizer_and_scheduler(config, net, best_loss):
         raise Exception('Architecture not known')
     return optimizer, scheduler, break_condition
 
+def get_max_epochs(n_samples: int, arch: Optional[str] = None) -> int:
+    """Get maximum amount of training epochs based on the number of sample.
 
-def get_max_epochs(n_samples, config):
-    """ Get maximum amount of training epochs.
+    If the config hasmap is provided override the returned epochs with the custom
+    number contained in it.
 
-    :param n_samples: number of training samples.
-        :type n_samples: int
-    :return: maximum amount of training epochs
+    Args:
+        n_samples: Number of training samples.
+        arch: The current model architecture if provided.
     """
-
-    # From original repository
     if n_samples >= 1000:
         max_epochs = 200
     elif n_samples >= 500:
@@ -208,13 +212,13 @@ def get_max_epochs(n_samples, config):
     else:
         max_epochs = 560
 
-    # NOTE: Temporary fix - following the original paper
-    if config["architecture"][0] == "dual-unet":
-        max_epochs = 200
-    elif config["architecture"][0] == "original-dual-unet" or config["architecture"][0] == "triple-unet":
-         max_epochs = 40
+    # Override the numbers with custom configurations.
+    if arch is not None:
+        if arch == "dual-unet":
+            max_epochs = 200
+        elif arch == "original-dual-unet":
+            max_epochs = 40
     return max_epochs
-
 
 def get_weights(net, weights, device, num_gpus):
     """ Load weights into model.
@@ -236,7 +240,6 @@ def get_weights(net, weights, device, num_gpus):
         net.load_state_dict(torch.load(weights, map_location=device))
     return net
 
-
 def update_running_losses(running_losses_list, losses_list, batch_size):
     # In input a list of losses computed during a mini_batch images, for every item of the list just update the values and returns it
 
@@ -247,7 +250,6 @@ def update_running_losses(running_losses_list, losses_list, batch_size):
         updated_running_losses.append(runn_loss + loss)
     return updated_running_losses
 
-
 def move_batches_to_device(samples_dict, device):
     # util function to get the dict. batch from the dataloader and move to the correct device
 
@@ -257,7 +259,6 @@ def move_batches_to_device(samples_dict, device):
 
     # Return updated dict.
     return samples_dict
-
 
 def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, path_models, best_loss=1e4):
     """Train the model using the .
@@ -280,15 +281,14 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
     # Assert that the datasets has been created correctly before the loop over the images
     show_training_dataset_samples(log, datasets["train"])
 
-    # NOTE: If it is not passed as arguments, set in this method.
+    # If it is not passed as arguments, set in this method.
     if not "max_epochs" in config:
         log.info(f"The 'max epochs' param is not set yet, it will be inferred now!")
         # Get number of training epochs depending on dataset size (just roughly to decrease training time):
-        config['max_epochs'] = get_max_epochs(len(datasets['train']) + len(datasets['val']), config)
+        config['max_epochs'] = get_max_epochs(len(datasets['train']), arch=config['architecture'][0])
 
     # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
     print(f"Number of epochs without improvement allowed {2 * config['max_epochs'] // 20 + 5}")
-
     print('-' * 20)
     print('Train {0} on {1} images, validate on {2} images'.format(config['run_name'],
                                                                    len(datasets['train']),

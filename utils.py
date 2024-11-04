@@ -425,7 +425,7 @@ class train_arg_dual_unet(train_arg_class_interface):
         self._ground_truth_labels = tuple(["dist_cell_and_neighbor", ])
 
     def get_arch_args(self) -> Tuple[Union[str, bool]]:
-        """Return all the architecture args as tuple
+        """Return all the architecture args as tuple.
         """
         return self.arch, self.pool_method, self.act_fun, self.norm_method, self.filters, False, False
 

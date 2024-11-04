@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import tanh
 
-
+# NOTE: This module is in refactoring.
 def build_unet(log, unet_type, act_fun, pool_method, normalization, device, num_gpus, ch_in=1, ch_out=1, filters=(64, 1024), detach_fusion_layers = False, softmax_layer = False):
     """ Build U-net architecture.
 
