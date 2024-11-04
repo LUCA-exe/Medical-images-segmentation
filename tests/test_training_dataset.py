@@ -18,7 +18,7 @@ from shutil import rmtree
 import torch
 import os
 from os.path import join
-from pathlib import Path
+from pathlib import Path, PurePath
 import numpy as np
 import pytest
 from copy import copy, deepcopy
@@ -71,12 +71,14 @@ class TestCustomDataset:
                                "cell_label": {"dtype": torch.float32},
                                "border_label": {"dtype": torch.float32},
                                "mask_label": {"dtype": torch.int64, "unique_values": 2},
-                               "binary_border_label": {"dtype": torch.int64, "unique_values": 2}
+                               "binary_border_label": {"dtype": torch.int64, "unique_values": 2},
+                               "id": {"dtype": str}
                                }
         path_data = Path("training_data")
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3, "expected_keys": ["image", "id", "cell_label", "border_label"]},
+            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3, "expected_keys": ["image", "id", "cell_label", "mask_label", "binary_border_label"]}
         ]
 
         for test_args in test_arguments:
@@ -88,19 +90,28 @@ class TestCustomDataset:
             # Remove the 'mock' created dataset folder if already exists.
             if os.path.isdir(join(run_parameters["train_images_path"], dataset_folder)):
                 rmtree(join(run_parameters["train_images_path"], dataset_folder))
-            mock_training_dataset_creation_pipeline(run_parameters)
+            _, _, _, _, _, _, train_args_cls = mock_training_dataset_creation_pipeline(run_parameters)
 
             # NOTE: min_value and max_value fixed params.
             data_transforms = augmentors(label_type = "distance", min_value=0, max_value=65535)
             dataset_name = "{}_{}_{}_{}".format(test_args["dataset"], "GT", "01", test_args["crop_size"])
-            datasets = {x: CellSegDataset(root_dir = path_data / Path(dataset_name), mode=x, transform=data_transforms[x])
+            
+            # Set-up the CellSegDataset class with the current needed images.
+            labels = train_args_cls.get_requested_image_labels()
+            datasets = {x: CellSegDataset(root_dir = path_data / Path(dataset_name), labels = labels, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
+            
             for key, dataset in datasets.items():
-
-                # NOTE: Temporary testing just the first sample.
+                # Testing just the first sample.
                 first_sample = dataset[0]
+
+                # Test keys content.
+                assert sorted(test_args["expected_keys"]) == sorted(first_sample.keys())
                 for key, item in first_sample.items():
-                    assert expected_label_type[key]["dtype"] == item.dtype
+
+                    # Differentiate between tensor and built-in types.
+                    if key != "id": assert expected_label_type[key]["dtype"] == item.dtype
+                    else: assert expected_label_type[key]["dtype"] == type(item)
 
                     # Checks on expected unique values just for category data (e.g. mask).
                     if "unique_values" in expected_label_type[key]:

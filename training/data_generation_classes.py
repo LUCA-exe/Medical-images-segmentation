@@ -60,7 +60,7 @@ class data_generation_factory(data_generation_factory_interface):
                 if not ((str(images["dist_cell"].dtype) == 'float32') and (str(images["dist_neighbor"].dtype) == 'float32')):
                     raise TypeError(f"The dist_cell and dist_neighbor images computed are not the expected type!")
             
-            # NOTE: Temporary coupling of two processing method.
+            # FIXME: Temporary coupling of two processing method.
             if label == "dist_cell":
                 images["dist_cell"], _ = distance_label_2d(label=mask,
                                                             cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),

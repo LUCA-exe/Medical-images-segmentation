@@ -12,7 +12,6 @@ To test just the entire pipeline:
 
 In some tests it will uses the *.npy files listed in the ./tests/README.txt file.
 """
-
 import pytest
 import logging
 from typing import Dict, Any, List, Tuple
@@ -96,8 +95,8 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
     
-    # FIXME: Temporary passing the 'logging.Logger()' object around
-    return log, num_gpus, device, path_data, trainset_name, path_models
+    # FIXME: Temporary passing the 'logging.Logger()' and other objects around (as the train_arg_class_interface class)
+    return log, num_gpus, device, path_data, trainset_name, path_models, train_args_cls
 
 def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, device: torch.device,
                                 path_data: str, trainset_name: str, path_models: str) -> None:
@@ -348,7 +347,7 @@ class TestMockTrainPipelines:
             if os.path.isdir(join(run_parameters["train_images_path"], dataset_folder)):
                 rmtree(join(run_parameters["train_images_path"], dataset_folder))
 
-            log, num_gpus, device, path_data, trainset_name, path_models = mock_training_dataset_creation_pipeline(run_parameters)
+            log, num_gpus, device, path_data, trainset_name, path_models, _ = mock_training_dataset_creation_pipeline(run_parameters)
             
             # TODO: Just compose an hasmap with all the path split/unified and pass that.
             mock_training_loop_pipeline(log, run_parameters, num_gpus, device, path_data,
