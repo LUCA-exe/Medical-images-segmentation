@@ -869,9 +869,12 @@ class TUNet(nn.Module):
         return x1, x2, x3
 
 
-# NOTE: Original neural network ("original-dual-unet") to reproduce the work of "Dual U-Net for segmentation of overlapping glioma nuclei"
 class ODUNet(nn.Module):
-    """ U-net with two decoder paths and on final fusion path (fusion layers for the segmentation path) """
+    """U-net with two decoder paths and on final fusion path (fusion layers for the segmentation output)
+    
+    This class reproduce the work of "Dual U-Net for segmentation of overlapping glioma nuclei"
+    (link: https://ieeexplore.ieee.org/document/8744511).
+    """
 
     def __init__(self, ch_in=1, ch_out=1, pool_method='conv', act_fun='relu', normalization='bn', filters=(64, 1024), detach_fusion_layers = False, softmax_layer = False):
         """
@@ -933,7 +936,6 @@ class ODUNet(nn.Module):
         self.decoder1Conv = nn.ModuleList()
         self.decoder2Upconv = nn.ModuleList()
         self.decoder2Conv = nn.ModuleList()
-
         # Additional fusion layers and final binary segmentation mask prediction
         self.fusionConv = nn.ModuleList()
 
@@ -976,7 +978,6 @@ class ODUNet(nn.Module):
             self.fusionConv.append(nn.Softmax(dim=1))
         else:
             self.fusionConv.append(nn.Sigmoid())
-
 
     def forward(self, x):
         """

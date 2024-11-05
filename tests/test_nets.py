@@ -1,9 +1,16 @@
 """This module will test the set up of the neural networks for both validation and traning phases.
 
-It will perform unit tests/system tests for the architectures consistency (structure implemented from papers). 
-It will perform system tests train/val inference as well.
+It will perform system tests for the architectures consistency during train/val inference (structure implemented from papers) and 
+unit tests for the custom inner Modules as well.
+
+To test just the integrity of the custom Module of the nets:
+...> python -m pytest -v --run-sub tests/test_nets.py
+
+To test just the entire architecture:
+...> python -m pytest -v --run-pipeline tests/test_nets.py
 """
 import pytest
+from torch.nn import ModuleList
 
 from tests.test_train_pipelines import update_default_args
 from training.training import get_max_epochs
@@ -56,7 +63,7 @@ def get_unet(args):
                            pool_method = model_config['architecture'][1],
                            normalization = model_config['architecture'][3],
                            device = device,
-                           num_gpus = num_gpus,  # FIXME: Use the 'num_gpus' key-value pair in the 'model_config' dict.
+                           num_gpus = model_config['num_gpus'],
                            ch_in = 1,
                            ch_out = 1,
                            filters = model_config['architecture'][4],
@@ -75,6 +82,8 @@ class TestNets:
         """This method will test the U-net architecture composing and retrival.
 
         This function will read the arguments from a file (./tests/*.json).
+        For every architecture, there are a specifics number of modules and sub-modules 
+        in a expected orders.
         """
 
         default_args = read_json_file("./tests/mock_train_args.json")
@@ -87,4 +96,10 @@ class TestNets:
             run_parameters = update_default_args(default_args, test_args)
             net = get_unet(run_parameters)
             assert isinstance(net, run_parameters["expected_net_class"]) == True
+
+            # TODO: set up testing of just the higher ModuleList blocks and the custom Blocks inside.
+            modules = [module for module in net.named_modules() if isinstance(module[1], ModuleList)]
+            print(len(modules))
+           
+        
         
