@@ -7,3 +7,4 @@ net_utils/evaluation_software/
 training_data/
 test_data/
 models/all/
+.vscode/

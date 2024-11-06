@@ -21,6 +21,7 @@ import torch
 import os
 import numpy as np
 from os.path import join, exists
+from copy import deepcopy
 
 from training.data_generation_classes import data_generation_factory
 from train import set_up_training_loops
@@ -170,6 +171,7 @@ def update_default_args(default_args: Dict, new_args: Dict) -> Dict[str, Any]:
     Returns:
         Hasmap encompassing the args updated.
     """
+    default_args = deepcopy(default_args)
     for key, value in new_args.items():
         default_args[key] = value
     return default_args
@@ -204,7 +206,7 @@ def load_images(folder_path: str) -> list[np.ndarray, np.ndarray, np.ndarray]:
     images = []
     for file_name in file_names:
 
-        # Load the images saved as '.npy' format
+        # Load the images saved as '.npy' format.
         images.append(np.load(os.path.join(folder_path, file_name)))
     return images
 

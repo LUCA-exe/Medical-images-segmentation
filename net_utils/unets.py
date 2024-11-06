@@ -918,7 +918,7 @@ class ODUNet(nn.Module):
         if self.pool_method == 'conv':
             self.pooling.append(ConvPool(ch_in=n_featuremaps, act_fun=act_fun, normalization=normalization))
 
-        # Remaining encoder blocks
+        # Remaining encoder blocks.
         while n_featuremaps < filters[1]:
 
             self.encoderConv.append(ConvBlock(ch_in=n_featuremaps,
@@ -928,7 +928,6 @@ class ODUNet(nn.Module):
 
             if n_featuremaps * 2 < filters[1] and self.pool_method == 'conv':
                 self.pooling.append(ConvPool(ch_in=n_featuremaps*2, act_fun=act_fun, normalization=normalization))
-
             n_featuremaps *= 2
 
         # Decoder 1 (cell borders) and Decoder 2 (cell distances)
