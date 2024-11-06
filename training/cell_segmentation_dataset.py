@@ -62,9 +62,7 @@ class CellSegDataset(Dataset):
 
         # Composing the custom sample for the current neural networks.
         for label in self.labels:
-            if label == "dist_cell_and_neighbor":
-                dist_label_id = img_id.parent / ('dist_cell' + img_id.name.split('img')[-1])
-                sample['cell_label'] = tiff.imread(str(dist_label_id)).astype(np.float32)
+            if label == "dist_neighbor":
                 dist_neighbor_label_id = img_id.parent / ('dist_neighbor' + img_id.name.split('img')[-1])
                 sample['border_label'] = tiff.imread(str(dist_neighbor_label_id)).astype(np.float32)
 

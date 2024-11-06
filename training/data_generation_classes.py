@@ -51,16 +51,16 @@ class data_generation_factory(data_generation_factory_interface):
         images["mask"] = mask
         images["tra_gt"] = tra_gt
         for label in labels:
-            if label == "dist_cell_and_neighbor":
-                images["dist_cell"], images["dist_neighbor"] = distance_label_2d(label=mask,
+            # FIXME: Temporary coupling of two processing method - bad for performances!.
+            if label == "dist_neighbor":
+                _, images["dist_neighbor"] = distance_label_2d(label=mask,
                                                             cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
                                                             neighbor_radius=td_settings['search_radius'], 
                                                             disk_radius = td_settings['disk_radius'])
                 
                 if not ((str(images["dist_cell"].dtype) == 'float32') and (str(images["dist_neighbor"].dtype) == 'float32')):
-                    raise TypeError(f"The dist_cell and dist_neighbor images computed are not the expected type!")
+                    raise TypeError(f"The dist_neighbor images computed are not the expected type!")
             
-            # FIXME: Temporary coupling of two processing method.
             if label == "dist_cell":
                 images["dist_cell"], _ = distance_label_2d(label=mask,
                                                             cell_radius=int(np.ceil(0.5 * td_settings['max_mal'])),
@@ -69,7 +69,6 @@ class data_generation_factory(data_generation_factory_interface):
                 
                 if not (str(images["dist_cell"].dtype) == 'float32'):
                     raise TypeError(f"The dist_cell image computed are not the expected type!")
-
 
             if label == "mask_label":
                 images["mask_label"] = extract_binary_mask_label(mask)

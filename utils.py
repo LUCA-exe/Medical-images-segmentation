@@ -419,10 +419,10 @@ class train_arg_dual_unet(train_arg_class_interface):
         self.crop_size = args[13]
         self.mode = args[14]
         self.pre_processing_pipeline = args[15]
-        self.classification_loss = False # NOTE: In this architecture is not present the classification branch
+        self.classification_loss = None # NOTE: In this architecture is not present the classification branch
 
         # TODO: check againts a config.json file for the 'allowed' images to request.
-        self._ground_truth_labels = tuple(["dist_cell_and_neighbor", ])
+        self._ground_truth_labels = tuple(["dist_cell", "dist_neighbor"])
 
     def get_arch_args(self) -> Tuple[Union[str, bool]]:
         """Return all the architecture args as tuple.

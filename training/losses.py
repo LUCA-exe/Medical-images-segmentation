@@ -98,6 +98,7 @@ def calculate_class_weights(num_bg_pixels: int, num_cell_pixels: int, emergency_
     class_weights = torch.tensor([num_cell_pixels / total_pixels, num_bg_pixels / total_pixels])
     return class_weights
 
+
 class WeightedCELoss(nn.Module):
     """Wrapper function for dynamically weighted cross-entropy loss.
 
@@ -141,6 +142,11 @@ class WeightedCELoss(nn.Module):
         else:
             raise ValueError(f"The provided weight function is not valid!")
 
+    def __str__(self) -> str:
+        """Human readable representation.
+        """
+        return "weighted cross-entropy loss"
+
 class CrossEntropyDiceLoss(nn.Module):
     """
     Wrapper function for dynamically weighted cross-entropy loss plus the Dice loss for refining the borders.
@@ -176,8 +182,7 @@ class CrossEntropyDiceLoss(nn.Module):
 
         elif self.weight_func is None:
             raise ValueError(f"The provided weight function for the cross-entropy loss is not valid!")
-
-        
+   
     def _dice_loss(self, inputs, targets):
         # Not parallelized - simple loop along the batch of predicted images and targets
 
@@ -207,7 +212,6 @@ class CrossEntropyDiceLoss(nn.Module):
         dice_loss = dice_loss/batch_size
         return dice_loss
 
-
     def _single_class_dice_coeff(self, input, target, smooth = 1):
         # Single binary class dice coefficent computation
         
@@ -216,6 +220,11 @@ class CrossEntropyDiceLoss(nn.Module):
 
         # Return the final coeff. for the current binary class
         return (2 * intersection + smooth) / (union + smooth)
+
+    def __str__(self) -> str:
+        """Human readable representation.
+        """
+        return "weighted dice loss"
 
 # NOTE: Work in progress - finish to test.
 class MultiClassJLoss(nn.Module):
@@ -309,6 +318,7 @@ class MultiClassJLoss(nn.Module):
         loss = bce_loss + self.lambda_ * j_reg_term.mean()
         return loss
 
+
 class LossComputator():
     """This class defines the internal configurations and methods for the loss.
     """
@@ -332,7 +342,7 @@ class LossComputator():
         self.device = device
 
         # NOTE: Temporary hard-coded values.
-        self.image_types = ["border", "cell", "binary_border", "mask"]
+        self.image_types = ["border_label", "cell_label", "binary_border_label", "mask_label"]
         self.loss_criterions: Dict[str, Optional[nn.Module]] = {}
         for type in self.image_types:
             self.loss_criterions[type] = self.get_loss(type)
@@ -341,9 +351,9 @@ class LossComputator():
         """It return the correct loss class for the image_type provided.
 
         Raises:
-            ValueError: The errors 
+            ValueError: If the loss chosen for a specific type is not supported.
         """
-        if image_type in ["border", "cell"]:
+        if image_type in ["border_label", "cell_label"]:
             if self.reg_loss == 'l1':
                 return nn.L1Loss()
             elif self.reg_loss  == 'l2':
@@ -354,15 +364,12 @@ class LossComputator():
                 return None
             else:
                 raise ValueError(f"The {self.reg_loss} is not supported among the regression losses!")
-
-        if image_type in ["binary_border", "mask"]:
-
+            
+        if image_type in ["binary_border_label", "mask_label"]:
             if self.class_loss ==  "cross-entropy":
                 return nn.CrossEntropyLoss()
-            
             elif self.class_loss == "weighted-cross-entropy":
                 return WeightedCELoss(weight_func = get_weights_tensor, device = self.device)
-
             elif self.class_loss == "cross-entropy-dice":
                 return CrossEntropyDiceLoss(weight_func=get_weights_tensor, device = self.device)
             elif self.class_loss is None:
@@ -373,7 +380,7 @@ class LossComputator():
     def compute_loss(self, 
                      pred_batches: Dict[str, torch.Tensor], 
                      gt_batches: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, List[float]]:
-        """Loop over the provided batches for using the previous stored loss criterions.
+        """Loop over the gt batches for using the previous stored loss criterions.
 
         Args:
             pred_batches: It contains the predicted images stored in the
@@ -384,10 +391,18 @@ class LossComputator():
         if pred_batches.keys() != gt_batches.keys():
             raise ValueError(f"The provided batches for the loss computation contains different keys: pred keys are {pred_batches.keys()} while the gt keys are {gt_batches.keys()}")
         losses = []
-        for key, image in pred_batches.items():
-            losses.append(self.loss_criterions[key](image, gt_batches[key]))
+        for key, gt_image in gt_batches.items():
+            losses.append(self.loss_criterions[key](pred_batches[key], gt_image))
         total_loss = sum(losses)
         
         # Convert to plain python number.
         losses = [loss.item() for loss in losses]
         return total_loss, losses
+
+    def get_loss_criterions(self, labels: Tuple[str,]) -> str:
+        """String representation of the internal criterions.
+        """
+        losses_str = ""
+        for label in labels:
+            losses_str + str(self.loss_criterions[label])
+        return losses_str

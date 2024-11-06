@@ -148,9 +148,10 @@ def set_up_training_loops(log, args: Type[train_arg_class_interface], path_data,
             model_config['data_transforms'] = str(data_transforms)
             dataset_name = "{}_{}_{}_{}".format(trainset_name, args.mode, args.split, crop_size)
             log.debug(f".. Reading dataset: {dataset_name} ..")
-            
+
+            labels = args.get_requested_image_labels()
             # In the original script it was implemented the 'all' dataset plus ST option.
-            datasets = {x: CellSegDataset(root_dir=path_data / dataset_name, mode=x, transform=data_transforms[x])
+            datasets = {x: CellSegDataset(root_dir=path_data / dataset_name, labels = labels, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
 
             # Train loop with the chosen architecture.

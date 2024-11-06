@@ -1,4 +1,5 @@
-"""Module to test the consistency of the dataloader returned images.
+"""
+Module to test the consistency of the dataloader returned images.
 
 It employes a function for setting the training dataset on disk
 from the ./test_train_pipelines.py module.
@@ -8,7 +9,7 @@ for the transformation functions.
 To test just the transformation functions:
 ...> python -m pytest -v --run-sub tests/test_training_dataset.py
 
-To test just the entire pipeline:
+To test just the pipeline:
 ...> python -m pytest -v --run-pipeline tests/test_training_dataset.py
 
 In some tests it will uses the *.npy files listed in the ./tests/README.txt file.

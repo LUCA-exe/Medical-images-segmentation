@@ -1,7 +1,6 @@
 """
-This testing module provide the following test features (WORK IN PROGRESS):
+This testing module provide the following test features:
 - Dataset creation.
-- Training Dataloader.
 - Train pipeline.
 
 To test just the sub-functions:
@@ -49,6 +48,7 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
     load_environment_variables()
     set_current_run_folders()
     log = create_logging()
+    log.info(f"**** THIS LOG FILE IS CREATED USING A MOCK PIPELINE: mock_training_dataset_creation_pipeline(args) method in the ./tests/test_train_pipelines.py module ****")
     device, num_gpus = set_device()
     log.info(f"System detected {device} device and {num_gpus} GPUs available.")
 
@@ -138,6 +138,7 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
                     'label_type': "distance", # NOTE: Fixed param.
                     'loss': train_args_cls.loss,
                     'classification_loss': train_args_cls.classification_loss,
+                    'images_labels': train_args_cls.get_requested_image_labels(),
                     'num_gpus': num_gpus,
                     'optimizer': train_args_cls.optimizer,
                     'max_epochs': 1  # NOTE: Set to 1 for testing purposes 
@@ -146,7 +147,7 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
     log.info(f"Model configuration: {model_config}")
     net = create_model_architecture(log, model_config, device, num_gpus)
 
-    # Call the original methods - method to refactor.
+    # Call the original methods present in the train.py.
     set_up_training_loops(log, train_args_cls, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
 
 def mock_processed_images(args: Dict) -> Dict[str, np.ndarray]:
@@ -260,9 +261,11 @@ class TestMockTrainPipelines:
             'max_mal': 200,
             'scale': 1,
             'crop_size': 320}
+        # NOTE: Fixed expected dtypes for future assertion
+        expected_types = ['uint8', 'uint16', 'float32']
         
         test_arguments = [
-            {"td_settings": mock_settings, "labels": tuple(["dist_cell_and_neighbor", ]), "expected_keys": ["dist_cell", "dist_neighbor", "img", "mask", "tra_gt"],
+            {"td_settings": mock_settings, "labels": tuple(["dist_cell", "dist_neighbor"]), "expected_keys": ["dist_cell", "dist_neighbor", "img", "mask", "tra_gt"],
              "expected_types": ['uint8', 'uint16', 'float32']},
              {"td_settings": mock_settings, "labels": tuple(["mask_label", "binary_border_label"]), "expected_keys": ["mask_label", "binary_border_label", "img", "mask", "tra_gt"],
              "expected_types": ['uint8', 'uint16', 'float32']}
@@ -279,9 +282,9 @@ class TestMockTrainPipelines:
             assert test_args["expected_types"][0] == str(processed_images["img"].dtype)
             for label, value in processed_images.items():
                 if label in ["mask_label", "binary_border_label", "mask"]:
-                    assert test_args["expected_types"][1] == str(value.dtype)
+                    assert expected_types[1] == str(value.dtype)
                 elif label in ["dist_cell", "dist_neighbor"]:
-                    assert test_args["expected_types"][2] == str(value.dtype)
+                    assert expected_types[2] == str(value.dtype)
 
             # Assert for the returned images labels from the factory
             assert sorted(test_args["expected_keys"]) == sorted(processed_images.keys())
@@ -326,17 +329,15 @@ class TestMockTrainPipelines:
                                      expected_image_number)
                 assert images_integrity == True
 
-    # FIXME: Main pipeline to refactor - both for the dataloder and for the images of the training set created.
     @pytest.mark.pipeline
     def test_training_loop(self):
-        """
-        Set environment folders, run the creation of the training dataset folder and 
-        execute the training loop.
+        """Set environment folders, run the creation of the training dataset folder and 
+        execute the training loop with an instantiated neural networks.
         """
         
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"dataset": "Mock-E2DV-train", "crop_size": 640}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640}
         ]
 
         for test_args in test_arguments:

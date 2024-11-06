@@ -9,14 +9,15 @@ import random
 import time
 import torch
 import torch.optim as optim
+from torch.optim import Optimizer
 from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import torch.nn as nn
 from copy import deepcopy
-from typing import Dict, Type, Any, Optional
+from typing import Dict, Type, Any, Optional, List, Tuple, Union
 
 from training.ranger2020 import Ranger
-from training.losses import get_weights_tensor, WeightedCELoss
+from training.losses import LossComputator
 from net_utils.utils import get_num_workers, save_current_model_state, save_current_branch_state, save_training_loss, show_training_dataset_samples, save_image
 
 
@@ -104,8 +105,13 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
 
     return loss, losses_list
 
-def set_up_optimizer_and_scheduler(config, net, best_loss):
-    """ Set up the optimizer and scheduler configurations adn return them to the main function.
+def set_up_optimizer_and_scheduler(config, net, best_loss) -> Tuple[type[Optimizer], 
+                                                                    Union[ReduceLROnPlateau,  CosineAnnealingLR],
+                                                                    int]:
+    """Set up the optimizer and scheduler configurations.
+
+    For all the architecture the optimal optimizer and scheduler
+    are the Adam optimizer and ReduceLROnPlateau scheduler.
 
     :param n_samples: number of training samples.
         :type n_samples: int
@@ -184,10 +190,9 @@ def set_up_optimizer_and_scheduler(config, net, best_loss):
         # NOTE: No break condition mentioned on the paper
         break_condition = config['max_epochs'] // 4
 
-
     else:
         raise Exception('Architecture not known')
-    return optimizer, scheduler, break_condition
+    return optimizer, break_condition
 
 def get_max_epochs(n_samples: int, arch: Optional[str] = None) -> int:
     """Get maximum amount of training epochs based on the number of sample.
@@ -221,7 +226,7 @@ def get_max_epochs(n_samples: int, arch: Optional[str] = None) -> int:
     return max_epochs
 
 def get_weights(net, weights, device, num_gpus):
-    """ Load weights into model.
+    """Load weights into model.
 
     :param net: Model to load the weights into.
         :type net:
@@ -240,13 +245,17 @@ def get_weights(net, weights, device, num_gpus):
         net.load_state_dict(torch.load(weights, map_location=device))
     return net
 
-def update_running_losses(running_losses_list, losses_list, batch_size):
-    # In input a list of losses computed during a mini_batch images, for every item of the list just update the values and returns it
+def update_running_losses(running_losses_list: List[float], 
+                          losses_list: List[float], 
+                          batch_size: int) -> List[float]:
+    """Updates the running losses during the training phase.
 
+    Given a list of cumulative and single loop losses, multiply the single
+    loop losses (averaged by batch) and add to the cumulative mini-batch correspondent.
+    """
     updated_losses = [loss * batch_size for loss in losses_list]
     updated_running_losses = []
-    for runn_loss, loss in zip(running_losses_list, updated_losses): # Update every running loss by the corrispondent current mini_batch loss
-
+    for runn_loss, loss in zip(running_losses_list, updated_losses):
         updated_running_losses.append(runn_loss + loss)
     return updated_running_losses
 
@@ -279,7 +288,7 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
     :return: None
     """
     # Assert that the datasets has been created correctly before the loop over the images
-    show_training_dataset_samples(log, datasets["train"])
+    #show_training_dataset_samples(log, datasets["train"])
 
     # If it is not passed as arguments, set in this method.
     if not "max_epochs" in config:
@@ -308,10 +317,14 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
                                                  worker_init_fn=seed_worker,
                                                  num_workers=num_workers)
                   for x in ['train', 'val']}
-
-    # Set-up the Loss function.
-    criterion = get_loss(config, device)
-    log.info(f"Loss that will be used are: {criterion}")
+    #criterion = get_loss(config, device)
+    loss_computator = LossComputator(config["loss"], 
+                                     config["classification_loss"],
+                                     device = device)
+    # TODO: Return the string repr. of the criterions used based on the gt images labels.
+    label = datasets["val"][0].keys()
+    print(label)  # NOTE: Use the dict. keys (dropped the 'image' and 'id' keys) for logging the loaded criterions. 
+    #log.info(f"Loss that will be used (one for each labels) are: {loss_computator.}")
 
     second_run = False # WARNING: Fixed arg - to change.
     max_epochs = config['max_epochs']
@@ -419,7 +432,7 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
                     print('Validation loss did not improve.')
                     epochs_wo_improvement += 1
 
-                # Update learning rate differently
+                # NOTE: Deprecated - Update learning rate differently.
                 if config['optimizer'] == 'ranger' and second_run:
                     scheduler.step()
                 else:

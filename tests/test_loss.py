@@ -1,4 +1,5 @@
-"""This module tests the losses configurations and computation only.
+"""
+This module tests the losses configurations and computation only.
 """
 from typing import Dict, Union, Optional
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, SmoothL1Loss
@@ -164,7 +165,7 @@ class TestMockCriterionComputation:
         seg_mask = seg_mask.astype(np.float32, copy=False)
         gt_float_img = get_mock_float_batch(img)
         gt_categorical_img = get_mock_categorical_batch(seg_mask)
-        gt_batch = {"cell": gt_float_img, "mask": gt_categorical_img}
+        gt_batch = {"cell_label": gt_float_img, "mask_label": gt_categorical_img}
             
         test_arguments = [
             {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10, "p": 0.7},
@@ -178,12 +179,12 @@ class TestMockCriterionComputation:
             noised_seg_mask = add_class_label(seg_mask, p = test_args["p"])
             pred_float_img = get_mock_float_batch(noised_img)
             pred_categorical_img = get_mock_categorical_batch(noised_seg_mask, gt = False)
-            pred_batch = {"cell": pred_float_img, "mask": pred_categorical_img}
+            pred_batch = {"cell_label": pred_float_img, "mask_label": pred_categorical_img}
             computator = LossComputator(test_args["regression_loss"], test_args["classification_loss"], device)
 
             # If the simple cross-entropy is employed, override the shape of the gt batch.
             if test_args["classification_loss"] == "cross-entropy":
-                gt_batch["mask"] = gt_batch["mask"][:, 0, :, :]
+                gt_batch["mask_label"] = gt_batch["mask_label"][:, 0, :, :]
             loss, losses_list = computator.compute_loss(pred_batch, gt_batch)
             assert isinstance(loss, torch.Tensor)
             for number in losses_list:
