@@ -13,7 +13,7 @@ from torch.optim import Optimizer
 from multiprocessing import cpu_count
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import torch.nn as nn
-from copy import deepcopy
+from copy import deepcopy, copy
 from typing import Dict, Type, Any, Optional, List, Tuple, Union
 
 from training.ranger2020 import Ranger
@@ -40,24 +40,30 @@ def sample_plot_during_validation(batches_list, val_phase_counter, binary_pred =
             else:
                 save_image(np.squeeze(batch[sample].cpu().detach().numpy()), "./tmp", f"Floating batch {idx} sample {sample} (Validation {val_phase_counter})")
             
-# NOTE: Deprecated.
-def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase, val_phase_counter):
-    # Extendible function for the deepen of the sstudy on different architecture
+def get_losses_from_model(batches_dict: Dict[str, torch.Tensor], 
+                          arch_name: str, 
+                          net: nn.Module, 
+                          criterions: LossComputator, 
+                          config, phase, val_phase_counter) -> Tuple[float, List[float]]:
+    """Execute the inference and compute the losses.
 
+    This function will compose the prediction batch, compute the total and single
+    losses. 
+    """
+    p_batch = {}
     if arch_name == 'dual-unet':
-        border_pred_batch, cell_pred_batch = net(batches_dict["image"])
-        loss_border = criterion['border'](border_pred_batch, batches_dict["border_label"])
-        loss_cell = criterion['cell'](cell_pred_batch, batches_dict["cell_label"])
+        p_batch["border_label"], p_batch["cell_label"] = net(batches_dict["image"])
+        #loss_border = criterion['border'](border_pred_batch, batches_dict["border_label"])
+        #loss_cell = criterion['cell'](cell_pred_batch, batches_dict["cell_label"])
 
-        loss = loss_border + loss_cell
-        losses_list = [loss_border.item(), loss_cell.item()]
+        #loss = loss_border + loss_cell
+        #losses_list = [loss_border.item(), loss_cell.item()]
 
         # Qualitative plotting in the validation phase
         if phase == "val":
-            sample_plot_during_validation([batches_dict["image"], border_pred_batch, cell_pred_batch], val_phase_counter, binary_pred = False)
+            sample_plot_during_validation([batches_dict["image"], p_batch["border_label"], p_batch["cell_label"]], val_phase_counter, binary_pred = False)
 
-
-    if arch_name == 'triple-unet':
+    elif arch_name == 'triple-unet':
         binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(batches_dict["image"])
 
         # Prepare dict. of predicted batches
@@ -79,13 +85,12 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
             sample_plot_during_validation([batches_dict["image"], pred_batches["binary_border_pred"],  pred_batches["mask_pred"]], val_phase_counter)
             sample_plot_during_validation([batches_dict["image"], pred_batches["cell_pred"]], val_phase_counter,  binary_pred = False)
 
-    if arch_name == 'original-dual-unet':
-
-        binary_border_pred_batch, cell_pred_batch, mask_pred_batch = net(batches_dict["image"])
+    elif arch_name == 'original-dual-unet':
+        p_batch["binary_border_label"], p_batch["cell_label"], p_batch["mask_label"] = net(batches_dict["image"])
         # Prepare dict. of predicted batches
-        pred_batches = {"binary_border_pred": binary_border_pred_batch, "cell_pred": cell_pred_batch,  "mask_pred":  mask_pred_batch}
+        #pred_batches = {"binary_border_pred": binary_border_pred_batch, "cell_pred": cell_pred_batch,  "mask_pred":  mask_pred_batch}
         
-        # Added 'interface' function for readibility
+        '''# Added 'interface' function for readibility
         if config["classification_loss"] == "cross-entropy":
             loss, losses_list = compute_cross_entropy(pred_batches, batches_dict, criterion)
         
@@ -96,13 +101,19 @@ def get_losses_from_model(batches_dict, arch_name, net, criterion, config, phase
             loss, losses_list = compute_weighted_cross_entropy(pred_batches, batches_dict, criterion)
 
         elif config["classification_loss"] == "j-cross-entropy":
-            loss, losses_list = compute_j_cross_entropy(pred_batches, batches_dict, criterion)
+            loss, losses_list = compute_j_cross_entropy(pred_batches, batches_dict, criterion)'''
         
         # Qualitative plotting in the validation phase
         if phase == "val":
             # NOTE: Plot all binary prediction or all floating prediction
             sample_plot_during_validation([batches_dict["image"], pred_batches["binary_border_pred"],  pred_batches["mask_pred"]], val_phase_counter)
-
+    else:
+        raise ValueError(f"The architecture {arch_name} is not supported!")
+    
+    if "image" in batches_dict: 
+        batches_dict = deepcopy(batches_dict)
+        del batches_dict["image"]
+    loss, losses_list = criterions.compute_loss(p_batch, batches_dict)
     return loss, losses_list
 
 def set_up_optimizer_and_scheduler(config, net, best_loss) -> Tuple[type[Optimizer], 
@@ -192,7 +203,7 @@ def set_up_optimizer_and_scheduler(config, net, best_loss) -> Tuple[type[Optimiz
 
     else:
         raise Exception('Architecture not known')
-    return optimizer, break_condition
+    return optimizer, scheduler, break_condition
 
 def get_max_epochs(n_samples: int, arch: Optional[str] = None) -> int:
     """Get maximum amount of training epochs based on the number of sample.
@@ -259,14 +270,19 @@ def update_running_losses(running_losses_list: List[float],
         updated_running_losses.append(runn_loss + loss)
     return updated_running_losses
 
-def move_batches_to_device(samples_dict, device):
-    # util function to get the dict. batch from the dataloader and move to the correct device
+def move_batches_to_device(samples_dict: Dict[str, torch.Tensor], device: torch.device) -> Dict[str, torch.Tensor]:
+    """It gets the dict. sample batch and move to the desired device.
 
-    # Un-pack the dict.
-    for key, tensor in samples_dict.items():
+    Returns:
+        The updated tensored in the original key-value pairs.
+    """
+    samples_dict = deepcopy(samples_dict)
+    # Remove not-tensors values.
+    if "id" in samples_dict:
+        del samples_dict["id"]
+
+    for key, _ in samples_dict.items():
         samples_dict[key] = samples_dict[key].to(device)
-
-    # Return updated dict.
     return samples_dict
 
 def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, path_models, best_loss=1e4):
@@ -295,7 +311,7 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
         log.info(f"The 'max epochs' param is not set yet, it will be inferred now!")
         # Get number of training epochs depending on dataset size (just roughly to decrease training time):
         config['max_epochs'] = get_max_epochs(len(datasets['train']), arch=config['architecture'][0])
-        max_epochs = config['max_epochs']
+        #max_epochs = config['max_epochs']
 
     # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
     print(f"Number of epochs without improvement allowed {2 * config['max_epochs'] // 20 + 5}")
@@ -322,10 +338,8 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
     loss_computator = LossComputator(config["loss"], 
                                      config["classification_loss"],
                                      device = device)
-    # TODO: Return the string repr. of the criterions used based on the gt images labels.
-    label = datasets["val"].get_sample_keys()
-    print(label)  # NOTE: Use the dict. keys (dropped the 'image' and 'id' keys) for logging the loaded criterions. 
-    log.info(f"Loss that will be used (one for each labels) are: {loss_computator.}")
+    gt_labels = datasets["val"].get_sample_keys()  # Image labels used for the loss computation
+    log.info(f"Loss that will be used (one for each labels) are: {loss_computator.get_loss_criterions(gt_labels)}")
 
     second_run = False # WARNING: Fixed arg - to change.
     # Set-up the optimizer.
@@ -340,15 +354,13 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
     # Added single regressive branch loss in case using the 'triple u-net'
     regressive_best_loss = 0
 
-    # Training process
-    for epoch in range(max_epochs):
+    # Starting training phase.
+    for epoch in range(config['max_epochs']):
 
         print('-' * 10)
-        print('Epoch {}/{}'.format(epoch + 1, max_epochs))
+        print('Epoch {}/{}'.format(epoch + 1, config['max_epochs']))
         print('-' * 10)
         start = time.time()
-
-        # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
                 net.train()  # Set model to training mode
@@ -356,59 +368,53 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
                 val_phase_counter += 1
                 net.eval()  # Set model to evaluation mode
 
-            # keep track of running losses
+            # Keep track of aggregated/single running losses.
             running_loss = 0.0
-            running_loss_border, running_loss_cell, running_loss_mask, running_loss_binary_border = 0.0, 0.0, 0.0, 0.0
-            loss_labels = ["Total loss", "Border loss", "Cell loss", "Mask loss", "Binary border loss"]
+            #running_losses_border, running_loss_cell, running_loss_mask, running_loss_binary_border = [0.0] * len(gt_labels)
+            running_losses = [0.0] * len(gt_labels)
+            loss_labels = copy(gt_labels)
 
-            # Iterate over data
             for samples in dataloader[phase]:
-
-                # Load always all 'labels'
                 samples_dict = move_batches_to_device(samples, device)
-
-                # Zero the parameter gradients
                 optimizer.zero_grad()
-
-                # Forward pass (track history if only in train)
                 with torch.set_grad_enabled(phase == 'train'):
 
                     # NOTE: The padding in case of different input image format?
 
                     # NOTE: important the orders of the true_label_batch
-                    loss, losses_list = get_losses_from_model(samples_dict, arch_name, net, criterion, config, phase, val_phase_counter)
-
-                    # Backward (optimize only if in training phase)
+                    loss, losses_list = get_losses_from_model(samples_dict, arch_name, net, loss_computator, config, phase, val_phase_counter)
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
                         
-                # Statistics - both general and single losses
-                running_loss += loss.item() * samples_dict["image"].size(0) # NOTE: loss.item() as default contains already the average of the mini_batch loss.
-
-                if config['architecture'][0] == 'dual-unet':
+                # NOTE: loss.item() as default contains already the average of the mini_batch loss.
+                running_loss += loss.item() * config['batch_size']
+                running_losses = update_running_losses(running_losses, losses_list, samples_dict["image"].size(0))
+                '''if config['architec ture'][0] == 'dual-unet':
                     running_loss_border, running_loss_cell = update_running_losses([running_loss_border, running_loss_cell], losses_list, samples_dict["image"].size(0))
 
                 if config['architecture'][0] == 'original-dual-unet':
                     running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
 
                 if config['architecture'][0] == 'triple-unet':
-                    running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))
+                    running_loss_binary_border, running_loss_cell, running_loss_mask = update_running_losses([running_loss_binary_border, running_loss_cell, running_loss_mask], losses_list, samples_dict["image"].size(0))'''
 
-            # Compute average epoch losses
+            # Compute average epoch loss and losses.
             epoch_loss = running_loss / len(datasets[phase])
-            epoch_loss_border =  running_loss_border / len(datasets[phase])
-            epoch_loss_cell =  running_loss_cell / len(datasets[phase])
-            epoch_loss_mask =  running_loss_mask / len(datasets[phase])
-            epoch_loss_binary_border = running_loss_binary_border / len(datasets[phase])
-
+            epoch_running_losses = [loss/len(datasets[phase]) for loss in running_losses]
+            '''epoch_loss_border = running_loss_border / len(datasets[phase])
+            epoch_loss_cell = running_loss_cell / len(datasets[phase])
+            epoch_loss_mask = running_loss_mask / len(datasets[phase])
+            epoch_loss_binary_border = running_loss_binary_border / len(datasets[phase])'''
+            # Merge in a single list all the losses
+            concat_losses = [epoch_loss] + epoch_running_losses 
             if phase == 'train': 
-
-                train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
-                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} - mask loss:  {:.5f} - binary border loss: {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
+                #train_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
+                train_loss.append(concat_losses)
+                print('Training - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} - mask loss:  {:.5f} - binary border loss: {:.5f}'.format(train_loss[-1]))
             else:
-
-                val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
+                #val_loss.append([epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border])
+                train_loss.append(concat_losses)
                 print('Validation - total loss: {:.5f} - border loss: {:.5f} - cell loss: {:.5f} - mask loss:  {:.5f} - binary border loss: {:.5f}'.format(epoch_loss, epoch_loss_border, epoch_loss_cell, epoch_loss_mask, epoch_loss_binary_border))
 
                 # NOTE: The update control just the total loss decrement, not the single ones.
@@ -436,6 +442,7 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
                 if config['optimizer'] == 'ranger' and second_run:
                     scheduler.step()
                 else:
+                    # NOTE: To affect the learning rate the step is performed at the val phase (at the end of each current epoch).
                     scheduler.step(epoch_loss)
 
         # Epoch training time
@@ -443,6 +450,7 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
 
         # Break training if plateau is reached
         if epochs_wo_improvement == break_condition:
+            log.info(str(epochs_wo_improvement) + ' epochs without validation loss improvement --> break')
             print(str(epochs_wo_improvement) + ' epochs without validation loss improvement --> break')
             break
 
@@ -450,8 +458,6 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}min {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     print('-' * 20)
-
-    # Save loss
     save_training_loss(loss_labels, train_loss, val_loss, second_run, path_models, config, time_elapsed, epoch)
 
     # Clear memory

@@ -49,7 +49,7 @@ def create_model_architecture(log: logging.Logger,
                            softmax_layer = model_config['architecture'][6])
     return net
 
-
+# NOTE: Refactoring.
 def save_training_loss(loss_labels: List[str], 
                        train_loss: List[List[float]], 
                        val_loss: List[List[float]], 
@@ -81,18 +81,20 @@ def save_training_loss(loss_labels: List[str],
     """
 
     # Un-pack the losses in the original variables
-    train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border = zip(*train_loss) 
-    val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border = zip(*val_loss) 
-    
-    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border, val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border]))
-    try:
+    #train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border = zip(*train_loss) 
+    #val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border = zip(*val_loss) 
+    # NOTE: debug
+    print(len(train_loss))
 
+    # Composing total stats.
+    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), zip(*train_loss), zip(*val_loss)]))
+    
+    try:
         if second_run:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_2nd_loss.txt')), X=stats,
                     fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
                     header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
             config['training_time_run_2'], config['trained_epochs_run2'] = tot_time, tot_epochs + 1
-
         else:
             np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), X=stats,
                     fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
@@ -101,7 +103,6 @@ def save_training_loss(loss_labels: List[str],
             # FIXME: Move to the calling function.
             config['training_time'], config['trained_epochs'] = tot_time, tot_epochs + 1
         print(f"Training losses saved corretly and current configuration parameters updated!")
-
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
     return None

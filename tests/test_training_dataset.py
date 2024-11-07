@@ -14,7 +14,7 @@ To test just the pipeline:
 
 In some tests it will uses the *.npy files listed in the ./tests/README.txt file.
 """
-from typing import Dict, Any, List, Tuple
+from typing import Dict, List
 from shutil import rmtree
 import torch
 import os
@@ -98,12 +98,12 @@ class TestCustomDataset:
             dataset_name = "{}_{}_{}_{}".format(test_args["dataset"], "GT", "01", test_args["crop_size"])
             
             # Set-up the CellSegDataset class with the current needed images.
-            labels = train_args_cls.get_requested_image_labels()
-            datasets = {x: CellSegDataset(root_dir = path_data / Path(dataset_name), labels = labels, mode=x, transform=data_transforms[x])
+            gt_labels = train_args_cls.get_requested_image_labels()
+            datasets = {x: CellSegDataset(root_dir = path_data / Path(dataset_name), labels = gt_labels, mode=x, transform=data_transforms[x])
                         for x in ['train', 'val']}
-            
             for key, dataset in datasets.items():
-                # Testing just the first sample keys.
+
+                # Testing just the first sample keys (both all and filtered).
                 first_sample = dataset[0]
                 assert sorted(test_args["expected_keys"]) == sorted(dataset[0].keys())
                 assert sorted(test_args["expected_filtered_keys"]) == sorted(dataset.get_sample_keys())

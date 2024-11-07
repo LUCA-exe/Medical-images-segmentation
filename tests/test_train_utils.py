@@ -5,8 +5,10 @@ setter.
 """
 from typing import List
 import numpy as np
+from pathlib import Path
 
 from training.training import get_max_epochs, update_running_losses
+from net_utils.utils import save_training_loss
 
 
 class TestTrainUtils:
@@ -45,6 +47,24 @@ class TestTrainUtils:
                 curr_losses = update_running_losses(curr_losses, test_args["losses_to_sum"], batch_size=mock_batch_size)
                 assert isinstance(curr_losses, List) == True
                 assert curr_losses == losses
-                
-    # TODO: Test the txt savings of both val and train losses.
-    
+
+    # TODO: Finish automated parsing of the file to check for the integrity. 
+    def test_losses_saving(self):
+        """It testes the *.txt generation with mock losses.
+
+        This function will generate a single *.txt file (inside the ./tests/ folder) 
+        that will be overwrited every time a use-case is tested with different 
+        loss labels and values.
+        """
+        test_arguments = [
+            {"loss_values": [[1.0, 3.4, 4.23]], "loss_labels": ["cell_label", "mask_label"]},
+            {"loss_values": [[1.0, 3.4, 4.23], [2.0, 4.4, 5.23]], "loss_labels": ["cell_label", "binary_border_label", "mask_label"]},
+        ]
+        mock_path_model = Path('./')
+        second_run = False
+        tot_time = 0.001
+        tot_epochs = 1
+        mock_config = {"run_name": "Mock-E2DV-train_GT_01_640_kit-ge_dual-unet_00"}
+        for test_args in test_arguments:
+            save_training_loss(test_args["loss_labels"], test_args["loss_values"], test_args["loss_values"],
+                               second_run, mock_path_model, mock_config, tot_time, tot_epochs)

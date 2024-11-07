@@ -19,7 +19,7 @@ from shutil import rmtree
 import torch
 import os
 import numpy as np
-from os.path import join, exists
+from os.path import join
 from copy import deepcopy
 
 from training.data_generation_classes import data_generation_factory
@@ -140,7 +140,7 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
                     'classification_loss': train_args_cls.classification_loss,
                     'num_gpus': num_gpus,
                     'optimizer': train_args_cls.optimizer,
-                    'max_epochs': 1  # NOTE: Set to 1 for testing purposes 
+                    'max_epochs': 1  # NOTE: Set to 1 for testing purposes. 
                     }  # TODO: Add the device obj. directly inside the 'model_config' hashmap. 
     
     log.info(f"Model configuration: {model_config}")
@@ -333,10 +333,10 @@ class TestMockTrainPipelines:
         """Set environment folders, run the creation of the training dataset folder and 
         execute the training loop with an instantiated neural networks.
         """
-        
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640},
+            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640}
         ]
 
         for test_args in test_arguments:
