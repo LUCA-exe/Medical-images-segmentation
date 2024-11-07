@@ -78,8 +78,8 @@ class TestCustomDataset:
         path_data = Path("training_data")
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3, "expected_keys": ["image", "id", "cell_label", "border_label"]},
-            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3, "expected_keys": ["image", "id", "cell_label", "mask_label", "binary_border_label"]}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3, "expected_keys": ["image", "id", "cell_label", "border_label"], "expected_filtered_keys": ["cell_label", "border_label"]},
+            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 320, "min_a_images": 3, "expected_keys": ["image", "id", "cell_label", "mask_label", "binary_border_label"], "expected_filtered_keys": ["cell_label", "mask_label", "binary_border_label"]}
         ]
 
         for test_args in test_arguments:
@@ -103,11 +103,10 @@ class TestCustomDataset:
                         for x in ['train', 'val']}
             
             for key, dataset in datasets.items():
-                # Testing just the first sample.
+                # Testing just the first sample keys.
                 first_sample = dataset[0]
-
-                # Test keys content.
-                assert sorted(test_args["expected_keys"]) == sorted(first_sample.keys())
+                assert sorted(test_args["expected_keys"]) == sorted(dataset[0].keys())
+                assert sorted(test_args["expected_filtered_keys"]) == sorted(dataset.get_sample_keys())
                 for key, item in first_sample.items():
 
                     # Differentiate between tensor and built-in types.

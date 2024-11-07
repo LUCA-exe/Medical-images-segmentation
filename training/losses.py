@@ -145,7 +145,7 @@ class WeightedCELoss(nn.Module):
     def __str__(self) -> str:
         """Human readable representation.
         """
-        return "weighted cross-entropy loss"
+        return "WeightedCrossEntropyLoss()"
 
 class CrossEntropyDiceLoss(nn.Module):
     """
@@ -224,7 +224,7 @@ class CrossEntropyDiceLoss(nn.Module):
     def __str__(self) -> str:
         """Human readable representation.
         """
-        return "weighted dice loss"
+        return "WeightedDiceLoss()"
 
 # NOTE: Work in progress - finish to test.
 class MultiClassJLoss(nn.Module):
@@ -404,5 +404,5 @@ class LossComputator():
         """
         losses_str = ""
         for label in labels:
-            losses_str + str(self.loss_criterions[label])
+            losses_str += " " + str(self.loss_criterions[label])
         return losses_str

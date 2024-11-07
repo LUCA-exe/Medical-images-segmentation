@@ -1,7 +1,7 @@
 import numpy as np
 import tifffile as tiff
 import torch
-from typing import Union, Dict
+from typing import Union, Dict, List
 from torch.utils.data import Dataset
 import scipy.ndimage as ndimage
 import copy
@@ -41,6 +41,17 @@ class CellSegDataset(Dataset):
         if not isinstance(transform, ToTensor) and mode == 'val':
             raise TypeError(f'The parameter tranform passed is a type {type(transform)} instead of {transforms.Compose}')
         self.transform = transform
+
+    def get_sample_keys(self, idx: int = 0) -> List[str]:
+        """Util function to get the expected filtered keys.
+
+        Specifically, It will return the 'example' of ground truth
+        labels expected during the loss computation.
+        """
+        keys = list(self.__getitem__(idx).keys())
+        keys.remove("id")
+        keys.remove("image")
+        return keys
 
     def __len__(self) -> int:
         return len(self.img_ids)

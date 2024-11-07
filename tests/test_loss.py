@@ -140,7 +140,6 @@ class TestMockCriterionComputation:
         for test_args in test_arguments:
             computator = LossComputator(test_args["regression_loss"], test_args["classification_loss"], device)
             for key, loss_object in computator.loss_criterions.items():
-
                 # Assertions based on the image label.
                 if key in class_image_labels:
                     assert isinstance(loss_object, test_args["expected_classification_loss_class"]) == True
@@ -168,9 +167,9 @@ class TestMockCriterionComputation:
         gt_batch = {"cell_label": gt_float_img, "mask_label": gt_categorical_img}
             
         test_arguments = [
-            {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10, "p": 0.7},
-            {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10, "p": 0.5},
-            {"regression_loss": "l1", "classification_loss": "cross-entropy",  "mean": 40, "var": 20, "p": 0.3},
+            {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10, "p": 0.7, "expected_str": " MSELoss() WeightedDiceLoss()"},
+            {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10, "p": 0.5, "expected_str": " SmoothL1Loss() WeightedCrossEntropyLoss()"},
+            {"regression_loss": "l1", "classification_loss": "cross-entropy",  "mean": 40, "var": 20, "p": 0.3, "expected_str": " L1Loss() CrossEntropyLoss()"},
         ]
         for test_args in test_arguments:
 
@@ -181,7 +180,10 @@ class TestMockCriterionComputation:
             pred_categorical_img = get_mock_categorical_batch(noised_seg_mask, gt = False)
             pred_batch = {"cell_label": pred_float_img, "mask_label": pred_categorical_img}
             computator = LossComputator(test_args["regression_loss"], test_args["classification_loss"], device)
-
+            
+            # Assertion over the string representation of the current Loss computator obj.
+            assert computator.get_loss_criterions(tuple(gt_batch.keys())) == test_args["expected_str"]
+            
             # If the simple cross-entropy is employed, override the shape of the gt batch.
             if test_args["classification_loss"] == "cross-entropy":
                 gt_batch["mask_label"] = gt_batch["mask_label"][:, 0, :, :]

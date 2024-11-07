@@ -295,6 +295,7 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
         log.info(f"The 'max epochs' param is not set yet, it will be inferred now!")
         # Get number of training epochs depending on dataset size (just roughly to decrease training time):
         config['max_epochs'] = get_max_epochs(len(datasets['train']), arch=config['architecture'][0])
+        max_epochs = config['max_epochs']
 
     # NOTE: Make the training.py more clean - all computation like the one belowe are passed from the calling function
     print(f"Number of epochs without improvement allowed {2 * config['max_epochs'] // 20 + 5}")
@@ -322,12 +323,11 @@ def train(log, net: Type[nn.Module], datasets, config: Dict[str, Any], device, p
                                      config["classification_loss"],
                                      device = device)
     # TODO: Return the string repr. of the criterions used based on the gt images labels.
-    label = datasets["val"][0].keys()
+    label = datasets["val"].get_sample_keys()
     print(label)  # NOTE: Use the dict. keys (dropped the 'image' and 'id' keys) for logging the loaded criterions. 
-    #log.info(f"Loss that will be used (one for each labels) are: {loss_computator.}")
+    log.info(f"Loss that will be used (one for each labels) are: {loss_computator.}")
 
     second_run = False # WARNING: Fixed arg - to change.
-    max_epochs = config['max_epochs']
     # Set-up the optimizer.
     optimizer, scheduler, break_condition = set_up_optimizer_and_scheduler(config, net, best_loss)
 

@@ -138,7 +138,6 @@ def mock_training_loop_pipeline(log: logging.Logger, args: Dict, num_gpus: int, 
                     'label_type': "distance", # NOTE: Fixed param.
                     'loss': train_args_cls.loss,
                     'classification_loss': train_args_cls.classification_loss,
-                    'images_labels': train_args_cls.get_requested_image_labels(),
                     'num_gpus': num_gpus,
                     'optimizer': train_args_cls.optimizer,
                     'max_epochs': 1  # NOTE: Set to 1 for testing purposes 
