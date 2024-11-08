@@ -2,12 +2,15 @@
 
 It will call the sparse configuration functions as the optimizer or the max_epochs
 setter.
+This test module contains dependendencies to the (absolute path) ./tests/test_loss.py module.
 """
 from typing import List
 import numpy as np
 from pathlib import Path
 
-from training.training import get_max_epochs, update_running_losses
+from tests.test_loss import load_images, get_mock_float_batch, get_mock_categorical_batch
+
+from training.training import get_max_epochs, update_running_losses, sample_plot_during_validation
 from net_utils.utils import save_training_loss
 
 
@@ -43,7 +46,6 @@ class TestTrainUtils:
         for test_args in test_arguments:
             curr_losses = [0.0, 0.0]
             for losses in test_args["expected_losses"]:
-                print(losses)
                 curr_losses = update_running_losses(curr_losses, test_args["losses_to_sum"], batch_size=mock_batch_size)
                 assert isinstance(curr_losses, List) == True
                 assert curr_losses == losses
@@ -57,10 +59,10 @@ class TestTrainUtils:
         loss labels and values.
         """
         test_arguments = [
-            {"loss_values": [[1.0, 3.4, 4.23]], "loss_labels": ["cell_label", "mask_label"]},
-            {"loss_values": [[1.0, 3.4, 4.23], [2.0, 4.4, 5.23]], "loss_labels": ["cell_label", "binary_border_label", "mask_label"]},
+            {"loss_values": [[7.0, 3.4, 4.23]], "loss_labels": ["total loss", "cell_label", "mask_label"]},
+            {"loss_values": [[8.0, 1.0, 3.4, 4.23], [8.0, 2.0, 4.4, 5.23]], "loss_labels": ["total loss", "cell_label", "binary_border_label", "mask_label"]},
         ]
-        mock_path_model = Path('./')
+        mock_path_model = Path('./tests/')
         second_run = False
         tot_time = 0.001
         tot_epochs = 1
@@ -68,3 +70,27 @@ class TestTrainUtils:
         for test_args in test_arguments:
             save_training_loss(test_args["loss_labels"], test_args["loss_values"], test_args["loss_values"],
                                second_run, mock_path_model, mock_config, tot_time, tot_epochs)
+            
+    def test_plotting_validation_sample(self):
+        """It testes the *.png generation for qualitative observations during the training phase.
+
+        Specifically, this function will generate *.png files in the ./tests/ folder using the 
+        mock batch files generated from the *.pny files inside the ./tests/ folder.
+        """
+        images_folder_path = "tests"
+
+        # Forming the "mock" prediction batch - fixed during training.
+        img, seg_mask = load_images(folder_path=images_folder_path)
+        img = img.astype(np.float32, copy = False)
+        seg_mask = np.array(seg_mask, dtype=bool)
+        seg_mask = seg_mask.astype(np.float32, copy=False)
+        pred_float_img = get_mock_float_batch(img)
+        pred_categorical_img = get_mock_categorical_batch(seg_mask, gt = False)
+        test_arguments = [
+            {"cell_label": pred_float_img, "mask_label": pred_categorical_img},
+            {"border_label": pred_float_img, "binary_border_label": pred_categorical_img}
+        ]
+
+        for test_args in test_arguments:
+            sample_plot_during_validation(sample_batch=test_args, val_phase_counter=0)
+

@@ -392,6 +392,10 @@ class LossComputator():
             raise ValueError(f"The provided batches for the loss computation contains different keys: pred keys are {pred_batches.keys()} while the gt keys are {gt_batches.keys()}")
         losses = []
         for key, gt_image in gt_batches.items():
+            
+            # FIXME: Temporary solution for the Cross entropy computation.
+            if str(self.loss_criterions[key]) == "CrossEntropyLoss()":
+                gt_image = gt_image[:, 0, :, :]
             losses.append(self.loss_criterions[key](pred_batches[key], gt_image))
         total_loss = sum(losses)
         

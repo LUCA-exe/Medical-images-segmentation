@@ -19,6 +19,5 @@
     "pre_train": false,
     "retrain": false,
     "softmax_layer": false,
-    "classification_loss": "cross_entropy"
-
+    "classification_loss": "cross-entropy"
 }

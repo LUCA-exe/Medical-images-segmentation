@@ -610,7 +610,6 @@ def create_ctc_training_sets(log, path_data, mode, cell_type, split='01+02', cro
     path_trainset = path_data / "{}_{}_{}_{}".format(cell_type, mode, split, crop_size) # Name of the generated train set in the chosen dataset folder
     
     if len(list((path_trainset / 'train').glob('*.tif'))) > 0: # Check if the generated 'train set' already exist
-
         log.info(f"Training set {path_trainset.stem} already generated, returning to the main training loop")
         return None
 

@@ -1,7 +1,11 @@
-"""train.py
+"""This module will perform the training of the neural network.
 
-This is the train main function that call creation of training set of a dataset.
-and train the models.
+This module will call all the classes to set up the needed parameters,
+create the datatesets with the correct images and perform the training of the
+neural network.
+
+Example of command from the console:
+./Medical-images-segmentation> python train.py --model_pipeline dual-unet --dataset Train-E2DV-train --crop_size 640 --filters 64 128 --train_loop
 """
 
 import os
@@ -10,7 +14,7 @@ from os.path import join, exists
 from collections import defaultdict
 from typing import Dict, Type, Any
 
-from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, train_factory, train_arg_class_interface
+from utils import create_logging, set_device, load_environment_variables, set_current_run_folders, check_path, train_factory, train_arg_class_interface
 from parser import get_parser, get_processed_args
 from net_utils.utils import unique_path, write_train_info, create_model_architecture
 from net_utils import unets
@@ -20,34 +24,67 @@ from training.mytransforms import augmentors
 from training.autoencoder_dataset import AutoEncoderDataset
 from training.cell_segmentation_dataset import CellSegDataset
 
-
-def set_up_args_and_folder():
-    # Parse initial arguments and set up environment variables/folder.
-
-    set_environment_paths_and_folders() # Read .env file and set-up the temporary folders
-
-    log = create_logging() # Set up 'logger' object and set up the current run folders
-    
-    args = get_parser() # Set up dict arguments
+def set_up_training() -> None:
+    """Main function ttha calls all the modules responsible for creating the dataset 
+    and execute the training loops.
+    """
+    load_environment_variables()
+    set_current_run_folders()
+    log = create_logging()
+    args = get_parser()
     args = get_processed_args(args)
-    return args, log
+    log.info(f"Args: {args}")
+    device, num_gpus = set_device() 
+    log.info(f"System detected {device} device and {num_gpus} GPUs available.")
+    log.info(f">>>   Training: pre-processing {args.pre_processing_pipeline} model {args.model_pipeline}   <<<")
 
-def set_up_training_set(log, args, path_data, cell_type):
-    # Pre-processing pipeline among the ones implemented to create the training set
+    # Load paths
+    path_data = Path(args.train_images_path)
+    path_models = Path(args.models_folder) # Train all models found here.
+    
+    # TODO: Make modular - for now just take the first dataset available indicated by the parameter.
+    args.dataset = args.dataset[0] # TODO: To fix the temporary 'work around'.
+    cell_type = Path(args.dataset)
+    
+    # Double check if both the training data folder and the specific dataset exist
+    if check_path(log, path_data) and check_path(log, join(path_data, cell_type)):
+        trainset_name = args.dataset # 'args.dataset' used as cell type
+    
+    train_args = get_training_args_class(log, args)
+    set_up_training_set(log, args, path_data, cell_type, train_args)
 
+    # NOTE: If it is desired to just create the training set.
+    if not args.train_loop:
+        log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
+        return None
+    
+    model_config = get_model_config(log, train_args, num_gpus)
+    net = create_model_architecture(log, model_config, device, num_gpus, train_args.pre_train)
+    set_up_training_loops(log, train_args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
+    log.info(">>> Training script ended correctly <<<")
+
+def set_up_training_set(log, args, path_data, cell_type, train_args_cls: Type[train_arg_class_interface]):
+    """ Pre-processing pipeline among the ones implemented to create the training set.
+    """
     if args.pre_processing_pipeline == 'kit-ge':
         log.info(f"Creation of the training dataset using {args.pre_processing_pipeline} pipeline for {args.crop_size} crops")
         
         for crop_size in args.crop_size: # If you want to create more dataset
-            create_ctc_training_sets(log, path_data=path_data, mode=args.mode, cell_type=cell_type, split=args.split, min_a_images=args.min_a_images, crop_size = crop_size)
+            create_ctc_training_sets(log, 
+                                    path_data = path_data,
+                                    mode = args.mode,
+                                    cell_type = cell_type,
+                                    split = args.split,
+                                    min_a_images = args.min_a_images,
+                                    crop_size = crop_size,
+                                    train_arg_class = train_args_cls)
     else:
         raise ValueError("This argument support just 'kit-ge' as pre-processing pipeline")
 
 def get_training_args_class(log, args: Dict) -> Type[train_arg_class_interface]:
     """Get the training argument class for the current model configurations.
     """
-
-    train_args = train_factory().create_argument_class(args.model_pipeline,
+    train_args = train_factory().create_arg_class(args.model_pipeline,
                             args.act_fun,
                             args.batch_size, 
                             args.filters,
@@ -73,7 +110,6 @@ def get_training_args_class(log, args: Dict) -> Type[train_arg_class_interface]:
 def get_model_config(log, train_args: Type[train_arg_class_interface], num_gpus: int) -> Dict[str, Any]:
     """Get the current neural network low-level configurations.
     """
-    
     # Parsing the model configurations - get CNN (double encoder U-Net). WARNING: Double 'decoder', not encoder.
     model_config = {'architecture': train_args.get_arch_args(),
                     'batch_size': train_args.batch_size,
@@ -84,13 +120,11 @@ def get_model_config(log, train_args: Type[train_arg_class_interface], num_gpus:
                     'num_gpus': num_gpus,
                     'optimizer': train_args.optimizer
                     }
-
     log.info(f"Model configuration {model_config}")
     return model_config
 
-
 # NOTE: Refactoring in progress.
-def set_up_training_loops(log, args: Type[train_arg_class_interface], path_data, trainset_name, path_models, model_config: Dict[str, Any], net, num_gpus, device):
+def set_up_training_loops(log, args: Type[train_arg_class_interface], path_data, trainset_name, path_models, model_config: Dict[str, Any], net, num_gpus, device) -> None:
     """Loop to iterate over the different trained/re-trained architectures.
     """
 
@@ -167,48 +201,8 @@ def set_up_training_loops(log, args: Type[train_arg_class_interface], path_data,
                 _ = train(net=net, datasets=datasets, config=model_config, device=device, path_models=path_models, best_loss=best_loss)
 
             # Write information to json-file - consider to pass even the train_args.
-            write_train_info(configs=model_config, path=path_models)
-    return None
-
-
-def set_up_training():
-    """ Main function to set up paths, datasets and training pipelines
-    """
-    args, log = set_up_args_and_folder()
-
-    log.info(f"Args: {args}") # Print overall args
-    device, num_gpus = set_device() # Set device: cpu or single-gpu usage
-    log.info(f"System detected {device} device and {num_gpus} GPUs available.")
-    log.info(f">>>   Training: pre-processing {args.pre_processing_pipeline} model {args.model_pipeline}   <<<")
-
-    # Load paths
-    path_data = Path(args.train_images_path)
-    path_models = Path(args.models_folder) # Train all models found here.
-    
-    # TODO: Make modular - for now just take the first dataset available indicated by the parameter.
-    args.dataset = args.dataset[0] # TODO: To fix the temporary 'work around'.
-    cell_type = Path(args.dataset)
-    
-    # Double check if both the training data folder and the specific dataset exist
-    if check_path(log, path_data) and check_path(log, join(path_data, cell_type)):
-        trainset_name = args.dataset # 'args.dataset' used as cell type
-    set_up_training_set(log, args, path_data, cell_type)
-
-    # If it is desired to just create the training set
-    if not args.train_loop:
-        log.info(f">>> Creation of the trainining dataset scripts ended correctly <<<")
-        return None # Exit the script
-
-    # Parse the training arguments and settings for the specific model pipeline
-    train_args = get_training_args_class(log, args)
-    model_config = get_model_config(log, train_args, num_gpus)
-    net = create_model_architecture(log, model_config, device, num_gpus, train_args.pre_train)
-
-    # Set up and execute the actual trainig
-    set_up_training_loops(log, train_args, path_data, trainset_name, path_models, model_config, net, num_gpus, device)
-    log.info(">>> Training script ended correctly <<<")
-    return
-
+            write_train_info(configs = model_config, path = path_models)
+    log.info(f"Training phase ended corretly! Closing program..")
 
 if __name__ == "__main__":
     set_up_training()

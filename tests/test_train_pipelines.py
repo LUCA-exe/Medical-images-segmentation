@@ -9,6 +9,8 @@ To test just the sub-functions:
 To test just the entire pipeline:
 ...> python -m pytest -v --run-pipeline tests/test_train_pipelines.py
 
+To visualize the 'stdout' (console prints) add -s as parameter when launching the test.
+
 In some tests it will uses the *.npy files listed in the ./tests/README.txt file.
 """
 import pytest
@@ -81,7 +83,7 @@ def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger,
                                                          args["softmax_layer"],
                                                          args["classification_loss"])
 
-    # Originally in another function.
+    # In the ./train.py module this instructions are contained in a wrapper function.
     if args["pre_processing_pipeline"] == 'kit-ge':
         log.info(f"Creation of the training dataset using {args['pre_processing_pipeline']} pipeline for {args['crop_size']} crops")
         
@@ -332,11 +334,14 @@ class TestMockTrainPipelines:
     def test_training_loop(self):
         """Set environment folders, run the creation of the training dataset folder and 
         execute the training loop with an instantiated neural networks.
+
+        The neural netowrks, despite being the official architecture are purposelly "shortened"
+        in terms of layers.
         """
         default_args = read_json_file("./tests/mock_train_args.json")
         test_arguments = [
-            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640},
-            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640}
+            {"model_pipeline": "dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640, "filters": [64, 128]},
+            {"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640, "filters": [64, 128]}
         ]
 
         for test_args in test_arguments:

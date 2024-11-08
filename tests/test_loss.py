@@ -1,5 +1,4 @@
-"""
-This module tests the losses configurations and computation only.
+"""This module tests the losses configurations and computation only.
 """
 from typing import Dict, Union, Optional
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss, SmoothL1Loss
@@ -165,7 +164,6 @@ class TestMockCriterionComputation:
         gt_float_img = get_mock_float_batch(img)
         gt_categorical_img = get_mock_categorical_batch(seg_mask)
         gt_batch = {"cell_label": gt_float_img, "mask_label": gt_categorical_img}
-            
         test_arguments = [
             {"regression_loss": "l2", "classification_loss": "cross-entropy-dice", "mean": 60, "var": 10, "p": 0.7, "expected_str": " MSELoss() WeightedDiceLoss()"},
             {"regression_loss": "smooth_l1", "classification_loss": "weighted-cross-entropy", "mean": 60, "var": 10, "p": 0.5, "expected_str": " SmoothL1Loss() WeightedCrossEntropyLoss()"},
@@ -183,10 +181,6 @@ class TestMockCriterionComputation:
             
             # Assertion over the string representation of the current Loss computator obj.
             assert computator.get_loss_criterions(tuple(gt_batch.keys())) == test_args["expected_str"]
-            
-            # If the simple cross-entropy is employed, override the shape of the gt batch.
-            if test_args["classification_loss"] == "cross-entropy":
-                gt_batch["mask_label"] = gt_batch["mask_label"][:, 0, :, :]
             loss, losses_list = computator.compute_loss(pred_batch, gt_batch)
             assert isinstance(loss, torch.Tensor)
             for number in losses_list:

@@ -182,15 +182,6 @@ def check_path(log: logging.Logger, path: str) -> bool:
         raise FileNotFoundError(f"The '{path}' provided is not existent!")
     return True
 
-def set_environment_paths_and_folders() -> None:
-
-    # Load the paths on the environment
-    load_dotenv()
-
-    # Set-up folders
-    clear_folder(os.getenv('TEMPORARY_PATH', None))
-    os.makedirs(os.getenv('TEMPORARY_PATH', None), exist_ok=True)
-
 def check_and_download_evaluation_software(log, software_path):
     # Check if eval. software is already downloaded: if not download it.
     

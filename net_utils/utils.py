@@ -12,8 +12,9 @@ import matplotlib.pyplot as plt
 from multiprocessing import cpu_count
 import torch
 from torch import nn
-from typing import Dict, Union, List, Type
+from typing import Dict, Union, List, Type, Any
 import pandas as pd
+from copy import copy
 
 from net_utils import unets
 
@@ -49,7 +50,6 @@ def create_model_architecture(log: logging.Logger,
                            softmax_layer = model_config['architecture'][6])
     return net
 
-# NOTE: Refactoring.
 def save_training_loss(loss_labels: List[str], 
                        train_loss: List[List[float]], 
                        val_loss: List[List[float]], 
@@ -57,16 +57,17 @@ def save_training_loss(loss_labels: List[str],
                        path_models: Path, 
                        config: Dict, 
                        tot_time: float, 
-                       tot_epochs: int):
+                       tot_epochs: int) -> None:
     """
-    Get the training loss and save it in a formatted '*.txt' file.
+    Get the train/val loss and save it in a formatted '*.txt' file.
+
     In this function key-value are added to the 'config' dict. containig the 
     current specifics of the model/trainig phase.
 
     Args:
-        loss_labels: List of columns correspondent to the loss values passed.
+        loss_labels: List of columns correspondent to the loss values.
         train_loss: Every i-th entry of this list correspond to the value of 
-        that i-th epochs of the total losses gathered during training.
+        that i-th epochs of the losses gathered during training.
         val_loss: Every i-th entry of this list correspond to the value of 
         that i-th epochs of the losses gathered during validation.
         second_run: Temporary flag to differentiate between end-to-end 
@@ -79,15 +80,20 @@ def save_training_loss(loss_labels: List[str],
         tot_epochs: Integer representings the total number of epochs. Usefull
         to record in case of early stops to avoid overfitting.
     """
+    # Compose the train/val labels.
+    loss_labels = copy(loss_labels)
+    train_labels = ["train " + label for label in loss_labels]
+    val_labels = ["val " + label for label in loss_labels]
+    
+    # Format the values.
+    file_header = "epoch, "
+    for loss_label in train_labels + val_labels:
+        file_header += loss_label + ", "
 
-    # Un-pack the losses in the original variables
-    #train_total_loss, train_loss_border, train_loss_cell, train_loss_mask, train_loss_binary_border = zip(*train_loss) 
-    #val_total_loss, val_loss_border, val_loss_cell, val_loss_mask, val_loss_binary_border = zip(*val_loss) 
-    # NOTE: debug
-    print(len(train_loss))
-
-    # Composing total stats.
-    stats = np.transpose(np.array([list(range(1, len(train_loss) + 1)), zip(*train_loss), zip(*val_loss)]))
+    file_header = file_header[:-2]  # Remove the last comma.
+    train_val_losses = [[num_epoch] + i1 + i2 for num_epoch, i1, i2 in zip(range(1, len(train_loss) + 1), train_loss, val_loss)]
+    stats = np.asarray(train_val_losses)
+    fmt_values = ['%3i'] + ['%2.5f'] * (len(loss_labels) * 2)
     
     try:
         if second_run:
@@ -96,24 +102,23 @@ def save_training_loss(loss_labels: List[str],
                     header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
             config['training_time_run_2'], config['trained_epochs_run2'] = tot_time, tot_epochs + 1
         else:
-            np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), X=stats,
-                    fmt=['%3i', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f', '%2.5f'],
-                    header='Epoch, training total loss, training border loss, training cell loss, training mask loss, training binary border loss, validation total loss, validation border loss, validation cell loss, validation mask loss, validation binary border loss', delimiter=',')
+            np.savetxt(fname=str(path_models / (config['run_name'] + '_loss.txt')), 
+                       X=stats,
+                       fmt = fmt_values,
+                       header = file_header,
+                       delimiter=',')
             
             # FIXME: Move to the calling function.
             config['training_time'], config['trained_epochs'] = tot_time, tot_epochs + 1
         print(f"Training losses saved corretly and current configuration parameters updated!")
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
-    return None
-
 
 def save_inference_final_images(result_path, file_id, prediction_instance):
     # Save final inferred image.
 
     tiff.imwrite(str(result_path / ('mask' + file_id)), prediction_instance)
     return None
-
 
 def save_inference_raw_images(result_path, file_id, prediction_cell_batch, prediction_border_batch, border):
     # Called if "args.save_raw_pred" is true: save the raw outputs of the model during inference time
@@ -123,22 +128,20 @@ def save_inference_raw_images(result_path, file_id, prediction_cell_batch, predi
     tiff.imwrite(str(result_path / ('border' + file_id)), border.astype(np.float32))
     return None
 
-
-def save_current_model_state(config, net, path_models):
-    # The state dict of data parallel (multi GPU) models need to get saved in a way that allows to
-    # load them also on single GPU or CPU
-
+def save_current_model_state(config: Dict[str, Any], net: nn.Module, path_models: Path) -> None:
+    """Save the netowrk state for the current training phase.
+    
+    The state dict of data parallel (multi GPU) models need to get saved in a way that allows to
+    load them also on single GPU or CPU
+    """
     try:
         if config['num_gpus'] > 1:
             torch.save(net.module.state_dict(), str(path_models / (config['run_name'] + '.pth')))
         else:
             torch.save(net.state_dict(), str(path_models / (config['run_name'] + '.pth')))
         print(f".. current model state correctly saved !")
-        
     except Exception as e:
-        raise Exception(f"Unexpected error: {e}")
-    return None
-    
+        raise Exception(f"Unexpected error: {e}")    
 
 def save_current_branch_state(config, net, path_models, device):
     # Util function to upgrade just'part' of the neural-network by upgrading certain tensors
@@ -388,8 +391,8 @@ def unique_path(directory, name_pattern):
             return path
 
 
-def write_train_info(configs, path):
-    """ Write training configurations into a json file.
+def write_train_info(configs, path) -> None:
+    """Write training configurations into a json file.
 
     :param configs: Dictionary with configurations of the training process.
         :type configs: dict
@@ -397,13 +400,9 @@ def write_train_info(configs, path):
         :type path: pathlib Path object
     :return: None
     """
-
     with open(path / (configs['run_name'] + '.json'), 'w', encoding='utf-8') as outfile:
         json.dump(configs, outfile, ensure_ascii=False, indent=2)
-
     print(f"Model configuration saved corretly!")
-    return None
-
 
 def copy_best_model(path_models, path_best_models, best_model, best_settings):
     """ Copy best models to KIT-Sch-GE_2021/SW and the best (training data set) results.
@@ -696,24 +695,19 @@ def show_training_set_images(pipeline, dataset_path, cell_type, mode, split, n_s
 
     return None
 
-
-# Used in train/validation phase to perform further analysis - e.g. in the 'border_label_2d' to debug visually the highlighted borders.
-def save_image(img, path, title, use_cmap = False):
-    
-    # Ensure the folder exists
+def save_image(img: Union[np.ndarray, torch.Tensor], path: str, title: str, use_cmap = False) -> None:
+    """Save image in train/validation phase.
+     
+    It helps performing further analysis (e.g. in the 'border_label_2d' to 
+    debug visually the highlighted borders).
+    """
     os.makedirs(path, exist_ok=True)
-    
-    # Create the full path for saving the image
     image_path = os.path.join(path, f"{title}.png")
-
-    # Plot the image using matplotlib
     plt.imshow(img, cmap='gray' if use_cmap else None)
     plt.title(title)
     plt.axis('off')  # Turn off axis labels
     plt.savefig(image_path, bbox_inches='tight', pad_inches=0.1)
     plt.close()  # Close the plot to free up resources
-    return None
-
 
 def save_segmentation_image(img, path, title, use_cmap = False):
     
@@ -744,39 +738,37 @@ def log_final_images_properties(log, image):
     log.debug(f".. the current image has {len(n_region)} labeled cells ..")
     return None
 
-
-def show_training_dataset_samples(log, dataset: torch.utils.data.Dataset, n_sample: int = 10) -> None:
-    """
-    It plots a defined number of images to provide a sample of data from the group used
-    for the training.
+def show_training_dataset_samples(log, 
+                                  dataset: torch.utils.data.Dataset, 
+                                  n_sample: int = 10) -> None:
+    """It plots a defined number of images from a Dataset class.
+    
+    It helps providing a sample of data that will be used in training.
 
     Args:
         dataset: A split ('train' or 'val') of type 'CellSegDataset'.
         n_sample: Number of sample to show - every sample is all the different
         format/transformation of the original image patch.   
     """
-
-    # Pre-conditions
+    log.info(f"Visually inspect the first {n_sample} samples of images from the training dataset")
     if n_sample > len(dataset):
         log.debug(f"""The original {n_sample} sample requested are too much, the 
                   current dataset contains {len(dataset)} samples""")
         n_sample = len(dataset)
-
-    count_neighbor_distance = 0
-    log.debug(f"Visually inspect the first {n_sample} samples of images from the training Dataset")
+    float_labels = ["image", "border_label", "cell_label"]
+    categorical_labels = ["binary_border_label", "mask_label"]
     folder = os.getenv("TEMPORARY_PATH")
     for idx in range(n_sample):
-
         image_dict = dataset[idx]
-        for pos, (key, image) in enumerate(image_dict.items()):
-
-            curr_title = "Sample " + str(idx) + f" type ({key})"
-            save_image(np.squeeze(image), folder, curr_title, use_cmap=True)
-
-            # Keep track of not-blank neighbor tranform
-            if key == "border_label" and np.squeeze(image).sum(axis = None) > 0:
-                count_neighbor_distance += 1
-    print(f"Between the shown example, the {round(count_neighbor_distance/n_sample, 2)}% of distance tranform are not-blanck!")
+        del image_dict["id"]
+        for key, image in image_dict.items():
+            curr_title = f"{key} (index {str(idx)})"
+            if key in float_labels:
+                save_image(np.squeeze(image), folder, curr_title, use_cmap=True)
+            elif key in categorical_labels:
+                save_image(np.squeeze(image), folder, curr_title, use_cmap=False)
+            else:
+                raise ValueError(f"The key {key} is not supported!")
     log.debug(f"Images correctly saved in {folder} before the training phase!")
 
 def show_inference_dataset_samples(log, dataset, samples = 3):
