@@ -5,19 +5,19 @@ This is the evaluation main function that call inference and the metrics computa
 import os
 from os.path import join, exists
 from collections import defaultdict
-from utils import create_logging, set_device, set_environment_paths_and_folders, check_path, eval_factory
+from utils import create_logging, set_device, load_environment_variables, set_current_run_folders, check_path, eval_factory
 from parser import get_parser, get_processed_args
 from inference.inference import inference_2d # Main inference loop
 from net_utils.metrics import count_det_errors, ctc_metrics
 from net_utils.utils import save_metrics
 
-# CONSTS
 SOFTWARE_DET_FILE = "DET_log.txt"
 
 def main():
     """ Main function to set up paths, load model and evaluate the inferred images.
     """
-    set_environment_paths_and_folders() # Save folders/folder paths in the env.
+    load_environment_variables()
+    set_current_run_folders()
     log = create_logging() # Set up 'logger' object 
 
     args = get_parser() # Set up dict arguments
@@ -89,8 +89,8 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
     # NOTE: For now it is implemented evaluation for one dataset - this current params loop is specific for kit-ge pipeline..
     for model in models: # Loop over all the models found
         model_path = os.path.join(path_models, model) # Create model path
-        for th_seed in args.th_seed:# Go through thresholds
-            for th_cell in args.th_cell:
+        for th_seed in args["th_seed"]:# Go through thresholds
+            for th_cell in args["th_cell"]:
                 for train_set in train_sets:
 
                     log.info(f'> Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
@@ -100,15 +100,15 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
                     log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
                     os.makedirs(path_seg_results, exist_ok=True)
 
-                    eval_class_args = eval_f.create_argument_class(args.post_processing_pipeline,
+                    eval_class_args = eval_f.create_argument_class(args["post_processing_pipeline"],
                                                     float(th_cell), 
                                                     float(th_seed),
-                                                    args.apply_clahe,
-                                                    args.scale,
-                                                    args.dataset,
-                                                    args.save_raw_pred,
-                                                    args.artifact_correction,
-                                                    args.apply_merging)
+                                                    args["apply_clahe"],
+                                                    args["scale"],
+                                                    args["dataset"],
+                                                    args["save_raw_pred"],
+                                                    args["artifact_correction"],
+                                                    args["apply_merging"])
                     
                     # Debug specific args for the current run.
                     log.debug(eval_class_args)
@@ -139,7 +139,7 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
                     curr_experiment += 1
                    
     # Save the metrics - It will update the file if there is already an "*.json" with the same name.
-    result_file_name = f"{args.model_pipeline}_{args.post_processing_pipeline}_{path_data.split('/')[-1]}_eval_results"
+    result_file_name = f"{args['model_pipeline']}_{args['post_processing_pipeline']}_{path_data.split('/')[-1]}_eval_results"
     save_metrics(log, result_dict, path_data, name = result_file_name)
     return None
 

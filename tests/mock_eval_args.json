@@ -1,0 +1,12 @@
+{
+    "train_images_path": "training_data/",
+    "pre_processing_pipeline": "kit-ge",
+    "models_folder": "./models/all/",
+    "split": "01",
+    "mode": "GT",
+    "eval_metric": "software",
+    "save_model": "./models/best/",
+    "evaluation_software_path": "./net_utils/evaluation_software/",
+    "th_cell": [0.07],
+    "th_seed": [0.45]
+}

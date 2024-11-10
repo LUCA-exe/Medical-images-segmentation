@@ -29,7 +29,7 @@ from train import set_up_training_loops
 from net_utils.utils import create_model_architecture
 from utils import load_environment_variables, set_current_run_folders, \
     create_logging, read_json_file, set_device, check_path, \
-        train_factory
+        train_factory, reset_logging
 from training.create_training_sets import create_ctc_training_sets
 
 def mock_training_dataset_creation_pipeline(args: Dict) -> Tuple[logging.Logger, int, torch.device, str, str, str]:
@@ -335,7 +335,7 @@ class TestMockTrainPipelines:
         """Set environment folders, run the creation of the training dataset folder and 
         execute the training loop with an instantiated neural networks.
 
-        The neural netowrks, despite being the official architecture are purposelly "shortened"
+        The neural networks, despite being the official architecture are purposelly "shortened"
         in terms of layers.
         """
         default_args = read_json_file("./tests/mock_train_args.json")
@@ -345,6 +345,7 @@ class TestMockTrainPipelines:
         ]
 
         for test_args in test_arguments:
+            reset_logging()
             run_parameters = update_default_args(default_args, test_args)
             
             # Compose current dataset folder.

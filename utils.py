@@ -146,6 +146,23 @@ def create_logging():
   logger.addHandler(debug_handler)
   return logger
 
+# NOTE: Finish testing.
+def reset_logging():
+    """Function to reset loggers configurations.
+
+    This is usually called to reset the logging handlers before the
+    runs of multiple tests.
+    """
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    loggers.append(logging.getLogger())
+    for logger in loggers:
+        handlers = logger.handlers[:]
+        for handler in handlers:
+            logger.removeHandler(handler)
+            handler.close()
+        logger.setLevel(logging.NOTSET)
+        logger.propagate = True
+
 # NOTE: Reaname the function - It is confusing.
 def set_device() -> Tuple[torch.device, int]:
     """It will check for the devices available.
@@ -164,8 +181,7 @@ def set_device() -> Tuple[torch.device, int]:
     return device, num_gpus
 
 def check_path(log: logging.Logger, path: str) -> bool:
-    """
-    Util function to check for critical folders/files for the 
+    """Util function to check for critical folders/files for the 
     current run.
 
     Args:
@@ -176,15 +192,16 @@ def check_path(log: logging.Logger, path: str) -> bool:
         FileNotFoundError: In case the provided path (file/folder to check is 
         not existent).
     """
-
     if not exists(path):
         log.info(f"Warning: the '{path}' provided is not existent! Interrupting the program...")
         raise FileNotFoundError(f"The '{path}' provided is not existent!")
     return True
 
-def check_and_download_evaluation_software(log, software_path):
-    # Check if eval. software is already downloaded: if not download it.
+def check_and_download_evaluation_software(log, software_path: str):
+    """Download the CTC evluation software
     
+    This method will check if the eval. software is already downloaded in the
+    provided software"""
     # Check if the evaluation folder is already contained
     files = [name for name in os.listdir(software_path) if not name.startswith(".")]
     
@@ -198,8 +215,7 @@ def check_and_download_evaluation_software(log, software_path):
 
     else:
         log.info(f"Evaluation software already set-up in '{software_path}'")
-        return False # Eval software already set up.
-
+        return False
     log.info(f"Evaluation software correctly set up")
     return None # Evaluation folder correctly set up
 

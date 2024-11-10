@@ -1,7 +1,10 @@
-"""download_data.py
+"""It provides public method to download the evaluation software and datasets.
 
-This file contains the function to download and set up the train/test data 
-and the evaluation software.
+Specifically, this module can be launched as stand-alone script to download 
+the additional required datasets in a specific folder.
+
+Example of command:
+.../Medical-images-segmentation > 
 """
 
 import os
