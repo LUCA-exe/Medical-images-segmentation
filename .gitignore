@@ -8,3 +8,4 @@ training_data/
 test_data/
 models/all/
 .vscode/
+*.DS_Store
