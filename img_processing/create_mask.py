@@ -1,9 +1,9 @@
-"""create_mask.py
+"""This module containing a method to create segmentation masks from the 'annotation.json' (computed trough VIA).
+It will create both 'man_seg*.tiff' and 'man_track*.tiff' for every original image from the '*.json' file
+created trough VIA.
 
-This is a 'util' script to create segmentation masks from the 'annotation.json' (computed trough VIA) and the following 'man_trackT.tif'.
-(It is separate from the general repository, just a script that you can call from a notebook cell - Its level of log is the console).
+The method is inspired by https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py.
 """
-
 from copy import deepcopy
 import shutil
 import json
@@ -11,11 +11,12 @@ import PIL.Image
 import numpy as np
 import os
 import cv2
+from typing import Dict, Union
 
 from img_processing.imageUtils import visualize_image, visualize_mask
 
 DEBUG_PATH = './tmp' # Folder for debug visualization
-N_IMAGES = 2 # Number of images to debug visually
+N_IMAGES = 2 # Number of images to print for the 
 
 
 def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
@@ -44,11 +45,21 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
 
     return None
 
-
-# Reference to the original repository (https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py)
-def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=7000, reducing_ratio=0.2): 
+def create_masks_from_json(json_file: str, 
+                           images_folder: str, 
+                           seg_folder: str, 
+                           pixels_limit: Union[int, float] = 7000, 
+                           reducing_ratio: float = 0.2): 
+    """
+    
+    
+    
+    Args:
+        pixel_limit: needed for the adusting of the marker dimension (smaller marker in case of cells).
+        reducing_ratio: Factor to reduce the initial marker dimension.
+    """
     # 'pixel_limit' needed for the adusting of the marker dimension (smaller marker in case of cells)
-    # 'reducing_ratio' Needed to reduce the initial marker dimension
+    
 
     print("*** Creation of the segmentation masks ***")
     print(f"Working on {json_file} ..")
@@ -179,5 +190,4 @@ def create_masks_from_json(json_file, images_folder, seg_folder, pixels_limit=70
 
     # NOTE: Calling visual debug functions
     debug_frames(d_names, d_images, d_drawed_images, d_masks, d_markers)
-
     return None
