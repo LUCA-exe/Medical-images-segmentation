@@ -24,13 +24,15 @@ from utils import load_environment_variables, set_current_run_folders, \
 from parser import get_parser, get_processed_args
 from eval import du_inference_loop, tu_inference_loop
 
-def mock_valuation_set_up(args):
-    """High-level function to set up paths, load model and evaluate the inferred images.
+def mock_evaluation_set_up(args) -> None:
+    """The called functions will to set up paths, load model and evaluate the inferred images.
+
+    In this evaluations (mock) set-up is not needed the parser methods for the args.
     """
     load_environment_variables()
     set_current_run_folders()
     log = create_logging() 
-    log.info(f"**** THIS LOG FILE IS CREATED USING A MOCK PIPELINE: mock_valuation_set_up method in the ./tests/test_eval_pipelines.py module ****")
+    log.info(f"**** THIS LOG FILE IS CREATED USING the mock_valuation_set_up(...) method in the ./tests/test_eval_pipelines.py module ****")
 
     env = {} # TODO: Load this from a '.json' file environment parameters
     env['logger'] = log # Move the object through 'env' dict
@@ -53,7 +55,8 @@ def mock_valuation_set_up(args):
             check_and_download_evaluation_software(log, path_ctc_metric)
             
             # NOTE: Temporary solution.
-            captured_stdout = subprocess.run(["chmod", "-R", "755" "'./net_utils/evaluation_software'"], capture_output=True)
+            software_path = os.path.join('net_utils', 'evaluation_software')
+            captured_stdout = subprocess.run(["chmod", "-R", "755", software_path], capture_output=True)
             if captured_stdout.stdout != "b''":
                 raise ValueError(f"The sub-process used to change permission of the evaluation sofware has failed!")
     models = [model for model in os.listdir(args["models_folder"]) if model.endswith('.pth')]
@@ -61,38 +64,30 @@ def mock_valuation_set_up(args):
         raise ValueError(f"The are no *.pth files inside the folder {args['models_folder']}!")
 
     # Load the paths in the log files
-    log.debug(f"Dataset folder to evaluate: {path_data}")
-    log.debug(f"Folder used to fetch models: {path_models}")
-    log.debug(f"Folder used to save models performances/files: {path_data}")
+    log.info(f"Dataset folder to evaluate: {path_data}")
+    log.info(f"Folder used to fetch models: {path_models}")
+    log.info(f"Folder used to save models performances/files: {path_data}")
     if path_ctc_metric != 'none': # In case of 'none' (str) use custom metrics on the script.
-        log.debug(f"Evaluation software folder: {path_ctc_metric}")
+        log.info(f"Evaluation software folder: {path_ctc_metric}")
 
     scores = [] # Temporary list to keep the evaluation results
-    train_sets = args["split"]  # List of subfolder to eval.
+    train_sets = [args["split"]]  # List of subfolder to eval.
+
     # NOTE: For now it is implemented evaluation for one dataset
     if args["post_processing_pipeline"] == 'dual-unet': # Call inference from the KIT-GE-(2) model's method
         du_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
-
-    elif args["post_processing_pipeline"] == 'fusion-dual-unet':
-        fdu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
-
-    elif args["post_processing_pipeline"] == 'triple-unet':
-        tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
 
     # TODO: Finish to test
     elif args["post_processing_pipeline"] == 'original-dual-unet':
         tu_inference_loop(log, models, path_models, train_sets, path_data, device, num_gpus, args)
     
     else: # Call other inference loop ..
-        raise NotImplementedError(f"Other inference options not implemented yet ..")
-        
+        raise NotImplementedError(f"Other inference options for testing are not implemented yet ..")
     log.info(">>> Evaluation script ended correctly <<<")
-    return None
 
 
 class TestMockTrainPipelines:
-    """This class contains functions to simulate and test the overall evaluation
-    pipeline.
+    """This class contains functions to simulate and test the evaluation pipeline.
     """
 
     @pytest.mark.pipeline
@@ -108,6 +103,6 @@ class TestMockTrainPipelines:
 
         for test_args in test_arguments:
             run_parameters = update_default_args(default_args, test_args)
-            mock_valuation_set_up(run_parameters)
+            mock_evaluation_set_up(run_parameters)
 
             

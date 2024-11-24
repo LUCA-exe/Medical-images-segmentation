@@ -8,8 +8,7 @@ training_data/
 test_data/
 models/all/
 .vscode/
-<<<<<<< HEAD
 *.ipynb
-=======
 *.DS_Store
->>>>>>> 71d9e0639c5590669c76ed96774caad45f46ef83
+tests/Mock-*.json
+tests/Mock-*.pth

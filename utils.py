@@ -181,8 +181,7 @@ def set_device() -> Tuple[torch.device, int]:
     return device, num_gpus
 
 def check_path(log: logging.Logger, path: str) -> bool:
-    """Util function to check for critical folders/files for the 
-    current run.
+    """It checks for folders/files for the current run.
 
     Args:
         log: Logger object initialized.

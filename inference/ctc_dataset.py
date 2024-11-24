@@ -5,14 +5,14 @@ import numpy as np
 import tifffile as tiff
 import torch
 from pathlib import Path
-
+from logging import Logger
 from skimage.exposure import equalize_adapthist
 from skimage.transform import rescale
 from torch.utils.data import Dataset
 from torchvision import transforms
+import os
 
-from net_utils.utils import zero_pad_model_input
-
+from net_utils.utils import zero_pad_model_input, save_image
 
 class CTCDataSet(Dataset):
     """ Pytorch data set for Cell Tracking Challenge format data. """
@@ -195,3 +195,22 @@ class ToTensor(object):
         img = torch.from_numpy(img).to(torch.float)
         sample["image"] = img
         return sample # Directly return the dict. of the batches
+    
+### Utils functions ###
+
+def show_inference_dataset_samples(log: Logger, dataset: CTCDataSet, samples: int = 2):
+    """Visual debug for the images used in the inference phase.
+    """
+
+    log.debug(f"Visually inspect the first {samples} samples of images from the inference CTC Dataset")
+    folder = os.getenv("TEMPORARY_PATH")
+    for idx in range(samples):
+
+        image_dict = dataset[idx]
+        for pos, (key, image) in enumerate(image_dict.items()):
+
+            if key in ["image", "single_channel_image", "nuclei_channel_image"]:
+                curr_title = "Sample " + str(idx) + f" type ({key})"
+                save_image(np.squeeze(image), folder, curr_title, use_cmap=True)
+    log.debug(f"Images correctly saved in {folder} before the inference phase!")
+    return True

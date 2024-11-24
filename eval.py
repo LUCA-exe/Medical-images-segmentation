@@ -93,7 +93,7 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
             for th_cell in args["th_cell"]:
                 for train_set in train_sets:
 
-                    log.info(f'> Evaluate {model} on {path_data}_{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
+                    log.info(f'> Evaluate {model} on {path_data}/{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
 
                     # Set up current results folder for the segmentation maps
                     path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model.split('.')[0]}_{th_seed}_{th_cell}")
@@ -119,15 +119,15 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
                                 result_path=path_seg_results,
                                 device=device,
                                 num_gpus = num_gpus,
-                                batchsize=args.batch_size,
+                                batchsize=args["batch_size"],
                                 args=eval_class_args) 
 
                     if args.eval_metric == 'software':
                         seg_measure, det_measure = ctc_metrics(path_data=path_data,
                                                                 path_results=path_seg_results,
-                                                                path_software=args.evaluation_software_path,
+                                                                path_software=args["evaluation_software_path"],
                                                                 subset=train_set,
-                                                                mode=args.mode)
+                                                                mode=args["mode"])
                         
                         _, so, fnv, fpv = count_det_errors(os.path.join(path_seg_results, SOFTWARE_DET_FILE))
 
