@@ -7,6 +7,8 @@ import tifffile as tiff
 import torch
 import numpy as np
 from pathlib import Path
+from torch.nn import Module
+from typing import Tuple, Dict
 
 from multiprocessing import cpu_count
 from skimage.measure import regionprops, label
@@ -17,7 +19,7 @@ from inference.postprocessing import *
 from net_utils.utils import load_weights, get_num_workers, save_inference_raw_images, save_inference_final_images, create_model_architecture, log_final_images_properties 
 
 
-def load_and_get_architecture(log, model_path, device, num_gpus):
+def load_and_get_architecture(log, model_path, device, num_gpus) -> Tuple[type[Module], Dict[str, any]]:
     # Load architecture from the "*.json" and prepare it for the evaluation phase.
 
     # Load model json file to get architecture + filters
@@ -41,7 +43,6 @@ def load_and_get_architecture(log, model_path, device, num_gpus):
     log.info(f"Model correctly set for evaluation phase")
     return net, model_settings
 
-
 def move_batches_to_device(samples_dict, device, keys_to_move = ["image", "single_channel_image", "nuclei_channel_image"]):
     # util function to get the dict. batch from the dataloader and move to the correct device
 
@@ -57,7 +58,7 @@ def move_batches_to_device(samples_dict, device, keys_to_move = ["image", "singl
 
 
 # For now use this simple 'dataloader' loop for evaluation of different pipelines.
-def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batchsize, args):
+def inference_2d(log, model_path, data_path: str, result_path, device, num_gpus, batchsize, args, is_unit_test: bool = False):
     """ Inference function for 2D Cell Tracking Challenge data sets.
 
     :param model: Path to the model to use for inference.
@@ -74,6 +75,8 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
         :type args:
     :param num_gpus: Number of GPUs to use in GPU mode (enables larger batches)
         :type num_gpus: int
+    is_unit_test: True if the evaluation is performed for a system/performance unit test.
+    Default to False.
     :return: None
     """
     result_path = Path(result_path) # Cast from str to Path type.
@@ -82,15 +85,14 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
     log.debug(f"Data path: {data_path}")
     # Get images to predict
     ctc_dataset = CTCDataSet(data_dir=data_path,
-                             transform=pre_processing_transforms(apply_clahe=args.apply_clahe, scale_factor=args.scale))
+                             transform=pre_processing_transforms(apply_clahe=args.apply_clahe, scale_factor=args.scale),
+                             is_test_sample=is_unit_test)
     # Assert that the datasets has been created correctly before the loop over the images - visual debugs for single channel images batch
     show_inference_dataset_samples(log, ctc_dataset)
-    log.info(f"Inference dataset correctly set")
-
+    log.info(f"Inference dataset correctly set!")
     num_workers = get_num_workers(device)
     num_workers = np.minimum(num_workers, 16)
     log.debug(f"Number of workers set for the dataloader: {num_workers}")
-
     dataloader = torch.utils.data.DataLoader(ctc_dataset, batch_size=batchsize, shuffle=False, pin_memory=True,
                                              num_workers=num_workers)
 
@@ -104,8 +106,6 @@ def inference_2d(log, model_path, data_path, result_path, device, num_gpus, batc
         if batchsize > 1:  # all images in a batch have same dimensions and pads
             pad_batch = [sample["pads"][i][0] for i in range(len(sample["pads"]))]
             img_size = [sample['original_size'][i][0] for i in range(len(sample['original_size']))]
-
-        # Prediction outputs - dependent on the loaded model pipeline and the chosen post-processing pipeline to move inside a function in this module
 
         if arch_name == "dual-unet":
 

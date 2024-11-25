@@ -92,14 +92,12 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
         for th_seed in args["th_seed"]:# Go through thresholds
             for th_cell in args["th_cell"]:
                 for train_set in train_sets:
-
-                    log.info(f'> Evaluate {model} on {path_data}/{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
+                    log.info(f'Evaluate {model} on {path_data}/{train_set}: th_seed: {th_seed}, th_cell: {th_cell}')
 
                     # Set up current results folder for the segmentation maps
                     path_seg_results = os.path.join(path_data, f"{train_set}_RES_{model.split('.')[0]}_{th_seed}_{th_cell}")
                     log.info(f"The result of the current evaluation will be saved in '{path_seg_results}'")
                     os.makedirs(path_seg_results, exist_ok=True)
-
                     eval_class_args = eval_f.create_argument_class(args["post_processing_pipeline"],
                                                     float(th_cell), 
                                                     float(th_seed),
@@ -120,9 +118,10 @@ def du_inference_loop(log, models, path_models, train_sets, path_data, device, n
                                 device=device,
                                 num_gpus = num_gpus,
                                 batchsize=args["batch_size"],
-                                args=eval_class_args) 
+                                args=eval_class_args,
+                                is_unit_test=args['is_unit_test']) 
 
-                    if args.eval_metric == 'software':
+                    if args["eval_metric"] == 'software':
                         seg_measure, det_measure = ctc_metrics(path_data=path_data,
                                                                 path_results=path_seg_results,
                                                                 path_software=args["evaluation_software_path"],

@@ -97,7 +97,7 @@ class TestMockTrainPipelines:
         """
         default_args = read_json_file("./tests/mock_eval_args.json")
         test_arguments = [
-            {"models_folder": "./tests/", "model_pipeline": "dual-unet", "post_processing_pipeline": "dual-unet", "dataset": ["Mock-E2DV-train"]},
+            {"models_folder": "./tests/", "model_pipeline": "dual-unet", "post_processing_pipeline": "dual-unet", "dataset": ["Mock-E2DV-train"], "is_unit_test": True},
             #{"model_pipeline": "original-dual-unet", "dataset": "Mock-E2DV-train", "crop_size": 640, "filters": [64, 128]}
         ]
 

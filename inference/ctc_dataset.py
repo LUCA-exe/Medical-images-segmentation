@@ -15,34 +15,51 @@ import os
 from net_utils.utils import zero_pad_model_input, save_image
 
 class CTCDataSet(Dataset):
-    """ Pytorch data set for Cell Tracking Challenge format data. """
+    """Custom dataset for Cell Tracking Challenge format data.
+    """
 
-    def __init__(self, data_dir, transform = lambda x: x):
+    def __init__(self, data_dir: str, 
+                 transform: transforms.Compose = lambda x: x, 
+                 is_test_sample = False):
         """
 
-        :param data_dir: Directory with the Cell Tracking Challenge images to predict (e.g., t001.tif)
-        :param transform:
+        Args:
+            data_dir: Directory with the Cell Tracking Challenge images to predict.
+            transform: List of class for image processing.
+            is_test_sample = Flag to set if it called during a system or performance
+            unit test. It will reduce the image dimensionality.
         """
-
         self.img_ids = sorted(Path(data_dir).glob('t*.tif'))
         self.transform = transform
+        self.is_test_sample = is_test_sample
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.img_ids)
 
-    def __getitem__(self, idx): # Here adapat my 3 channel images to the single channel expected input.
+    def __getitem__(self, idx: int): 
+        """This method will return a sample dict. containing the different
+        channel agggreagations of a single image.
+
+        Specifically, the EVs and Nuclei are respectively the red (0) and blue(2)
+        channels. 
+        The normal image instead is an aggregatation of all channels.
+        """
 
         img_id = self.img_ids[idx]
         image = tiff.imread(str(img_id))  
 
-        # Processing in case of RGB images as my dataset
+        if self.is_test_sample:
+            image = image[:120, :120, :]
+
+        # NOTE: Processing in case of RGB images - tailored for my dataset.
         if len(image.shape) > 2:
-            # Taking the EVs and nuclei specifics channel for single-channel inference
-            single_channel_img = image[:, :, 0] # NOTE: EVs channel (Red)
-            nuclei_channel_img = image[:, :, 2] # NOTE: Nuclei channel (blue)
-            img = np.sum(image, axis=2) # Keep all particles
+            single_channel_img = image[:, :, 0]
+            nuclei_channel_img = image[:, :, 2]
+
+            # NOTE: Keep all channels.
+            img = np.sum(image, axis=2)  
         else:
-            # For single-channel dataset just load twice the image - being already on single-channel
+            # NOTE: Temporary workaround.
             single_channel_img = image
             img = image
 
@@ -64,7 +81,6 @@ def pre_processing_transforms(apply_clahe, scale_factor):
 
     :return: transforms
     """
-
     data_transforms = transforms.Compose([ContrastEnhancement(apply_clahe),
                                           Normalization(),
                                           Scaling(scale_factor),
