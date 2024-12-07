@@ -1,0 +1,1 @@
+In this folder are kept and loaded the configurations to test the evaluation pipeline.

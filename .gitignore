@@ -10,5 +10,5 @@ models/all/
 .vscode/
 *.ipynb
 *.DS_Store
-tests/Mock-*.json
-tests/Mock-*.pth
+tests/model_configs/Mock-*.json
+tests/model_configs/Mock-*.pth
