@@ -4,6 +4,7 @@ created trough VIA.
 
 The method is inspired by https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py.
 """
+from copy import copy
 from copy import deepcopy
 import shutil
 import json
@@ -87,10 +88,12 @@ def create_masks_from_json(json_file: str,
         d_names.append(image_name.split('.')[0])
 
         print(f".. Working on image {image_name} ..")
+        print("DIOOOO")
         image_name = image_name.split('.')[0] + '.tif' # Original name.format of the current image
 
         if image_name in images_names: # Change the extension of the image (from '.jpg' to '.tif')
             img = np.asarray(PIL.Image.open(os.path.join(images_folder, image_name)))
+            img = copy(img)
             d_images.append(deepcopy(img))
         else:
             print(">> Exception! Pass to another the image ..")
@@ -100,7 +103,10 @@ def create_masks_from_json(json_file: str,
             try:
                 shapes_x, shapes_y, id_obj = [], [], [] # In order to take into account EVs that compare/disappear it is added the 'id_obj' attribute.
                 for segm_obj in data[name]['regions']: # Loop over the 'dict' (one for each segmented object)
-                    id_obj.append(segm_obj['region_attributes']['name'])
+                    current_name = segm_obj['region_attributes']['name']
+
+                    # In case there is '\n' in the name by mistake.
+                    id_obj.append(current_name.replace("\n", ""))
                     shapes_x.append(segm_obj['shape_attributes']['all_points_x'])
                     shapes_y.append(segm_obj['shape_attributes']['all_points_y'])
 
