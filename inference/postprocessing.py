@@ -289,7 +289,6 @@ def fusion_post_processing(prediction_dict: dict, sc_prediction_dict: dict, nucl
 
     return refined_evs_prediction.astype(np.uint16), refined_evs_prediction.astype(np.uint16)
 
-
 def remove_smaller_areas(seeds, area_threshold):
     """
     Removes connected components in a 2D array with areas smaller than a given threshold.
@@ -322,7 +321,6 @@ def remove_smaller_areas(seeds, area_threshold):
 
     # Re-label the remaining components
     return measure.label(filtered_seeds, background=0)
-
 
 def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=1000):
     """
@@ -373,24 +371,22 @@ def refine_objects_by_overlapping(base_image, refiner_image, max_cell_area=1000)
                 refined_image[current_label_mask] = 0
     return refined_image
 
-
-def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 0.99, min_cell_area = 1000):
+def add_objects_by_overlapping(base_image, single_channel_image, cells_overlap = 1.00, min_cell_area = 1000):
     """
     Adds objects from a single-channel image to a base image based on overlap conditions.
 
     This function takes a base image containing labeled connected components and
     a single-channel image representing potential objects. It adds objects from
-    the single-channel image to the base image if they meet certain overlap
-    criteria.
+    the single-channel image to the base image.
 
     Args:
         base_image (numpy.ndarray): The base image containing labeled connected
             components (assumed to be a 2D array).
         single_channel_image (numpy.ndarray): The single-channel image representing
             potential objects (assumed to be a 2D array).
-        cells_overlap (float, optional): The minimum overlap ratio between an
-            object and a connected component in the base image to be considered
-            overlapping (defaults to 0.95).
+        cells_overlap (float, optional): The maximum overlap ratio between an
+            object and a connected component (in the base image) to be added.
+            Defaults to 0.99.
         min_cell_area (int, optional): The minimum area (in pixels) for a connected
             component in the base image to be considered a cell (defaults to 4000).
 
@@ -483,8 +479,7 @@ def add_nuclei_by_overlapping(base_image, single_channel_image, cells_overlap = 
     save_image(image, "./tmp", f"Final labeled image with nuclei")
     save_segmentation_image(image, "./tmp", f"Final labeled image with nuclei (prism)", use_cmap=True)
     return image
-
-    
+  
 def get_maximum_label(image):
     """
     Calculates the maximum label value present in a labeled image.
@@ -510,7 +505,6 @@ def get_maximum_label(image):
     # Calculate the maximum label value
     max_label = np.max(unique_labels)
     return max_label
-
 
 def get_overlapping_components(original_image, marker, maximum_cells_overlap) -> tuple[Optional[int], Optional[np.ndarray], Optional[float]]:
     """

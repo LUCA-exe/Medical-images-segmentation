@@ -48,7 +48,11 @@ def load_npy_arrays_by_label(folder_path: Union[str, Path]) -> Dict[str, np.ndar
 
 
 def try_fusion_approach(images: dict) -> None:
-    # Call functions from the post-processing technique for easy testing the visual results
+    """
+    Call functions from the post-processing technique for easy testing the visual results.
+
+    This function will create multiple "debug's" plot in the temporary folder.
+    """ 
 
     # Parsing the orginal data structure
     prediction_instance = images["prediction"]
@@ -66,7 +70,7 @@ def try_fusion_approach(images: dict) -> None:
     processed_prediction = refine_objects_by_overlapping(prediction_instance, sc_prediction_instance)
     save_image(processed_prediction > 0, "./tmp", f"Refined mask overlapped image with EVs")        
 
-    # NOTE: Work in progress
+    # Optimized for metrics.
     refined_evs_prediction = add_objects_by_overlapping(processed_prediction, sc_prediction_instance)
     save_image(refined_evs_prediction, "./tmp", f"Final image with additional objects") 
     return None
