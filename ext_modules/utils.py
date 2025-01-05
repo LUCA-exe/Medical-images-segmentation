@@ -51,7 +51,7 @@ def load_masks(folder_path: str) -> list[np.ndarray]:
     masks = [imread(mask_file) for mask_file in mask_files]
 
     # NOTE: Atemption to the memory consumption
-    masks = [mask[1024:, :1024] for mask in masks]
+    masks = [mask[400: 1400, :1000] for mask in masks]
     return masks
 
 # TODO: assert type of the loaded masks - single channel and unsidegned int 16

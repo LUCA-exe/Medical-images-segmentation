@@ -24,12 +24,13 @@ from PIL import Image
 
 from ext_modules.utils import *
 from net_utils.utils import save_image
+from inference.postprocessing import remove_smaller_areas
 
 # TODO: Move to typeVerifierObject - avoid constants
 MASK_IMAGES_SUPPORTED_TYPE = [np.uint16]
 
 # Const to filter out unwanted cells for the counting
-CONSIDERED_LABEL = [12]
+CONSIDERED_LABEL = [16]
 
 def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 5000) -> dict:
     """
@@ -75,6 +76,49 @@ def get_centroids_map(labeled_image: np.ndarray, dim_filter: int = 5000) -> dict
             centroids_map[prop['label']] = centroid
     return centroids_map
 
+def get_ev_centroids_map(labeled_image: np.ndarray, dim_filter: int = 5000) -> dict:
+    """
+    Calculates centroids for connected components in a single-channel image under a certain threshold.
+
+    This function takes a grayscale image (`image`) and a minimum size filter (`dim_filter`) as input. 
+    It performs the following steps:
+
+    1. Binarizes the image using thresholding (assuming background is 0).
+    2. Identifies connected components (objects) in the binary image.
+    3. Filters out components greater than the specified `dim_filter`.
+    4. Calculates the centroid (center of mass) for each remaining connected component.
+    5. Returns a dictionary where keys are unique IDs (incrementing integers)
+        and values are NumPy arrays representing the (row, col) coordinates of the centroids.
+
+    Args:
+        image (np.ndarray): A single-channel labeled image (assumed to be 2D).
+        dim_filter (int, optional): Minimum size (number of pixels) for a connected component to be included. 
+                                    Defaults to 4000.
+
+    Returns:
+        dict: A dictionary containing centroids as key-value pairs. Keys are unique IDs (integers),
+                and values are NumPy arrays with shape (2,) representing (row, col) coordinates.
+
+    Raises:
+        ValueError: If the input image is not a single-channel grayscale image.
+    """
+
+    # NOTE: Temporary fixed list of possible types
+    if len(labeled_image.shape) != 2 or labeled_image.dtype not in MASK_IMAGES_SUPPORTED_TYPE:
+        raise ValueError("Input image must be a single-channel grayscale image (2D).")
+    region_props = measure.regionprops(labeled_image)
+
+    # Extract centroids and store in dictionary
+    centroids_map = {}
+    for prop in region_props:
+
+        # Just take the EVs
+        if prop['area'] < dim_filter:
+            centroid = prop['centroid']
+
+            # Store the tuple with the original id of the connected components
+            centroids_map[prop['label']] = centroid
+    return centroids_map
 
 def get_nearer_centroid_label(labeled_centroids: dict[int, tuple], centroid_coord: tuple, max_distance: Union[float, int] = 200) -> int:
     """
@@ -165,15 +209,8 @@ def count_evs(masked_image: np.ndarray, labeled_image: np.ndarray, expand_value:
         # Additional operations just for the debug print
         eroded_mask = binary_erosion(dilated_mask, footprint=np.ones((6, 6)))
         delimiting_area = dilated_mask & (~eroded_mask)
-
-        #save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account") 
-        #save_image(delimiting_area > 0, "./tmp", f"Current delimiting area") 
         rgb_line = plot_rgb_image_from_mask(delimiting_area > 0, idx, (masked_image.shape[0], masked_image.shape[1]))
         overlap_images(rgb_image, rgb_line, f'./tmp/overlapped_line_{idx}.png')
-
-        #plot_image_with_highlighted_mask(image = rgb_image, mask = delimiting_area, idx = idx)
-
-    #save_image(dilated_mask > 0, "./tmp", f"Current dilated cell in account")  
 
     # Filter labeled image based on overlap with dilated mask
     filtered_labeled_image = labeled_image[dilated_mask]
@@ -206,10 +243,6 @@ def plot_image_with_dots(image: np.ndarray, dots: list[tuple], file_path: str) -
     Raises:
         ValueError: If the input image is not a single-channel grayscale image.
     """
-
-    #if len(image.shape) != 2 or image.dtype not in MASK_IMAGES_SUPPORTED_TYPE:
-        #raise ValueError("Input image must be a single-channel grayscale image (2D).")
-
     # Plot the grayscale image
     plt.imshow(image)
 
@@ -256,17 +289,6 @@ def overlap_images(image1: np.ndarray, image2, output_path: str):
     image2_path (str): Path to the second image.
     output_path (str): Path where the output image will be saved.
     """
-    # Load the second image
-    #image2 = Image.open(image2_path)
-    
-    # Ensure the second image is in RGB mode
-    #if image2.mode != 'RGB':
-        #image2 = image2.convert('RGB')
-    #image2 = imread(image2_path)
-    
-    # Convert the second image to a numpy array
-    #image2 = np.array(image2)
-    
     # Ensure both images have the same dimensions
     if image1.shape != image2.shape:
         raise ValueError("The two images must have the same dimensions.")
@@ -317,11 +339,12 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
     # Get centroids from the first mask (assuming first mask represents cells)
     centroids_map = get_centroids_map(gt_masks[0], dim_filter=cells_area)
     print(f"Current identified centroids: {centroids_map}")
+    plot_image_with_dots(rgb_images[0], centroids_map.values(), os.path.join(debug_folder_path, "first_frame_example"))
 
     # Visualize centroids (taken from mask) on the first original image (optional)
     #centroids_list = centroids_map[14].values()
-    current_centroid = centroids_map[12]
-    plot_image_with_dots(rgb_images[0], [current_centroid], os.path.join(debug_folder_path, "first_frame_example"))
+    current_centroid = centroids_map[16]
+    plot_image_with_dots(rgb_images[0], [current_centroid], os.path.join(debug_folder_path, "first_frame_example with chosen cell"))
 
     # Initialize dictionary to store cell labels and corresponding EV counts
     id_evs_map = defaultdict(list)
@@ -338,8 +361,11 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
                 current_cell_mask = evs_labeled_image == reg["label"]
                 evs_labeled_image[current_cell_mask] = 0
 
-        # Visualize mask with EVs (optional)
-        save_image(evs_labeled_image > 0, debug_folder_path, f"Current labeled EVs mask of mask {idx}")
+        # Visualize mask with EVs and EV centroids
+        evs_labeled_image = remove_smaller_areas(evs_labeled_image, 30).astype(np.uint16)
+        save_image(evs_labeled_image > 0, debug_folder_path, f"Current labeled EVs mask {idx}")
+        ev_centroids = get_ev_centroids_map(evs_labeled_image, dim_filter=cells_area)
+        plot_image_with_dots(evs_labeled_image, ev_centroids.values(), os.path.join(debug_folder_path, f"Current labeled EV centroids mask {idx}"))
 
         # Get centroids for the current mask
         current_centroids_map = get_centroids_map(mask, dim_filter=cells_area)
@@ -356,9 +382,6 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
                 # Take the mask of the current cell label
                 current_cell_mask = mask == current_cell_label
                 
-                # Debug plot
-                #save_image(current_cell_mask > 0, "./tmp", f"Current label referenced: {current_cell_label} - frame: {idx}") 
-                
                 # Make two times the count of EVs using different expansion values
                 current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_images[idx], idx = idx)
                 id_evs_map[label].append(current_evs)
@@ -368,9 +391,9 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
 if __name__ == '__main__':
      
     # TODO: Testing the features
-    masks_path = "/content/Medical-images-segmentation/training_data/Fluo-O2DV-count/01_RES_Fluo-E2DV-train_GT_01_320_kit-ge_original-dual-unet_02_0.02_0.01"
+    masks_path = "training_data/seg_masks/"
     # NOTE: Temorary position
-    rgb_images_paths = "/content/Medical-images-segmentation/training_data/Fluo-O2DV-count/01"
+    rgb_images_paths = "training_data/Fluo-M2DR-count/01"
 
     # Add original path to load the original RGB image for delinneation
     cells_area = 5000
@@ -379,11 +402,3 @@ if __name__ == '__main__':
 
     evs_counter = count_small_connected_components(rgb_images_paths, masks_path, cells_area, expanding_val)
     print(evs_counter)
-    # Save teh dict in a jsopn format for clarity - add utils function in this module
-
-
-
-
-
-
-
