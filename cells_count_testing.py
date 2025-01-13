@@ -328,6 +328,9 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
         ValueError: If `hard_expanding_val` is greater than or equal to `soft_expanding_val`.
     """
 
+    # Temporary addition: list of evs pixel over total
+    evs_ratio = []
+
     # Load all masks from the folder
     gt_masks = load_masks(masks_path)
     rgb_images = load_masks(rgb_images_paths)
@@ -352,18 +355,23 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
     # Process each mask (image)
     for idx, mask in tqdm(enumerate(gt_masks)):
         print(f".. Analyzing mask {idx} ..")
-
-        # Keep only small components (potential EVs)
+        # Keep track of cell area
+        current_cell_area = 0
+        # Keep only small components (potential EVs)    
         evs_labeled_image = mask.copy()  # Avoid modifying the original mask
         for reg in measure.regionprops(evs_labeled_image):
             if reg["area"] > cells_area:
                 # Remove regions exceeding the cell area threshold
                 current_cell_mask = evs_labeled_image == reg["label"]
+                current_cell_area += reg["area"]
                 evs_labeled_image[current_cell_mask] = 0
 
         # Visualize mask with EVs and EV centroids
         evs_labeled_image = remove_smaller_areas(evs_labeled_image, 30).astype(np.uint16)
         save_image(evs_labeled_image > 0, debug_folder_path, f"Current labeled EVs mask {idx}")
+        # Load the evs ratio over the total segmented area
+        evs_ratio.append(round(sum(sum(evs_labeled_image > 0))/current_cell_area * 100, 3))
+
         ev_centroids = get_ev_centroids_map(evs_labeled_image, dim_filter=cells_area)
         plot_image_with_dots(evs_labeled_image, ev_centroids.values(), os.path.join(debug_folder_path, f"Current labeled EV centroids mask {idx}"))
 
@@ -385,7 +393,7 @@ def count_small_connected_components(rgb_images_paths, masks_path: str, cells_ar
                 # Make two times the count of EVs using different expansion values
                 current_evs = count_evs(current_cell_mask, evs_labeled_image, expand_value = expanding_val, dim_filter = cells_area, rgb_image = rgb_images[idx], idx = idx)
                 id_evs_map[label].append(current_evs)
-    return id_evs_map
+    return id_evs_map, evs_ratio
  
 
 if __name__ == '__main__':
@@ -400,5 +408,5 @@ if __name__ == '__main__':
     # NOTE: Soft and hard expanding values are use to count EVs - two values to provide more information about circultaing EVs
     expanding_val = 30
 
-    evs_counter = count_small_connected_components(rgb_images_paths, masks_path, cells_area, expanding_val)
-    print(evs_counter)
+    evs_counter, evs_ratio = count_small_connected_components(rgb_images_paths, masks_path, cells_area, expanding_val)
+    print(evs_counter, evs_ratio)
