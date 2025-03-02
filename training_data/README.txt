@@ -1,4 +1,5 @@
-# Datasets folder path
+# Training datasets
+The datasets are contained Medical-images-segmentation/training_data
 
 ## 1. Overview
 This datasets are intended for image segmentation and follow a specific format.

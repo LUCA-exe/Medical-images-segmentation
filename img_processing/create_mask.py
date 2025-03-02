@@ -1,7 +1,9 @@
-"""This module containing a method to create segmentation masks from the 'annotation.json' (computed trough VIA).
+"""This module containing a method to create segmentation masks.
+
 It will create both 'man_seg*.tiff' and 'man_track*.tiff' for every original image from the '*.json' file
 created trough VIA.
 
+VIA Tool: https://www.robots.ox.ac.uk/~vgg/software/via/via_demo.html
 The method is inspired by https://github.com/maftouni/binary_mask_from_json/blob/main/binary_mask_from_json.py.
 """
 from copy import copy
@@ -19,9 +21,9 @@ from img_processing.imageUtils import visualize_image, visualize_mask
 DEBUG_PATH = './tmp' # Folder for debug visualization
 N_IMAGES = 2 # Number of images to print for the 
 
-
-def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
-    
+def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers) -> None:
+    """
+    """
     # Clean and set up the debugging folder
     try:
         shutil.rmtree(DEBUG_PATH, ignore_errors=True)
@@ -41,47 +43,33 @@ def debug_frames(file_names, d_images, d_drawed_images, d_masks, d_markers):
         visualize_image(drawed_images, os.path.join(DEBUG_PATH, f"drawed_{name}"))
         visualize_mask(mask, os.path.join(DEBUG_PATH, f"man_seg{name.split('t')[-1]}"))
         visualize_mask(marker, os.path.join(DEBUG_PATH, f"man_track{name.split('t')[-1]}"))
-    
     print(f"The {N_IMAGES} images annotation process is shown on the {DEBUG_PATH}!")
-
-    return None
 
 def create_masks_from_json(json_file: str, 
                            images_folder: str, 
                            seg_folder: str, 
                            pixels_limit: Union[int, float] = 7000, 
                            reducing_ratio: float = 0.2): 
-    """
-    
-    
+    """ Function that reads from a JSON file and create the segmentation and tracking masks.
     
     Args:
         pixel_limit: needed for the adusting of the marker dimension (smaller marker in case of cells).
         reducing_ratio: Factor to reduce the initial marker dimension.
     """
-    # 'pixel_limit' needed for the adusting of the marker dimension (smaller marker in case of cells)
-    
-
     print("*** Creation of the segmentation masks ***")
     print(f"Working on {json_file} ..")
-
     with open(json_file, 'r') as read_file:
         data = json.load(read_file)
-
     all_file_names=list(data.keys())
-    print(f"Read {len(all_file_names)} names from the '*.json' file:  {all_file_names}")
-
+    print(f"There is {len(all_file_names)} names in the '{json_file}' file:  {all_file_names}")
     images_names = []
-    # Gather the name of the images to segment - can use 'listdir'
     for root, dirs, files in os.walk(images_folder, topdown=True):
         print(f"Reading images in '{root}'")
-        
         for filename in files:
             print(f".. Reading {filename} ..")
             images_names.append(filename)
 
     d_names, d_images, d_drawed_images, d_masks, d_markers = [], [], [], [], []  
-
     for name in all_file_names: # Loop over the original filenames - order of the '.json' keys mantained.
 
         image_name = data[name]['filename'] # Extract the current 'real' images filename 
@@ -193,7 +181,5 @@ def create_masks_from_json(json_file: str,
                 print(f"Saved '{track_name}'")
             else:
                 print(f"Error when saving '{track_name}' !")
-
-    # NOTE: Calling visual debug functions
     debug_frames(d_names, d_images, d_drawed_images, d_masks, d_markers)
     return None
